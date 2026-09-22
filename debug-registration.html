@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .participant { 
+            border: 2px solid #ccc; 
+            padding: 10px; 
+            margin: 5px; 
+            cursor: pointer; 
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .participant.selected { 
+            border-color: #3b82f6; 
+            background-color: #eff6ff; 
+        }
+        .participant.disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+        }
+        .register-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .register-btn.enabled {
+            background-color: #16a34a;
+            color: white;
+        }
+        .register-btn.disabled {
+            background-color: #9ca3af;
+            color: white;
+            cursor: not-allowed;
+        }
+        .debug { 
+            background: #f3f4f6; 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin: 10px 0; 
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Registration Debug Test</h1>
+        <p>This simulates the participant selection logic. Try selecting exactly 3 participants.</p>
+        
+        <div class="debug">
+            <strong>Debug Info:</strong><br>
+            Selected: <span id="selected-count">0</span> / 3<br>
+            Selected IDs: <span id="selected-ids">[]</span><br>
+            Button Enabled: <span id="button-enabled">false</span>
+        </div>
+
+        <h3>Available Participants:</h3>
+        <div id="participants">
+            <div class="participant" data-id="SMD001">SMD001 - Ahmed Ali</div>
+            <div class="participant" data-id="SMD002">SMD002 - Fatima Hassan</div>
+            <div class="participant" data-id="SMD003">SMD003 - Omar Khalil</div>
+            <div class="participant" data-id="SMD004">SMD004 - Aisha Rahman</div>
+            <div class="participant" data-id="SMD005">SMD005 - Yusuf Ibrahim</div>
+        </div>
+
+        <button id="register-btn" class="register-btn disabled" disabled>
+            SELECT 3 PARTICIPANTS
+        </button>
+    </div>
+
+    <script>
+        let selectedParticipants = [];
+        const requiredParticipants = 3;
+
+        function updateUI() {
+            const selectedCount = selectedParticipants.length;
+            const isValid = selectedCount === requiredParticipants;
+            
+            // Update debug info
+            document.getElementById('selected-count').textContent = selectedCount;
+            document.getElementById('selected-ids').textContent = JSON.stringify(selectedParticipants);
+            document.getElementById('button-enabled').textContent = isValid;
+            
+            // Update participants
+            document.querySelectorAll('.participant').forEach(p => {
+                const id = p.dataset.id;
+                const isSelected = selectedParticipants.includes(id);
+                const isDisabled = !isSelected && selectedCount >= requiredParticipants;
+                
+                p.classList.toggle('selected', isSelected);
+                p.classList.toggle('disabled', isDisabled);
+            });
+            
+            // Update button
+            const btn = document.getElementById('register-btn');
+            if (isValid) {
+                btn.className = 'register-btn enabled';
+                btn.disabled = false;
+                btn.textContent = '🎉 REGISTER TEAM';
+            } else {
+                btn.className = 'register-btn disabled';
+                btn.disabled = true;
+                btn.textContent = selectedCount === 0 
+                    ? 'SELECT 3 PARTICIPANTS' 
+                    : `NEED ${requiredParticipants - selectedCount} MORE`;
+            }
+        }
+
+        function toggleParticipant(id) {
+            console.log('Toggling:', id);
+            console.log('Current selected:', selectedParticipants);
+            
+            if (selectedParticipants.includes(id)) {
+                // Remove
+                selectedParticipants = selectedParticipants.filter(p => p !== id);
+                console.log('Removed, new selection:', selectedParticipants);
+            } else if (selectedParticipants.length < requiredParticipants) {
+                // Add
+                selectedParticipants.push(id);
+                console.log('Added, new selection:', selectedParticipants);
+            } else {
+                console.log('Cannot add - limit reached');
+                alert('Maximum 3 participants allowed!');
+                return;
+            }
+            
+            updateUI();
+        }
+
+        // Event listeners
+        document.querySelectorAll('.participant').forEach(p => {
+            p.addEventListener('click', () => {
+                const id = p.dataset.id;
+                const isSelected = selectedParticipants.includes(id);
+                const isDisabled = !isSelected && selectedParticipants.length >= requiredParticipants;
+                
+                if (!isDisabled || isSelected) {
+                    toggleParticipant(id);
+                }
+            });
+        });
+
+        document.getElementById('register-btn').addEventListener('click', () => {
+            if (selectedParticipants.length === requiredParticipants) {
+                alert('Registration successful! Selected: ' + selectedParticipants.join(', '));
+            } else {
+                alert('Please select exactly 3 participants');
+            }
+        });
+
+        // Initialize
+        updateUI();
+    </script>
+</body>
+</html>

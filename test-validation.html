@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Validation Logic</title>
+</head>
+<body>
+    <h1>Testing Registration Validation Logic</h1>
+    
+    <script>
+        // Simulate the issue
+        console.log('=== TESTING VALIDATION LOGIC ===');
+        
+        // Original issue - programme.requiredParticipants might be string
+        const programme1 = { requiredParticipants: "3" }; // String from database
+        const programme2 = { requiredParticipants: 3 };   // Number from database
+        
+        const selectedParticipants = ["401", "402", "403"]; // 3 selected
+        
+        console.log('Test 1 - String requiredParticipants:');
+        console.log('- Selected count:', selectedParticipants.length);
+        console.log('- Required (string):', programme1.requiredParticipants, typeof programme1.requiredParticipants);
+        console.log('- Direct comparison (===):', selectedParticipants.length === programme1.requiredParticipants);
+        console.log('- With Number() conversion:', selectedParticipants.length === Number(programme1.requiredParticipants));
+        
+        console.log('\nTest 2 - Number requiredParticipants:');
+        console.log('- Selected count:', selectedParticipants.length);
+        console.log('- Required (number):', programme2.requiredParticipants, typeof programme2.requiredParticipants);
+        console.log('- Direct comparison (===):', selectedParticipants.length === programme2.requiredParticipants);
+        console.log('- With Number() conversion:', selectedParticipants.length === Number(programme2.requiredParticipants));
+        
+        console.log('\n=== CONCLUSION ===');
+        console.log('The fix using Number() conversion should work for both string and number types!');
+        
+        // Test button enable logic
+        const isSubmitting = false;
+        
+        console.log('\nButton Enable Tests:');
+        console.log('- String type button enabled:', selectedParticipants.length === Number(programme1.requiredParticipants) && !isSubmitting);
+        console.log('- Number type button enabled:', selectedParticipants.length === Number(programme2.requiredParticipants) && !isSubmitting);
+        
+        document.body.innerHTML += '<h2>Check Console for Results</h2>';
+        document.body.innerHTML += '<p>The fix should work! Try registering again in the team admin portal.</p>';
+    </script>
+</body>
+</html>
