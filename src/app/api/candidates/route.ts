@@ -17,7 +17,6 @@ export async function GET(request: Request) {
     let query: any = {
       name: { $exists: true, $ne: '', $ne: null },
       chestNumber: { $exists: true, $ne: '', $ne: null },
-      team: { $exists: true, $ne: '', $ne: null },
       section: { $exists: true, $ne: '', $ne: null }
     };
     

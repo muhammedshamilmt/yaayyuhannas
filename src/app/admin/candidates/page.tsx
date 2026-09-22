@@ -11,6 +11,8 @@ export default function CandidatesPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCandidate, setEditCandidate] = useState({
@@ -30,8 +32,6 @@ export default function CandidatesPage() {
       candidate.name.trim() !== '' &&
       candidate.chestNumber &&
       candidate.chestNumber.trim() !== '' &&
-      candidate.team &&
-      candidate.team.trim() !== '' &&
       candidate.section &&
       candidate.section.trim() !== ''
     );
@@ -139,9 +139,20 @@ export default function CandidatesPage() {
   };
 
   // Filter candidates by selected team
-  const filteredCandidates = selectedTeam === 'all' 
+  const allFilteredCandidates = selectedTeam === 'all' 
     ? candidates 
     : candidates.filter(candidate => candidate.team === selectedTeam);
+
+  const totalPages = Math.max(1, Math.ceil(allFilteredCandidates.length / itemsPerPage));
+  const filteredCandidates = allFilteredCandidates.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset page when team filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedTeam]);
 
   // Group candidates by team for statistics
   const candidatesByTeam = teams.map(team => ({
@@ -239,7 +250,7 @@ export default function CandidatesPage() {
                 </div>
                 
                 <div className="text-sm text-gray-600">
-                  Showing {filteredCandidates.length} of {candidates.length} candidates
+                  Showing {Math.min((currentPage - 1) * itemsPerPage + 1, allFilteredCandidates.length)}-{Math.min(currentPage * itemsPerPage, allFilteredCandidates.length)} of {allFilteredCandidates.length} candidates
                 </div>
               </div>
 
@@ -408,6 +419,29 @@ export default function CandidatesPage() {
                       })}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* Pagination Controls */}
+              {allFilteredCandidates.length > 0 && totalPages > 1 && (
+                <div className="flex justify-between items-center mt-4 p-4 bg-white border-t border-gray-200">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-gray-600">
+                    Page <span className="font-semibold text-gray-900">{currentPage}</span> of <span className="font-semibold text-gray-900">{totalPages}</span>
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
                 </div>
               )}
             </>
