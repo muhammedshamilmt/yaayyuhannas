@@ -15,25 +15,7 @@ export async function POST(request: Request) {
 
     const db = await getDatabase();
     
-    // 1. Get current draft state
-    const draftState = await db.collection('draft_state').findOne({});
-    
-    if (!draftState || draftState.status !== 'in_progress') {
-      return NextResponse.json(
-        { success: false, message: 'Draft is not active' },
-        { status: 400 }
-      );
-    }
-
-    // 2. Validate turn
-    if (draftState.currentTurn !== teamCode) {
-      return NextResponse.json(
-        { success: false, message: `It is not your turn. Current turn: ${draftState.currentTurn}` },
-        { status: 403 }
-      );
-    }
-
-    // 3. Ensure candidate exists and is not already picked
+    // Ensure candidate exists and is not already picked
     const candidateQuery = ObjectId.isValid(candidateId) ? { _id: new ObjectId(candidateId) } : { _id: candidateId };
     const candidate = await db.collection('candidates').findOne(candidateQuery);
 
@@ -51,40 +33,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. Draft candidate
+    // Draft candidate
     await db.collection('candidates').updateOne(
       candidateQuery,
       { $set: { team: teamCode, updatedAt: new Date() } }
     );
 
-    // 5. Calculate next turn (Snake Draft logic)
-    const numTeams = draftState.turnOrder.length;
-    const nextPickNumber = draftState.pickNumber + 1;
-    const nextRound = Math.floor((nextPickNumber - 1) / numTeams) + 1;
-    const pickInRound = (nextPickNumber - 1) % numTeams;
-    const isReversedRound = nextRound % 2 === 0;
-    
-    // Base order is always the turnOrder from round 1 (or sorted list)
-    // We assume turnOrder stored in state is the base order (e.g. ['team1', 'team2', 'team3'])
-    const index = isReversedRound ? (numTeams - 1 - pickInRound) : pickInRound;
-    const nextTurn = draftState.turnOrder[index];
-
-    const nextState = {
-      pickNumber: nextPickNumber,
-      round: nextRound,
-      currentTurn: nextTurn,
-      updatedAt: new Date()
-    };
-
-    await db.collection('draft_state').updateOne(
-      { _id: draftState._id },
-      { $set: nextState }
-    );
-
     return NextResponse.json({
       success: true,
       message: 'Candidate drafted successfully',
-      draftState: { ...draftState, ...nextState }
+      draftState: null
     });
 
   } catch (error) {

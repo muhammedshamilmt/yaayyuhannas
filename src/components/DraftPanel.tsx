@@ -147,7 +147,7 @@ export function DraftPanel() {
     );
   }
 
-  const isMyTurn = activeTeamCode && draftState?.currentTurn === activeTeamCode;
+  const canPick = !!activeTeamCode;
   const currentTeam = teams.find(t => t.code === draftState?.currentTurn);
 
   const filteredCandidates = candidates.filter(candidate => {
@@ -166,17 +166,15 @@ export function DraftPanel() {
 
       <div className="space-y-6">
 
-        <div className={`border rounded-lg p-6 ${isMyTurn ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'} shadow-sm`}>
+        <div className={`border rounded-lg p-6 ${canPick ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'} shadow-sm`}>
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold mb-2">
-                {draftState?.status === 'in_progress' ? `Round ${draftState.round} - Pick ${draftState.pickNumber}` : 'Draft Not Started'}
+                Team Draft (Manual Selection)
               </h2>
-              {draftState?.status === 'in_progress' && (
-                <p className="text-lg text-gray-700">
-                  Current Turn: <span className="font-bold text-blue-700">{currentTeam?.name || draftState.currentTurn}</span>
-                </p>
-              )}
+              <p className="text-lg text-gray-700">
+                You can freely select candidates for your team below.
+              </p>
             </div>
 
 
@@ -219,9 +217,9 @@ export function DraftPanel() {
               </div>
             )}
 
-            {isMyTurn && (
-              <div className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold animate-pulse">
-                Your Turn! Select a candidate below.
+            {canPick && (
+              <div className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold">
+                You can select candidates.
               </div>
             )}
           </div>
@@ -263,13 +261,13 @@ export function DraftPanel() {
                     <td className="py-3 px-4">
                       <button
                         onClick={() => handlePickCandidate(candidate._id as string)}
-                        disabled={!isMyTurn}
-                        className={`px-4 py-1.5 rounded-lg font-medium text-sm transition ${isMyTurn
+                        disabled={!canPick}
+                        className={`px-4 py-1.5 rounded-lg font-medium text-sm transition ${canPick
                           ? 'bg-blue-600 text-white hover:bg-blue-700'
                           : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                           }`}
                       >
-                        {isMyTurn ? 'Select' : 'Wait Turn'}
+                        {canPick ? 'Select' : 'Wait Turn'}
                       </button>
                     </td>
                   </tr>
