@@ -11,6 +11,7 @@ export default function CandidatesPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
   
@@ -25,13 +26,22 @@ export default function CandidatesPage() {
     team: ''
   });
 
+  const [isAdding, setIsAdding] = useState(false);
+  const [newCandidate, setNewCandidate] = useState({
+    chestNumber: '',
+    name: '',
+    section: 'senior' as 'senior' | 'junior' | 'sub-junior',
+    team: '',
+    profileImage: null as string | null,
+    profileImageMimeType: undefined as string | undefined,
+    profileImageSize: undefined as number | undefined
+  });
+
   // Filter out blank/empty candidates
   const filterValidCandidates = (candidates: Candidate[]) => {
     return candidates.filter(candidate =>
       candidate.name &&
       candidate.name.trim() !== '' &&
-      candidate.chestNumber &&
-      candidate.chestNumber.trim() !== '' &&
       candidate.section &&
       candidate.section.trim() !== ''
     );
@@ -89,6 +99,40 @@ export default function CandidatesPage() {
     }
   };
 
+  const handleAddCandidate = async () => {
+    if (!newCandidate.name || !newCandidate.section) {
+      alert("Please fill all required fields (Name, Section).");
+      return;
+    }
+    try {
+      const response = await fetch('/api/candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCandidate)
+      });
+      if (response.ok) {
+        setIsAdding(false);
+        setNewCandidate({
+          chestNumber: '',
+          name: '',
+          section: 'senior',
+          team: '',
+          profileImage: null,
+          profileImageMimeType: undefined,
+          profileImageSize: undefined
+        });
+        fetchData();
+        alert('Candidate added successfully!');
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.error || 'Failed to add candidate'}`);
+      }
+    } catch (error) {
+      console.error('Error adding candidate:', error);
+      alert('Error adding candidate');
+    }
+  };
+
   const deleteCandidate = async (candidateId: string, candidateName: string) => {
     if (!confirm(`Are you sure you want to delete "${candidateName}"? This action cannot be undone.`)) {
       return;
@@ -138,10 +182,14 @@ export default function CandidatesPage() {
     });
   };
 
-  // Filter candidates by selected team
-  const allFilteredCandidates = selectedTeam === 'all' 
-    ? candidates 
-    : candidates.filter(candidate => candidate.team === selectedTeam);
+  // Filter candidates by selected team and search query
+  const allFilteredCandidates = candidates.filter(candidate => {
+    const matchesTeam = selectedTeam === 'all' || candidate.team === selectedTeam;
+    const matchesSearch = searchQuery === '' || 
+      candidate.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      candidate.chestNumber?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesTeam && matchesSearch;
+  });
 
   const totalPages = Math.max(1, Math.ceil(allFilteredCandidates.length / itemsPerPage));
   const filteredCandidates = allFilteredCandidates.slice(
@@ -149,10 +197,10 @@ export default function CandidatesPage() {
     currentPage * itemsPerPage
   );
 
-  // Reset page when team filter changes
+  // Reset page when team filter or search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedTeam]);
+  }, [selectedTeam, searchQuery]);
 
   // Group candidates by team for statistics
   const candidatesByTeam = teams.map(team => ({
@@ -232,25 +280,45 @@ export default function CandidatesPage() {
           ) : (
             <>
               {/* Filter Controls */}
-              <div className="mb-6 flex justify-between items-center">
-                <div className="flex items-center space-x-4">
-                  <label className="text-sm font-medium text-gray-700">Filter by Team:</label>
-                  <select
-                    value={selectedTeam}
-                    onChange={(e) => setSelectedTeam(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                  >
-                    <option value="all">All Teams ({candidates.length})</option>
-                    {teams.map((team) => (
-                      <option key={team.code} value={team.code}>
-                        {team.name} ({candidates.filter(c => c.team === team.code).length})
-                      </option>
-                    ))}
-                  </select>
+              <div className="mb-6 flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full lg:w-auto">
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Filter by Team:</label>
+                    <select
+                      value={selectedTeam}
+                      onChange={(e) => setSelectedTeam(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    >
+                      <option value="all">All Teams ({candidates.length})</option>
+                      {teams.map((team) => (
+                        <option key={team.code} value={team.code}>
+                          {team.name} ({candidates.filter(c => c.team === team.code).length})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="w-full sm:w-64">
+                    <input
+                      type="text"
+                      placeholder="Search name or chest no..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    />
+                  </div>
                 </div>
                 
-                <div className="text-sm text-gray-600">
-                  Showing {Math.min((currentPage - 1) * itemsPerPage + 1, allFilteredCandidates.length)}-{Math.min(currentPage * itemsPerPage, allFilteredCandidates.length)} of {allFilteredCandidates.length} candidates
+                <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full lg:w-auto">
+                  <div className="text-sm text-gray-600">
+                    Showing {Math.min((currentPage - 1) * itemsPerPage + 1, allFilteredCandidates.length)}-{Math.min(currentPage * itemsPerPage, allFilteredCandidates.length)} of {allFilteredCandidates.length} candidates
+                  </div>
+                  <button
+                    onClick={() => setIsAdding(true)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition whitespace-nowrap"
+                  >
+                    + Add Candidate
+                  </button>
                 </div>
               </div>
 
@@ -281,6 +349,86 @@ export default function CandidatesPage() {
                       </tr>
                     </thead>
                     <tbody>
+                      {isAdding && (
+                        <tr className="border-b border-gray-100 bg-blue-50">
+                          <td className="py-3 px-4">
+                            <ImageUpload
+                              currentImage={newCandidate.profileImage || undefined}
+                              onImageChange={(imageData, mimeType, size) => {
+                                setNewCandidate({
+                                  ...newCandidate,
+                                  profileImage: imageData,
+                                  profileImageMimeType: mimeType,
+                                  profileImageSize: size
+                                });
+                              }}
+                              name="New"
+                              size="sm"
+                              shape="circle"
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <input
+                              type="text"
+                              placeholder="Chest No"
+                              value={newCandidate.chestNumber}
+                              onChange={(e) => setNewCandidate({...newCandidate, chestNumber: e.target.value})}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <input
+                              type="text"
+                              placeholder="Name"
+                              value={newCandidate.name}
+                              onChange={(e) => setNewCandidate({...newCandidate, name: e.target.value})}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <select
+                              value={newCandidate.team}
+                              onChange={(e) => setNewCandidate({...newCandidate, team: e.target.value})}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            >
+                              <option value="">No Team</option>
+                              {teams.map(t => (
+                                <option key={t.code} value={t.code}>{t.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-3 px-4">
+                            <select
+                              value={newCandidate.section}
+                              onChange={(e) => setNewCandidate({...newCandidate, section: e.target.value as any})}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            >
+                              <option value="senior">Senior</option>
+                              <option value="junior">Junior</option>
+                              <option value="sub-junior">Sub Junior</option>
+                            </select>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-bold text-gray-900">0</span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex flex-col space-y-1">
+                              <button
+                                onClick={handleAddCandidate}
+                                className="text-white bg-green-600 hover:bg-green-700 text-xs font-medium px-2 py-1 rounded border border-green-700"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setIsAdding(false)}
+                                className="text-gray-600 hover:text-gray-900 text-xs font-medium bg-gray-100 px-2 py-1 rounded border border-gray-200"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                       {filteredCandidates.map((candidate) => {
                         const team = teams.find(t => t.code === candidate.team);
                         const isEditing = editingId === candidate._id?.toString();

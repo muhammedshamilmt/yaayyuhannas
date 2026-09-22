@@ -15,6 +15,7 @@ export function DraftPanel() {
   const activeTeamCode = urlTeam || user?.team?.code;
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [teams, setTeams] = useState<Team[]>([]);
   const [draftState, setDraftState] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -149,6 +150,16 @@ export function DraftPanel() {
   const isMyTurn = activeTeamCode && draftState?.currentTurn === activeTeamCode;
   const currentTeam = teams.find(t => t.code === draftState?.currentTurn);
 
+  const filteredCandidates = candidates.filter(candidate => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      candidate.name?.toLowerCase().includes(query) ||
+      candidate.chestNumber?.toLowerCase().includes(query) ||
+      candidate.section?.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <>
       <Breadcrumb pageName="Team Member Draft" />
@@ -218,6 +229,15 @@ export function DraftPanel() {
 
         {/* Candidates List */}
         <ShowcaseSection title="Available Candidates">
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search by name, chest number, or section..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full sm:w-1/2 md:w-1/3 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
@@ -229,7 +249,7 @@ export function DraftPanel() {
                 </tr>
               </thead>
               <tbody>
-                {candidates.map(candidate => (
+                {filteredCandidates.map(candidate => (
                   <tr key={candidate._id?.toString()} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-3 px-4 capitalize font-semibold text-purple-700">
                       {candidate.section}
@@ -254,10 +274,10 @@ export function DraftPanel() {
                     </td>
                   </tr>
                 ))}
-                {candidates.length === 0 && (
+                {filteredCandidates.length === 0 && (
                   <tr>
                     <td colSpan={4} className="text-center py-8 text-gray-500">
-                      No available candidates.
+                      {candidates.length === 0 ? "No available candidates." : "No candidates match your search."}
                     </td>
                   </tr>
                 )}

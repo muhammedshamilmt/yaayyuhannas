@@ -16,7 +16,6 @@ export async function GET(request: Request) {
     // Build query with team filter if provided
     let query: any = {
       name: { $exists: true, $ne: '', $ne: null },
-      chestNumber: { $exists: true, $ne: '', $ne: null },
       section: { $exists: true, $ne: '', $ne: null }
     };
     
