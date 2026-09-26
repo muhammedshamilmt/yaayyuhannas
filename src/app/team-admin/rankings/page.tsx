@@ -6,7 +6,21 @@ import { Team, Candidate, Result } from '@/types';
 
 export default function TeamRankingsPage() {
   const searchParams = useSearchParams();
-  const teamCode = searchParams.get('team') || 'SMD';
+  const getFallbackTeam = () => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('selectedTeam');
+      if (saved) return saved;
+      try {
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (u.team?.code) return u.team.code;
+        }
+      } catch (e) {}
+    }
+    return 'SMD';
+  };
+  const teamCode = searchParams.get('team') || getFallbackTeam();
   
   const [teams, setTeams] = useState<Team[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);

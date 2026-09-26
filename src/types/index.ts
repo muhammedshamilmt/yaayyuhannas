@@ -9,6 +9,7 @@ export interface Team {
   motto?: string;
   captain: string;
   captainEmail?: string;
+  adminEmails?: string[];
   leaders?: string[];
   members: number;
   points: number;
@@ -33,6 +34,7 @@ export interface Programme {
   thirdPoints?: number; // Custom points for 3rd place
   participationPoints?: number; // Custom points for participation
   status: 'active' | 'inactive' | 'completed';
+  isOver?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -86,6 +88,8 @@ export interface FestivalInfo {
   venue: string;
   description: string;
   status: 'upcoming' | 'ongoing' | 'completed';
+  minCandidateParticipation?: number;
+  maxCandidateParticipation?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }

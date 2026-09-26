@@ -5,6 +5,7 @@ import { SignInPage, Testimonial } from "@/components/ui/sign-in";
 import { signInWithGoogle, signOutUser } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 const sampleTestimonials: Testimonial[] = [
   {
@@ -31,6 +32,7 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleSignIn = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -48,13 +50,21 @@ const Login = () => {
       if (data.email && data.password) {
         const displayName = data.email.split('@')[0];
         const avatarUrl = `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(displayName)}`;
+        const isAdmin = data.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL;
 
-        localStorage.setItem('currentUser', JSON.stringify({
+        const userData = {
           name: displayName,
           email: data.email,
           avatarUrl,
-          isAdmin: data.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL,
-        }));
+          isAdmin,
+          userType: (isAdmin ? 'admin' : 'user') as 'admin' | 'user',
+        };
+
+        try {
+          login(userData);
+        } catch (e) {
+          localStorage.setItem('currentUser', JSON.stringify(userData));
+        }
 
         toast({
           title: "Welcome back!",
@@ -62,11 +72,7 @@ const Login = () => {
         });
 
         // Redirect based on admin status
-        if (data.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
-          router.push('/admin');
-        } else {
-          router.push('/');
-        }
+        window.location.href = isAdmin ? '/admin' : '/';
       }
     } catch (error: any) {
       console.error('Login error:', error);
@@ -107,7 +113,15 @@ const Login = () => {
         throw new Error('Failed to verify team membership');
       }
 
-      let userData;
+      let userData: {
+        name: string;
+        email: string;
+        avatarUrl: string;
+        userType: 'admin' | 'team-captain' | 'user';
+        isAdmin: boolean;
+        authProvider: string;
+        team?: any;
+      };
       let redirectPath = '/';
       let welcomeMessage = `Signed in as ${displayName}`;
 
@@ -133,8 +147,8 @@ const Login = () => {
           team: team,
           authProvider: 'google',
         };
-        redirectPath = '/team-admin';
-        welcomeMessage += ` (${team.name} Captain)`;
+        redirectPath = `/team-admin?team=${team.code}`;
+        welcomeMessage += ` (${team.name} Admin)`;
       } else {
         userData = {
           name: displayName,
@@ -149,14 +163,24 @@ const Login = () => {
 
       // Store user data in localStorage
       localStorage.setItem('currentUser', JSON.stringify(userData));
+      if (userData.team?.code) {
+        localStorage.setItem('selectedTeam', userData.team.code);
+      }
+
+      // Synchronize in-memory auth state
+      try {
+        login(userData);
+      } catch (authErr) {
+        console.error('Error synchronizing auth context:', authErr);
+      }
 
       toast({
         title: 'Welcome!',
         description: welcomeMessage,
       });
 
-      // Redirect based on user type
-      router.push(redirectPath);
+      // Full window navigation ensures all contexts and layouts reload with fresh auth state
+      window.location.href = redirectPath;
 
     } catch (error: any) {
       console.error('Google sign-in error:', error);

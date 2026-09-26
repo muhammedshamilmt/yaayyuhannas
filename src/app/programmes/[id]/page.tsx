@@ -115,6 +115,7 @@ export default function ProgrammeDetailPage() {
   };
 
   const getProgrammeStatus = () => {
+    if (programme?.status === 'completed' || (programme as any)?.isOver) return 'over';
     const programmeResults = getProgrammeResults();
     if (programmeResults.length > 0) return 'completed';
     if (programme?.status === 'active') return 'active';
@@ -123,15 +124,17 @@ export default function ProgrammeDetailPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'active': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'upcoming': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'over': return 'bg-rose-100 text-rose-800 border-rose-300 font-bold';
+      case 'completed': return 'bg-green-100 text-green-800 border-green-200 font-bold';
+      case 'active': return 'bg-blue-100 text-blue-800 border-blue-200 font-bold';
+      case 'upcoming': return 'bg-yellow-100 text-yellow-800 border-yellow-200 font-bold';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case 'over': return '🛑';
       case 'completed': return '✅';
       case 'active': return '🔄';
       case 'upcoming': return '⏰';
@@ -218,6 +221,20 @@ export default function ProgrammeDetailPage() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        {status === 'over' && (
+          <div className="mb-8 p-5 bg-gradient-to-r from-rose-50 to-red-50 border-2 border-rose-300 rounded-2xl flex items-center gap-4 text-rose-900 shadow-sm animate-pulse">
+            <div className="w-12 h-12 rounded-xl bg-rose-600 flex items-center justify-center text-2xl text-white shrink-0 shadow">
+              🛑
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Programme is Finished / Over</h2>
+              <p className="text-rose-700 text-sm mt-0.5">
+                This programme has concluded. New registrations and participant modifications are locked and no longer permitted.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-xl shadow-sm border p-6 text-center">

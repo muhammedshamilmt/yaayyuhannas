@@ -1,15 +1,182 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
+import { FestivalInfo } from "@/types";
 
 export default function SettingsPage() {
+  const [loading, setLoading] = useState(true);
+  const [savingFestival, setSavingFestival] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState({
+    name: 'Wattaqa Arts Festival 2K25',
+    year: '2025',
+    startDate: '2025-03-10',
+    endDate: '2025-03-16',
+    venue: 'Wattaqa School Campus',
+    description: 'Annual arts and sports festival celebrating creativity, talent, and teamwork among students.',
+    minCandidateParticipation: 1,
+    maxCandidateParticipation: 3,
+  });
+
+  useEffect(() => {
+    async function loadFestivalInfo() {
+      try {
+        const res = await fetch('/api/festival-info');
+        if (res.ok) {
+          const data: FestivalInfo = await res.json();
+          setFormData({
+            name: data.name || 'Wattaqa Arts Festival 2K25',
+            year: data.year || '2025',
+            startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '2025-03-10',
+            endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '2025-03-16',
+            venue: data.venue || 'Wattaqa School Campus',
+            description: data.description || '',
+            minCandidateParticipation: data.minCandidateParticipation ?? 1,
+            maxCandidateParticipation: data.maxCandidateParticipation ?? 3,
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching festival info:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadFestivalInfo();
+  }, []);
+
+  const handleFestivalSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (formData.minCandidateParticipation < 1) {
+      alert('Minimum candidate participation must be at least 1.');
+      return;
+    }
+    if (formData.maxCandidateParticipation < formData.minCandidateParticipation) {
+      alert('Maximum participation cannot be less than minimum participation.');
+      return;
+    }
+
+    setSavingFestival(true);
+    setSaveSuccess(null);
+    try {
+      const res = await fetch('/api/festival-info', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (res.ok) {
+        setSaveSuccess('Festival settings & participation rules saved successfully!');
+        setTimeout(() => setSaveSuccess(null), 4000);
+      } else {
+        alert('Failed to save festival settings.');
+      }
+    } catch (err) {
+      console.error('Error updating festival info:', err);
+      alert('Error updating festival info.');
+    } finally {
+      setSavingFestival(false);
+    }
+  };
+
   return (
     <>
       <Breadcrumb pageName="Settings" />
 
+      {saveSuccess && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-xl flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center space-x-2">
+            <span className="text-xl">✅</span>
+            <span className="font-semibold text-sm">{saveSuccess}</span>
+          </div>
+          <button onClick={() => setSaveSuccess(null)} className="text-green-600 hover:text-green-800 text-sm font-bold">✕</button>
+        </div>
+      )}
+
       <div className="space-y-6">
+        {/* Candidate Participation Rules */}
+        <ShowcaseSection title="Candidate Participation Rules">
+          <form onSubmit={handleFestivalSave} className="space-y-6">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+              <h4 className="text-sm font-bold text-blue-900 mb-1 flex items-center gap-2">
+                <span>🎯</span> Candidate Limits & Team Eligibility Engine
+              </h4>
+              <p className="text-xs text-blue-700 leading-relaxed">
+                Define the mandatory minimum and maximum programmes allowed per candidate. Teams with any student falling below the minimum programme requirement will automatically be marked as <strong>Not Eligible</strong> in the Admin Panel. Students will be strictly blocked from registering in more programmes than the maximum.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+                <label className="block text-sm font-bold text-gray-800 mb-1">
+                  Minimum Programmes per Candidate *
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  Each candidate in a team must participate in at least this many programmes for the team to be eligible.
+                </p>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={formData.minCandidateParticipation}
+                    onChange={(e) => setFormData(prev => ({ ...prev, minCandidateParticipation: parseInt(e.target.value, 10) || 1 }))}
+                    className="w-32 px-4 py-2 text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800"
+                    required
+                  />
+                  <span className="text-xs font-semibold text-gray-600">programme(s) minimum</span>
+                </div>
+              </div>
+
+              <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+                <label className="block text-sm font-bold text-gray-800 mb-1">
+                  Maximum Programmes per Candidate *
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  A student cannot be registered for more than this number of programmes across the festival.
+                </p>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="number"
+                    min={formData.minCandidateParticipation}
+                    max="100"
+                    value={formData.maxCandidateParticipation}
+                    onChange={(e) => setFormData(prev => ({ ...prev, maxCandidateParticipation: parseInt(e.target.value, 10) || 1 }))}
+                    className="w-32 px-4 py-2 text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800"
+                    required
+                  />
+                  <span className="text-xs font-semibold text-gray-600">programme(s) maximum limit</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <div className="text-xs text-gray-500">
+                Current rule: Each candidate must do <strong>{formData.minCandidateParticipation}–{formData.maxCandidateParticipation}</strong> programme(s).
+              </div>
+              <button
+                type="submit"
+                disabled={savingFestival}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium px-6 py-2.5 rounded-lg transition-colors duration-200 shadow-sm flex items-center gap-2"
+              >
+                {savingFestival ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <span>Save Participation Rules</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </ShowcaseSection>
+
         {/* Festival Settings */}
         <ShowcaseSection title="Festival Settings">
-          <form className="space-y-4">
+          <form onSubmit={handleFestivalSave} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -17,7 +184,8 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="text"
-                  defaultValue="Wattaqa Arts Festival 2K25"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
                 />
               </div>
@@ -27,7 +195,8 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="text"
-                  defaultValue="2025"
+                  value={formData.year}
+                  onChange={(e) => setFormData(prev => ({ ...prev, year: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
                 />
               </div>
@@ -40,7 +209,8 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="date"
-                  defaultValue="2025-03-10"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
                 />
               </div>
@@ -50,7 +220,8 @@ export default function SettingsPage() {
                 </label>
                 <input
                   type="date"
-                  defaultValue="2025-03-16"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
                 />
               </div>
@@ -62,7 +233,8 @@ export default function SettingsPage() {
               </label>
               <input
                 type="text"
-                defaultValue="Wattaqa School Campus"
+                value={formData.venue}
+                onChange={(e) => setFormData(prev => ({ ...prev, venue: e.target.value }))}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
               />
             </div>
@@ -73,14 +245,16 @@ export default function SettingsPage() {
               </label>
               <textarea
                 rows={3}
-                defaultValue="Annual arts and sports festival celebrating creativity, talent, and teamwork among students."
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
               />
             </div>
 
             <button
               type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors duration-200"
+              disabled={savingFestival}
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg transition-colors duration-200"
             >
               Save Festival Settings
             </button>
@@ -108,7 +282,6 @@ export default function SettingsPage() {
                       <input type="checkbox" className="rounded border-gray-300" defaultChecked />
                       <span className="ml-2 text-sm text-gray-700">Active</span>
                     </label>
-                    <button className="text-gray-600 hover:text-gray-900 text-sm">Configure</button>
                   </div>
                 </div>
 
@@ -127,7 +300,6 @@ export default function SettingsPage() {
                       <input type="checkbox" className="rounded border-gray-300" defaultChecked />
                       <span className="ml-2 text-sm text-gray-700">Active</span>
                     </label>
-                    <button className="text-gray-600 hover:text-gray-900 text-sm">Configure</button>
                   </div>
                 </div>
 
@@ -146,7 +318,6 @@ export default function SettingsPage() {
                       <input type="checkbox" className="rounded border-gray-300" defaultChecked />
                       <span className="ml-2 text-sm text-gray-700">Active</span>
                     </label>
-                    <button className="text-gray-600 hover:text-gray-900 text-sm">Configure</button>
                   </div>
                 </div>
               </div>
@@ -192,139 +363,6 @@ export default function SettingsPage() {
                   </label>
                 </div>
               </div>
-            </div>
-          </div>
-        </ShowcaseSection>
-
-        {/* Website Settings */}
-        <ShowcaseSection title="Website Settings">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Website Title
-                </label>
-                <input
-                  type="text"
-                  defaultValue="Festival 2K25 - Wattaqa Arts Festival"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contact Email
-                </label>
-                <input
-                  type="email"
-                  defaultValue="info@wattaqafestival.com"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Website Status
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="website_status" value="live" className="border-gray-300" defaultChecked />
-                  <span className="text-sm text-gray-700">Live - Website is publicly accessible</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="website_status" value="maintenance" className="border-gray-300" />
-                  <span className="text-sm text-gray-700">Maintenance - Show maintenance page</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input type="radio" name="website_status" value="private" className="border-gray-300" />
-                  <span className="text-sm text-gray-700">Private - Require login to access</span>
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-3">Public Features</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <label className="flex items-center space-x-2">
-                    <input type="checkbox" className="rounded border-gray-300" defaultChecked />
-                    <span className="text-sm text-gray-700">Show Live Rankings</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input type="checkbox" className="rounded border-gray-300" defaultChecked />
-                    <span className="text-sm text-gray-700">Show Event Schedule</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input type="checkbox" className="rounded border-gray-300" defaultChecked />
-                    <span className="text-sm text-gray-700">Show Gallery</span>
-                  </label>
-                </div>
-                <div className="space-y-3">
-                  <label className="flex items-center space-x-2">
-                    <input type="checkbox" className="rounded border-gray-300" defaultChecked />
-                    <span className="text-sm text-gray-700">Show Team Information</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input type="checkbox" className="rounded border-gray-300" />
-                    <span className="text-sm text-gray-700">Allow Public Registration</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input type="checkbox" className="rounded border-gray-300" />
-                    <span className="text-sm text-gray-700">Show Contact Form</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ShowcaseSection>
-
-        {/* System Settings */}
-        <ShowcaseSection title="System Settings">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Time Zone
-                </label>
-                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700">
-                  <option value="UTC">UTC</option>
-                  <option value="Asia/Dubai" selected>Asia/Dubai (GMT+4)</option>
-                  <option value="Asia/Riyadh">Asia/Riyadh (GMT+3)</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Language
-                </label>
-                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700">
-                  <option value="en" selected>English</option>
-                  <option value="ar">Arabic</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-3">Data Management</h3>
-              <div className="flex space-x-4">
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
-                  Export All Data
-                </button>
-                <button className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm transition-colors">
-                  Backup Database
-                </button>
-                <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
-                  Reset Festival Data
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-gray-200">
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors duration-200"
-              >
-                Save All Settings
-              </button>
             </div>
           </div>
         </ShowcaseSection>

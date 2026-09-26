@@ -8,38 +8,67 @@ import TeamBreadcrumb from '@/components/TeamAdmin/TeamBreadcrumb';
 
 export default function TeamProgrammesPage() {
   const searchParams = useSearchParams();
-  const teamCode = searchParams.get('team') || 'SMD';
+  const getFallbackTeam = () => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('selectedTeam');
+      if (saved) return saved;
+      try {
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (u.team?.code) return u.team.code;
+        }
+      } catch (e) {}
+    }
+    return 'SMD';
+  };
+  const teamCode = searchParams.get('team') || getFallbackTeam();
   
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [programmes, setProgrammes] = useState<Programme[]>([]);
   const [participants, setParticipants] = useState<ProgrammeParticipant[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [teamData, setTeamData] = useState<Team | null>(null);
+  const [festInfo, setFestInfo] = useState<{ minCandidateParticipation?: number; maxCandidateParticipation?: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchData();
   }, [teamCode]);
 
+  // Filter out blank/empty programmes
+  const filterValidProgrammes = (programmes: Programme[]) => {
+    if (!Array.isArray(programmes)) return [];
+    return programmes.filter(programme =>
+      programme &&
+      programme.name && String(programme.name).trim() !== '' &&
+      programme.code && String(programme.code).trim() !== ''
+    );
+  };
+
   const fetchData = async () => {
     try {
-      const [candidatesRes, programmesRes, participantsRes, teamsRes] = await Promise.all([
+      const [candidatesRes, programmesRes, participantsRes, teamsRes, festRes] = await Promise.all([
         fetch(`/api/candidates?team=${teamCode}`),
         fetch('/api/programmes'),
         fetch(`/api/programme-participants?team=${teamCode}`),
-        fetch('/api/teams')
+        fetch('/api/teams'),
+        fetch('/api/festival-info')
       ]);
 
-      const [candidatesData, programmesData, participantsData, teamsData] = await Promise.all([
-        candidatesRes.json(),
-        programmesRes.json(),
-        participantsRes.json(),
-        teamsRes.json()
+      const [candidatesData, programmesData, participantsData, teamsData, festData] = await Promise.all([
+        candidatesRes.ok ? candidatesRes.json() : [],
+        programmesRes.ok ? programmesRes.json() : [],
+        participantsRes.ok ? participantsRes.json() : [],
+        teamsRes.ok ? teamsRes.json() : [],
+        festRes.ok ? festRes.json() : null
       ]);
 
-      setCandidates(candidatesData);
-      setProgrammes(programmesData);
-      setParticipants(participantsData);
-      setTeamData(teamsData.find((t: Team) => t.code === teamCode) || null);
+      setCandidates(Array.isArray(candidatesData) ? candidatesData : []);
+      setProgrammes(filterValidProgrammes(programmesData));
+      setParticipants(Array.isArray(participantsData) ? participantsData : []);
+      setTeamData(Array.isArray(teamsData) ? teamsData.find((t: Team) => t.code === teamCode) || null : null);
+      setFestInfo(festData);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -68,6 +97,12 @@ export default function TeamProgrammesPage() {
     return teamSections.includes(p.section);
   });
   
+  const filteredProgrammes = availableProgrammes.filter(p => 
+    searchQuery === '' || 
+    p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    p.code?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
   // Calculate correct statistics
   const registeredProgrammeIds = [...new Set(participants.map(p => p.programmeId))]; // Unique programme IDs
   const availableProgrammesCount = availableProgrammes.length;
@@ -75,13 +110,13 @@ export default function TeamProgrammesPage() {
   const unregisteredCount = Math.max(0, availableProgrammesCount - registeredCount); // Ensure non-negative
 
   const groupedProgrammes = {
-    sports: availableProgrammes.filter(p => p.category === 'sports' && p.section !== 'general'),
-    sportsGeneral: availableProgrammes.filter(p => p.category === 'sports' && p.section === 'general'),
-    artsStage: availableProgrammes.filter(p => p.category === 'arts' && (p.subcategory === 'stage' || !p.subcategory) && p.section !== 'general'),
-    artsStageGeneral: availableProgrammes.filter(p => p.category === 'arts' && (p.subcategory === 'stage' || !p.subcategory) && p.section === 'general'),
-    artsNonStage: availableProgrammes.filter(p => p.category === 'arts' && p.subcategory === 'non-stage' && p.section !== 'general'),
-    artsNonStageGeneral: availableProgrammes.filter(p => p.category === 'arts' && p.subcategory === 'non-stage' && p.section === 'general'),
-    general: availableProgrammes.filter(p => p.category === 'general')
+    sports: filteredProgrammes.filter(p => p.category === 'sports' && p.section !== 'general'),
+    sportsGeneral: filteredProgrammes.filter(p => p.category === 'sports' && p.section === 'general'),
+    artsStage: filteredProgrammes.filter(p => p.category === 'arts' && (p.subcategory === 'stage' || !p.subcategory) && p.section !== 'general'),
+    artsStageGeneral: filteredProgrammes.filter(p => p.category === 'arts' && (p.subcategory === 'stage' || !p.subcategory) && p.section === 'general'),
+    artsNonStage: filteredProgrammes.filter(p => p.category === 'arts' && p.subcategory === 'non-stage' && p.section !== 'general'),
+    artsNonStageGeneral: filteredProgrammes.filter(p => p.category === 'arts' && p.subcategory === 'non-stage' && p.section === 'general'),
+    general: filteredProgrammes.filter(p => p.category === 'general')
   };
 
   if (loading) {
@@ -95,25 +130,80 @@ export default function TeamProgrammesPage() {
     );
   }
 
+  const minLimit = festInfo?.minCandidateParticipation ?? 1;
+  const maxLimit = festInfo?.maxCandidateParticipation ?? 3;
+
+  // Calculate candidate participation counts
+  const candidateProgCounts = candidates.reduce((acc, c) => {
+    acc[c.chestNumber] = participants.filter(
+      p => p.status !== 'withdrawn' && p.participants?.includes(c.chestNumber)
+    ).length;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const underMinCandidates = candidates.filter(c => (candidateProgCounts[c.chestNumber] || 0) < minLimit);
+  const isTeamEligible = candidates.length > 0 && underMinCandidates.length === 0;
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
       <TeamBreadcrumb pageName="Programme Registration" teamData={teamData || undefined} />
       
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Programme Registration</h1>
           <p className="text-gray-600">Register your team for competitions and events</p>
         </div>
-        <div className="text-right px-4 py-2 rounded-lg border shadow-sm text-white"
-             style={{ backgroundColor: teamData?.color || '#3B82F6' }}>
-          <div className="text-2xl font-bold">{registeredCount}</div>
-          <div className="text-sm opacity-90">Registered Programmes</div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+          <input
+            type="text"
+            placeholder="Search programme name or code..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full sm:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+          />
+          <div className="text-right px-4 py-2 rounded-lg border shadow-sm text-white w-full sm:w-auto"
+               style={{ backgroundColor: teamData?.color || '#3B82F6' }}>
+            <div className="text-2xl font-bold">{registeredCount}</div>
+            <div className="text-sm opacity-90">Registered</div>
+          </div>
         </div>
       </div>
 
-
+      {/* Team Participation & Eligibility Banner */}
+      <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm ${
+        isTeamEligible 
+          ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-300 text-emerald-900' 
+          : 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300 text-amber-900'
+      }`}>
+        <div className="flex items-start gap-3">
+          <span className="text-3xl">{isTeamEligible ? '🟢' : '⚠️'}</span>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-bold text-base">
+                Team Eligibility: {isTeamEligible ? 'Eligible' : 'Not Eligible (Under Minimum)'}
+              </h3>
+              <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${
+                isTeamEligible ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900'
+              }`}>
+                {isTeamEligible ? 'All Requirements Met' : `${underMinCandidates.length} Under Minimum`}
+              </span>
+            </div>
+            <p className="text-xs mt-1 text-gray-700">
+              Rule: Every candidate must have between <strong>{minLimit}</strong> (min) and <strong>{maxLimit}</strong> (max) programmes.
+              {!isTeamEligible && underMinCandidates.length > 0 && (
+                <span className="text-rose-700 font-semibold block mt-1">
+                  Need more programmes: {underMinCandidates.slice(0, 5).map(c => `${c.name} (${candidateProgCounts[c.chestNumber] || 0}/${minLimit})`).join(', ')}{underMinCandidates.length > 5 ? ` +${underMinCandidates.length - 5} more` : ''}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+        <div className="text-xs text-right text-gray-600 bg-white/70 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-gray-200">
+          <div>Limits: <strong>{minLimit} min / {maxLimit} max</strong></div>
+        </div>
+      </div>
 
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -162,6 +252,8 @@ export default function TeamProgrammesPage() {
                     candidates={candidates}
                     participants={participants}
                     onUpdate={fetchParticipants}
+                    minLimit={minLimit}
+                    maxLimit={maxLimit}
                   />
                 ))}
               </div>
@@ -186,6 +278,8 @@ export default function TeamProgrammesPage() {
                     candidates={candidates}
                     participants={participants}
                     onUpdate={fetchParticipants}
+                    minLimit={minLimit}
+                    maxLimit={maxLimit}
                   />
                 ))}
               </div>
@@ -210,6 +304,8 @@ export default function TeamProgrammesPage() {
                     candidates={candidates}
                     participants={participants}
                     onUpdate={fetchParticipants}
+                    minLimit={minLimit}
+                    maxLimit={maxLimit}
                   />
                 ))}
               </div>
@@ -234,6 +330,8 @@ export default function TeamProgrammesPage() {
                     candidates={candidates}
                     participants={participants}
                     onUpdate={fetchParticipants}
+                    minLimit={minLimit}
+                    maxLimit={maxLimit}
                   />
                 ))}
               </div>
@@ -258,6 +356,8 @@ export default function TeamProgrammesPage() {
                     candidates={candidates}
                     participants={participants}
                     onUpdate={fetchParticipants}
+                    minLimit={minLimit}
+                    maxLimit={maxLimit}
                   />
                 ))}
               </div>
@@ -282,6 +382,8 @@ export default function TeamProgrammesPage() {
                     candidates={candidates}
                     participants={participants}
                     onUpdate={fetchParticipants}
+                    minLimit={minLimit}
+                    maxLimit={maxLimit}
                   />
                 ))}
               </div>
@@ -306,6 +408,8 @@ export default function TeamProgrammesPage() {
                     candidates={candidates}
                     participants={participants}
                     onUpdate={fetchParticipants}
+                    minLimit={minLimit}
+                    maxLimit={maxLimit}
                   />
                 ))}
               </div>
@@ -332,13 +436,17 @@ function ProgrammeCard({
   teamCode, 
   candidates, 
   participants, 
-  onUpdate 
+  onUpdate,
+  minLimit = 1,
+  maxLimit = 3
 }: {
   programme: Programme;
   teamCode: string;
   candidates: Candidate[];
   participants: ProgrammeParticipant[];
   onUpdate: () => void;
+  minLimit?: number;
+  maxLimit?: number;
 }) {
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -348,6 +456,7 @@ function ProgrammeCard({
 
   const existingParticipant = participants.find(p => p.programmeId === programme._id?.toString());
   const isRegistered = !!existingParticipant;
+  const isOver = programme.status === 'completed' || (programme as any).isOver === true;
   
   // Filter candidates based on programme section
   const sectionCandidates = candidates.filter(candidate => {
@@ -358,6 +467,10 @@ function ProgrammeCard({
   });
 
   const openModal = () => {
+    if (isOver) {
+      alert(`🛑 Programme "${programme.name}" is OVER. Registrations are closed.`);
+      return;
+    }
     setSelectedParticipants([]);
     setSearchTerm('');
     setShowModal(true);
@@ -370,6 +483,10 @@ function ProgrammeCard({
   };
 
   const openEditModal = () => {
+    if (isOver) {
+      alert(`🛑 Programme "${programme.name}" is OVER. Registrations and edits are closed.`);
+      return;
+    }
     // Pre-populate with existing participants
     if (existingParticipant) {
       setSelectedParticipants(existingParticipant.participants.map(p => p.candidateId || p));
@@ -391,26 +508,33 @@ function ProgrammeCard({
   );
 
   const handleParticipantToggle = (chestNumber: string) => {
-    console.log('🔄 Toggling participant:', chestNumber);
-    console.log('📊 Current selected:', selectedParticipants);
-    console.log('🎯 Required participants:', programme.requiredParticipants);
-    
+    if (isOver) {
+      alert(`🛑 Programme "${programme.name}" is OVER. Changes are not allowed.`);
+      return;
+    }
     setSelectedParticipants(prev => {
       const isCurrentlySelected = prev.includes(chestNumber);
       
       if (isCurrentlySelected) {
-        // Remove from selection
-        const newSelection = prev.filter(p => p !== chestNumber);
-        console.log('➖ Removing, new selection:', newSelection);
-        return newSelection;
+        return prev.filter(p => p !== chestNumber);
       } else {
+        // Check maximum participation limit across other programmes
+        const otherProgCount = participants.filter(
+          p => p.status !== 'withdrawn' && 
+               p.programmeId !== programme._id?.toString() && 
+               p.participants?.includes(chestNumber)
+        ).length;
+
+        if (otherProgCount >= maxLimit) {
+          const cand = candidates.find(c => c.chestNumber === chestNumber);
+          alert(`🚫 Cannot select ${cand?.name || chestNumber}: Candidate has already reached the maximum participation limit of ${maxLimit} programme(s).`);
+          return prev;
+        }
+
         // Check if we can add more
         if (prev.length < Number(programme.requiredParticipants)) {
-          const newSelection = [...prev, chestNumber];
-          console.log('➕ Adding, new selection:', newSelection);
-          return newSelection;
+          return [...prev, chestNumber];
         } else {
-          console.log('🚫 Cannot add - limit reached. Current:', prev.length, 'Max:', programme.requiredParticipants);
           alert(`Maximum ${programme.requiredParticipants} participants allowed. Please deselect someone first.`);
           return prev;
         }
@@ -419,6 +543,10 @@ function ProgrammeCard({
   };
 
   const handleRegister = async () => {
+    if (isOver) {
+      alert(`🛑 Programme "${programme.name}" is OVER. Registrations are closed.`);
+      return;
+    }
     if (selectedParticipants.length !== Number(programme.requiredParticipants)) {
       alert(`Please select exactly ${programme.requiredParticipants} participant(s)`);
       return;
@@ -456,6 +584,10 @@ function ProgrammeCard({
   };
 
   const handleUpdate = async () => {
+    if (isOver) {
+      alert(`🛑 Programme "${programme.name}" is OVER. Edits are closed.`);
+      return;
+    }
     if (selectedParticipants.length !== Number(programme.requiredParticipants)) {
       alert(`Please select exactly ${programme.requiredParticipants} participant(s)`);
       return;
@@ -491,21 +623,37 @@ function ProgrammeCard({
 
   return (
     <>
-      <div className={`border-2 rounded-xl p-5 transition-all duration-200 ${
-        isRegistered 
+      <div className={`border-2 rounded-xl p-5 transition-all duration-200 relative ${
+        isOver
+          ? 'border-rose-300 bg-rose-50/40 shadow-xs'
+          : isRegistered 
           ? 'border-green-300 bg-green-50 shadow-md' 
           : 'border-gray-200 hover:border-blue-300 hover:shadow-lg bg-white'
       }`}>
-        <div className="flex justify-between items-start mb-3">
-          <Link 
-            href={`/admin/programmes/${programme._id}`}
-            className="font-bold text-base text-blue-600 hover:text-blue-800 hover:underline leading-tight transition-colors"
-          >
-            {programme.name}
-          </Link>
-          <span className="text-xs bg-gray-800 text-white px-3 py-1 rounded-full font-mono font-bold">
-            {programme.code}
-          </span>
+        <div className="flex justify-between items-start mb-3 gap-2">
+          <div className="flex-1">
+            <Link 
+              href={`/programmes/${programme._id}`}
+              className="font-bold text-base text-gray-900 hover:text-blue-600 hover:underline leading-tight transition-colors block"
+            >
+              {programme.name}
+            </Link>
+            {isOver && (
+              <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold text-rose-700 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full">
+                <span>🛑</span> PROGRAMME IS OVER
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {isOver && (
+              <span className="text-xs bg-rose-600 text-white px-2.5 py-1 rounded-full font-bold uppercase tracking-wider shadow-xs flex items-center gap-1 animate-pulse">
+                <span>🛑</span> OVER
+              </span>
+            )}
+            <span className="text-xs bg-gray-800 text-white px-3 py-1 rounded-full font-mono font-bold">
+              {programme.code}
+            </span>
+          </div>
         </div>
         
         <div className="space-y-2 mb-4">
@@ -528,7 +676,41 @@ function ProgrammeCard({
           </div>
         </div>
         
-        {isRegistered ? (
+        {isOver ? (
+          isRegistered ? (
+            <div className="space-y-3">
+              <div className="flex items-center text-green-700 font-semibold text-sm">
+                <span className="text-lg mr-2">✅</span>
+                Registered (Locked)
+              </div>
+              <div className="bg-white/80 p-3 rounded-lg border border-rose-200">
+                <div className="text-xs font-semibold text-gray-700 mb-2">Team Participants:</div>
+                <div className="flex flex-wrap gap-1">
+                  {existingParticipant.participants.map((participant, index) => (
+                    <span key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full font-mono">
+                      {participant}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => alert(`🛑 Programme "${programme.name}" is OVER. Registrations and edits are closed.`)}
+                className="w-full bg-gray-200 text-gray-500 text-sm font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2 cursor-not-allowed border border-gray-300"
+              >
+                <span>🔒</span> Programme is Over (Edits Closed)
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => alert(`🛑 Programme "${programme.name}" is OVER. Registrations are closed.`)}
+              className="w-full bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 text-sm font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              <span>🛑</span> Programme is Over (Closed)
+            </button>
+          )
+        ) : isRegistered ? (
           <div className="space-y-3">
             <div className="flex items-center text-green-700 font-semibold text-sm">
               <span className="text-lg mr-2">✅</span>
@@ -669,7 +851,16 @@ function ProgrammeCard({
                             if (e.key === 'Enter') {
                               const chestNumber = e.currentTarget.value.toUpperCase();
                               const candidate = candidates.find(c => c.chestNumber === chestNumber);
-                              if (candidate && !selectedParticipants.includes(chestNumber) && selectedParticipants.length < programme.requiredParticipants) {
+                              if (candidate && !selectedParticipants.includes(chestNumber) && selectedParticipants.length < Number(programme.requiredParticipants)) {
+                                const otherProgCount = participants.filter(
+                                  p => p.status !== 'withdrawn' && 
+                                       p.programmeId !== programme._id?.toString() && 
+                                       p.participants?.includes(chestNumber)
+                                ).length;
+                                if (otherProgCount >= maxLimit) {
+                                  alert(`🚫 Cannot add ${candidate.name}: Candidate has reached the maximum allowed limit of ${maxLimit} programme(s).`);
+                                  return;
+                                }
                                 handleParticipantToggle(chestNumber);
                                 e.currentTarget.value = '';
                               } else if (!candidate) {
@@ -697,7 +888,14 @@ function ProgrammeCard({
                       ) : (
                         filteredCandidates.map((candidate) => {
                           const isSelected = selectedParticipants.includes(candidate.chestNumber);
-                          const isDisabled = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
+                          const otherProgCount = participants.filter(
+                            p => p.status !== 'withdrawn' && 
+                                 p.programmeId !== programme._id?.toString() && 
+                                 p.participants?.includes(candidate.chestNumber)
+                          ).length;
+                          const hasReachedMax = !isSelected && otherProgCount >= maxLimit;
+                          const isRequiredLimitReached = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
+                          const isDisabled = hasReachedMax || isRequiredLimitReached;
                           
                           return (
                             <div
@@ -705,24 +903,21 @@ function ProgrammeCard({
                               className={`border-2 rounded-lg p-4 transition-all ${
                                 isSelected
                                   ? 'border-blue-500 bg-blue-50 shadow-md cursor-pointer'
-                                  : isDisabled
+                                  : hasReachedMax
+                                  ? 'border-red-200 bg-red-50/50 opacity-60 cursor-not-allowed'
+                                  : isRequiredLimitReached
                                   ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
                                   : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
                               }`}
                               onClick={() => {
-                                console.log('🖱️ Card clicked for:', candidate.chestNumber);
-                                console.log('🔍 isSelected:', isSelected, 'isDisabled:', isDisabled);
-                                
                                 if (isSelected) {
-                                  // Always allow deselection
-                                  console.log('✅ Allowing deselection');
                                   handleParticipantToggle(candidate.chestNumber);
-                                } else if (!isDisabled) {
-                                  // Allow selection if not at limit
-                                  console.log('✅ Allowing selection');
+                                } else if (hasReachedMax) {
+                                  alert(`🚫 Candidate ${candidate.name} (#${candidate.chestNumber}) has already reached the maximum participation limit of ${maxLimit} programme(s).`);
+                                } else if (!isRequiredLimitReached) {
                                   handleParticipantToggle(candidate.chestNumber);
                                 } else {
-                                  console.log('❌ Click ignored - at participant limit');
+                                  alert(`Maximum ${programme.requiredParticipants} participants allowed for this programme.`);
                                 }
                               }}
                             >
@@ -733,13 +928,27 @@ function ProgrammeCard({
                                   {isSelected && <span className="text-white text-sm font-bold">✓</span>}
                                 </div>
                                 <div className="flex-1">
-                                  <div className="font-bold text-gray-900 font-mono text-base">
-                                    {candidate.chestNumber}
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-gray-900 font-mono text-base">
+                                      {candidate.chestNumber}
+                                    </span>
+                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                                      otherProgCount >= minLimit 
+                                        ? 'bg-emerald-100 text-emerald-800' 
+                                        : 'bg-amber-100 text-amber-800'
+                                    }`}>
+                                      {otherProgCount} / {maxLimit} prog
+                                    </span>
                                   </div>
                                   <div className="text-gray-700 font-medium">{candidate.name}</div>
                                   <div className="text-xs text-gray-500 capitalize">
                                     {candidate.section} Section • {candidate.points} points
                                   </div>
+                                  {hasReachedMax && (
+                                    <div className="text-[11px] font-bold text-red-600 mt-1">
+                                      ⛔ Max Limit Reached
+                                    </div>
+                                  )}
                                 </div>
                                 {isSelected && (
                                   <div className="text-blue-500 font-bold text-sm">
@@ -1064,7 +1273,14 @@ function ProgrammeCard({
                       ) : (
                         filteredCandidates.map((candidate) => {
                           const isSelected = selectedParticipants.includes(candidate.chestNumber);
-                          const isDisabled = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
+                          const otherProgCount = participants.filter(
+                            p => p.status !== 'withdrawn' && 
+                                 p.programmeId !== programme._id?.toString() && 
+                                 p.participants?.includes(candidate.chestNumber)
+                          ).length;
+                          const hasReachedMax = !isSelected && otherProgCount >= maxLimit;
+                          const isRequiredLimitReached = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
+                          const isDisabled = hasReachedMax || isRequiredLimitReached;
                           
                           return (
                             <div
@@ -1072,15 +1288,21 @@ function ProgrammeCard({
                               className={`border-2 rounded-lg p-4 transition-all ${
                                 isSelected
                                   ? 'border-orange-500 bg-orange-50 shadow-md cursor-pointer'
-                                  : isDisabled
+                                  : hasReachedMax
+                                  ? 'border-red-200 bg-red-50/50 opacity-60 cursor-not-allowed'
+                                  : isRequiredLimitReached
                                   ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
                                   : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50 cursor-pointer'
                               }`}
                               onClick={() => {
                                 if (isSelected) {
                                   handleParticipantToggle(candidate.chestNumber);
-                                } else if (!isDisabled) {
+                                } else if (hasReachedMax) {
+                                  alert(`🚫 Candidate ${candidate.name} (#${candidate.chestNumber}) has already reached the maximum participation limit of ${maxLimit} programme(s).`);
+                                } else if (!isRequiredLimitReached) {
                                   handleParticipantToggle(candidate.chestNumber);
+                                } else {
+                                  alert(`Maximum ${programme.requiredParticipants} participants allowed for this programme.`);
                                 }
                               }}
                             >
@@ -1091,13 +1313,27 @@ function ProgrammeCard({
                                   {isSelected && <span className="text-white text-sm font-bold">✓</span>}
                                 </div>
                                 <div className="flex-1">
-                                  <div className="font-bold text-gray-900 font-mono text-base">
-                                    {candidate.chestNumber}
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-gray-900 font-mono text-base">
+                                      {candidate.chestNumber}
+                                    </span>
+                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                                      otherProgCount >= minLimit 
+                                        ? 'bg-emerald-100 text-emerald-800' 
+                                        : 'bg-amber-100 text-amber-800'
+                                    }`}>
+                                      {otherProgCount} / {maxLimit} prog
+                                    </span>
                                   </div>
                                   <div className="text-gray-700 font-medium">{candidate.name}</div>
                                   <div className="text-xs text-gray-500 capitalize">
                                     {candidate.section} Section • {candidate.points} points
                                   </div>
+                                  {hasReachedMax && (
+                                    <div className="text-[11px] font-bold text-red-600 mt-1">
+                                      ⛔ Max Limit Reached
+                                    </div>
+                                  )}
                                 </div>
                                 {isSelected && (
                                   <div className="text-orange-500 font-bold text-sm">

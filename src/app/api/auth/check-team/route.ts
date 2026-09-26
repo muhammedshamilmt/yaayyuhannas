@@ -13,11 +13,15 @@ export async function POST(request: Request) {
     const db = await getDatabase();
     const collection = db.collection<Team>('teams');
     
-    // Check if email matches any team captain email or leaders
+    const escapedEmail = email.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const emailRegex = new RegExp(`^${escapedEmail}$`, 'i');
+
+    // Check if email matches any team admin email, captain email, or leaders
     const team = await collection.findOne({ 
       $or: [
-        { captainEmail: { $regex: new RegExp(`^${email}$`, 'i') } },
-        { leaders: { $regex: new RegExp(`^${email}$`, 'i') } }
+        { adminEmails: { $regex: emailRegex } },
+        { captainEmail: { $regex: emailRegex } },
+        { leaders: { $regex: emailRegex } }
       ]
     });
     
@@ -32,7 +36,8 @@ export async function POST(request: Request) {
           color: team.color,
           description: team.description,
           captain: team.captain,
-          captainEmail: team.captainEmail
+          captainEmail: team.captainEmail,
+          adminEmails: team.adminEmails || (team.captainEmail ? [team.captainEmail] : [])
         }
       });
     }

@@ -26,7 +26,16 @@ export async function GET(request: Request) {
     // Otherwise, fetch all programmes
     // Filter out blank/empty programmes using MongoDB query
     const cookieStore = await cookies();
-    const activeFestId = cookieStore.get('activeFestId')?.value;
+    let activeFestId = searchParams.get('festId') || cookieStore.get('activeFestId')?.value;
+    
+    // If no activeFestId provided, automatically default to the active festival
+    if (!activeFestId) {
+      const activeFest = await db.collection('fests').findOne({ status: 'active', name: /wattaqa/i })
+        || await db.collection('fests').findOne({ status: 'active' });
+      if (activeFest) {
+        activeFestId = activeFest._id.toString();
+      }
+    }
     
     let query: any = {
       name: { $exists: true, $ne: '', $ne: null },
@@ -37,10 +46,25 @@ export async function GET(request: Request) {
     };
     
     if (activeFestId) {
-      query.festId = activeFestId;
+      const festIdValues: any[] = [activeFestId];
+      if (ObjectId.isValid(activeFestId)) {
+        festIdValues.push(new ObjectId(activeFestId));
+      }
+      query.festId = { $in: festIdValues };
     }
     
-    const programmes = await collection.find(query).toArray();
+    let programmes = await collection.find(query).toArray();
+    
+    // Fallback: If 0 programmes returned for selected festId, fallback to active Wattaqa fest
+    if (programmes.length === 0 && activeFestId) {
+      const defaultFest = await db.collection('fests').findOne({ name: /wattaqa/i });
+      if (defaultFest && defaultFest._id.toString() !== activeFestId) {
+        programmes = await collection.find({
+          ...query,
+          festId: { $in: [defaultFest._id.toString(), defaultFest._id] }
+        }).toArray();
+      }
+    }
     
     return NextResponse.json(programmes);
   } catch (error) {
@@ -90,13 +114,17 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
+    let id = searchParams.get('id');
+
+    const body = await request.json();
+    if (!id && (body._id || body.id)) {
+      id = body._id || body.id;
+    }
     
     if (!id) {
       return NextResponse.json({ error: 'Programme ID is required' }, { status: 400 });
     }
 
-    const body = await request.json();
     const db = await getDatabase();
     const collection = db.collection<Programme>('programmes');
     
@@ -106,6 +134,7 @@ export async function PUT(request: Request) {
     };
     
     delete updateData._id;
+    delete updateData.id;
     
     const result = await collection.updateOne(
       { _id: new ObjectId(id) },
@@ -116,14 +145,10 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Programme not found' }, { status: 404 });
     }
     
-    // Auto-sync to Google Sheets
-    try {
-      const { sheetsSync } = await import('@/lib/sheetsSync');
-      await sheetsSync.syncToSheets('programmes');
-    } catch (syncError) {
-      console.error('Error syncing to sheets:', syncError);
-      // Don't fail the main operation if sync fails
-    }
+    // Auto-sync to Google Sheets in background
+    import('@/lib/sheetsSync')
+      .then(({ sheetsSync }) => sheetsSync.syncToSheets('programmes'))
+      .catch(syncError => console.error('Error syncing to sheets in background:', syncError));
 
     return NextResponse.json({ success: true, message: 'Programme updated successfully' });
   } catch (error) {

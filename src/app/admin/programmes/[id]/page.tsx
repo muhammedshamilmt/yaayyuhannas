@@ -67,6 +67,37 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
         }
     };
 
+    const handleToggleOver = async () => {
+        if (!programme) return;
+        const isCurrentlyOver = programme.status === 'completed' || (programme as any).isOver === true;
+        const newStatus = isCurrentlyOver ? 'active' : 'completed';
+        const confirmMessage = isCurrentlyOver
+            ? `Reopen programme "${programme.name}" (${programme.code})?\nTeams will be allowed to register and edit candidates again.`
+            : `Mark programme "${programme.name}" (${programme.code}) as OVER?\nTeams will NOT be able to register or edit candidates for this programme.`;
+
+        if (!confirm(confirmMessage)) return;
+
+        try {
+            const res = await fetch(`/api/programmes?id=${programme._id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: newStatus,
+                    isOver: !isCurrentlyOver
+                })
+            });
+
+            if (res.ok) {
+                setProgramme(prev => prev ? { ...prev, status: newStatus, isOver: !isCurrentlyOver } : null);
+            } else {
+                alert('Failed to update programme status');
+            }
+        } catch (err) {
+            console.error('Error updating status:', err);
+            alert('Error updating status');
+        }
+    };
+
     const getCategoryIcon = (category: string) => {
         switch (category) {
             case 'arts': return '🎨';
@@ -151,12 +182,31 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
+                    {programme.status === 'completed' || (programme as any).isOver ? (
+                        <span className="px-3 py-1 rounded-full text-sm font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+                            <span>🛑</span> OVER
+                        </span>
+                    ) : (
+                        <span className="px-3 py-1 rounded-full text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                            <span>🟢</span> ACTIVE
+                        </span>
+                    )}
                     <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getCategoryColor(programme.category)}`}>
                         {getCategoryIcon(programme.category)} {programme.category.toUpperCase()}
                     </span>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getSectionColor(programme.section)}`}>
                         {programme.section.toUpperCase()}
                     </span>
+                    <button
+                        onClick={handleToggleOver}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all shadow-xs ${
+                            programme.status === 'completed' || (programme as any).isOver
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                : 'bg-rose-600 hover:bg-rose-700 text-white'
+                        }`}
+                    >
+                        {programme.status === 'completed' || (programme as any).isOver ? 'Reopen Programme' : 'Mark as Over'}
+                    </button>
                 </div>
             </div>
 

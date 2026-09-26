@@ -98,6 +98,7 @@ export default function ProgrammesPage() {
   };
 
   const getProgrammeStatus = (programme: Programme) => {
+    if (programme.status === 'completed' || (programme as any).isOver) return 'over';
     const programmeResults = getProgrammeResults(programme.name);
     if (programmeResults.length > 0) return 'completed';
     if (programme.status === 'active') return 'active';
@@ -117,7 +118,8 @@ export default function ProgrammesPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'over': return 'bg-rose-100 text-rose-800 border-rose-300 font-semibold';
+      case 'completed': return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'active': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'upcoming': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -126,10 +128,11 @@ export default function ProgrammesPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return '✅';
-      case 'active': return '🔄';
-      case 'upcoming': return '⏰';
-      default: return '📋';
+      case 'over': return '🛑 OVER';
+      case 'completed': return '✅ Completed';
+      case 'active': return '🔄 Active';
+      case 'upcoming': return '⏰ Upcoming';
+      default: return '📋 Draft';
     }
   };
 

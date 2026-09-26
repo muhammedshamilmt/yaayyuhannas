@@ -4,14 +4,24 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
-import { Team } from '@/types';
+import { Team, Candidate, ProgrammeParticipant, FestivalInfo } from '@/types';
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [participants, setParticipants] = useState<ProgrammeParticipant[]>([]);
+  const [festInfo, setFestInfo] = useState<FestivalInfo | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
+
+  // Eligibility modal state
+  const [selectedTeamForEligibility, setSelectedTeamForEligibility] = useState<Team | null>(null);
+  const [eligibilityFilter, setEligibilityFilter] = useState<'all' | 'under-min' | 'ready'>('all');
+  const [eligibilitySearch, setEligibilitySearch] = useState('');
+
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -20,6 +30,7 @@ export default function TeamsPage() {
     motto: '',
     captain: '',
     captainEmail: '',
+    adminEmails: [''],
     leaders: ['', '']
   });
 
@@ -31,37 +42,65 @@ export default function TeamsPage() {
     '#374151', '#4B5563', '#6B7280', '#9CA3AF', '#D1D5DB', '#F3F4F6'
   ];
 
-  const fetchTeams = async () => {
+  const fetchAllData = async () => {
     try {
-      const response = await fetch('/api/teams');
-      const data = await response.json();
-      setTeams(data);
+      const [teamsRes, candidatesRes, participantsRes, festRes] = await Promise.all([
+        fetch('/api/teams'),
+        fetch('/api/candidates'),
+        fetch('/api/programme-participants'),
+        fetch('/api/festival-info')
+      ]);
+
+      const [teamsData, candidatesData, participantsData, festData] = await Promise.all([
+        teamsRes.json(),
+        candidatesRes.json(),
+        participantsRes.json(),
+        festRes.json()
+      ]);
+
+      setTeams(Array.isArray(teamsData) ? teamsData : []);
+      setCandidates(Array.isArray(candidatesData) ? candidatesData : []);
+      setParticipants(Array.isArray(participantsData) ? participantsData : []);
+      setFestInfo(festData);
     } catch (error) {
-      console.error('Error fetching teams:', error);
+      console.error('Error fetching admin team data:', error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTeams();
+    fetchAllData();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Ensure at least 2 leaders are required
     const filteredLeaders = formData.leaders.filter(leader => leader.trim() !== '');
     if (filteredLeaders.length < 2) {
       alert('Please add at least 2 team leaders');
       return;
     }
 
+    // Clean and validate admin emails (lowercase, trimmed, non-empty, unique)
+    const cleanedAdminEmails = Array.from(new Set(
+      formData.adminEmails
+        .map(e => e.trim().toLowerCase())
+        .filter(e => e !== '')
+    ));
+
+    const primaryCaptainEmail = formData.captainEmail.trim().toLowerCase();
+    if (primaryCaptainEmail && !cleanedAdminEmails.includes(primaryCaptainEmail)) {
+      cleanedAdminEmails.unshift(primaryCaptainEmail);
+    }
+
     const teamData = {
       ...formData,
+      captainEmail: primaryCaptainEmail || cleanedAdminEmails[0] || '',
+      adminEmails: cleanedAdminEmails,
       leaders: filteredLeaders,
-      members: editingTeam ? editingTeam.members : 0, // Preserve existing member count or start with 0
-      points: editingTeam ? editingTeam.points : 0   // Preserve existing points or start with 0
+      members: editingTeam ? editingTeam.members : 0,
+      points: editingTeam ? editingTeam.points : 0
     };
 
     try {
@@ -78,7 +117,7 @@ export default function TeamsPage() {
       });
 
       if (response.ok) {
-        await fetchTeams();
+        await fetchAllData();
         resetForm();
         alert(editingTeam ? 'Team updated successfully!' : 'Team created successfully!');
       } else {
@@ -93,6 +132,18 @@ export default function TeamsPage() {
 
   const handleEdit = (team: Team) => {
     setEditingTeam(team);
+
+    let existingAdminEmails: string[] = [];
+    if (team.adminEmails && Array.isArray(team.adminEmails)) {
+      existingAdminEmails = [...team.adminEmails];
+    }
+    if (team.captainEmail && !existingAdminEmails.some(e => e.toLowerCase() === team.captainEmail?.toLowerCase())) {
+      existingAdminEmails.unshift(team.captainEmail);
+    }
+    if (existingAdminEmails.length === 0) {
+      existingAdminEmails = [''];
+    }
+
     setFormData({
       code: team.code,
       name: team.name,
@@ -100,7 +151,8 @@ export default function TeamsPage() {
       description: team.description,
       motto: team.motto || '',
       captain: team.captain,
-      captainEmail: team.captainEmail || '',
+      captainEmail: team.captainEmail || existingAdminEmails[0] || '',
+      adminEmails: existingAdminEmails,
       leaders: team.leaders && team.leaders.length >= 2 ? team.leaders : ['', '']
     });
     setShowAddForm(true);
@@ -115,7 +167,7 @@ export default function TeamsPage() {
       });
 
       if (response.ok) {
-        await fetchTeams();
+        await fetchAllData();
         alert('Team deleted successfully!');
       } else {
         const error = await response.json();
@@ -136,11 +188,33 @@ export default function TeamsPage() {
       motto: '',
       captain: '',
       captainEmail: '',
+      adminEmails: [''],
       leaders: ['', '']
     });
     setEditingTeam(null);
     setShowAddForm(false);
     setShowColorPicker(false);
+  };
+
+  const addAdminEmailField = () => {
+    setFormData(prev => ({
+      ...prev,
+      adminEmails: [...prev.adminEmails, '']
+    }));
+  };
+
+  const removeAdminEmailField = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      adminEmails: prev.adminEmails.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateAdminEmail = (index: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      adminEmails: prev.adminEmails.map((email, i) => i === index ? value : email)
+    }));
   };
 
   const addLeaderField = () => {
@@ -187,6 +261,38 @@ export default function TeamsPage() {
     return brightness > 128 ? '#000000' : '#FFFFFF';
   };
 
+  const minLimit = festInfo?.minCandidateParticipation ?? 1;
+  const maxLimit = festInfo?.maxCandidateParticipation ?? 3;
+
+  // Compute stats helper for any team
+  const getTeamCandidateStats = (teamCode: string) => {
+    const teamCandidates = candidates.filter(c => c.team === teamCode);
+    const candidateStats = teamCandidates.map(c => {
+      const registrations = participants.filter(
+        p => p.status !== 'withdrawn' && p.participants?.includes(c.chestNumber)
+      );
+      return {
+        candidate: c,
+        registeredCount: registrations.length,
+        programmes: registrations.map(r => r.programmeName || r.programmeCode || 'Programme'),
+        isUnderMin: registrations.length < minLimit,
+        hasZero: registrations.length === 0,
+      };
+    });
+
+    const underMinCount = candidateStats.filter(s => s.isUnderMin).length;
+    const zeroCount = candidateStats.filter(s => s.hasZero).length;
+    const isEligible = teamCandidates.length > 0 && underMinCount === 0;
+
+    return {
+      teamCandidates,
+      candidateStats,
+      underMinCount,
+      zeroCount,
+      isEligible
+    };
+  };
+
   if (loading) {
     return (
       <>
@@ -198,37 +304,61 @@ export default function TeamsPage() {
     );
   }
 
+  // Active team for modal
+  const activeModalStats = selectedTeamForEligibility ? getTeamCandidateStats(selectedTeamForEligibility.code) : null;
+  const filteredModalCandidates = activeModalStats?.candidateStats.filter(item => {
+    const matchesSearch = 
+      item.candidate.name.toLowerCase().includes(eligibilitySearch.toLowerCase()) ||
+      item.candidate.chestNumber.toLowerCase().includes(eligibilitySearch.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    if (eligibilityFilter === 'under-min') return item.isUnderMin;
+    if (eligibilityFilter === 'ready') return !item.isUnderMin;
+    return true;
+  }) || [];
+
   return (
     <>
       <Breadcrumb pageName="Teams" />
 
       <div className="space-y-6">
-        {/* Info Section */}
-        <ShowcaseSection title="Team Management">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-            <h4 className="text-sm font-medium text-blue-800 mb-2">🏆 Festival Teams</h4>
-            <p className="text-sm text-blue-700">
-              Manage your festival teams here. You can create, edit, and delete teams. 
-              The three main teams (SMD→SUMUD, INT→INTIFADA, AQS→AQSA) are recommended for the festival.
-            </p>
-          </div>
-          
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-green-800 mb-2">📋 Sync Information</h4>
-            <p className="text-sm text-green-700">
-              Teams now sync with Google Sheets automatically! When you create, update, or delete teams, 
-              the changes are synced to your Google Sheets including the captain's email address. 
-              Team member counts and points are calculated from synced data.
-            </p>
+        {/* Info & Rules Section */}
+        <ShowcaseSection title="Team Management & Eligibility">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <h4 className="text-sm font-bold text-blue-900 mb-1">🏆 Festival Teams</h4>
+              <p className="text-xs text-blue-700 leading-relaxed">
+                Manage your festival teams here. You can create, edit, and delete teams. 
+                Team member counts and points are calculated automatically from database records.
+              </p>
+            </div>
+            
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="text-sm font-bold text-purple-900 flex items-center gap-1.5">
+                  <span>⚙️</span> Candidate Participation Rules
+                </h4>
+                <Link href="/admin/settings" className="text-xs text-purple-600 hover:text-purple-800 underline font-medium">
+                  Configure Settings
+                </Link>
+              </div>
+              <p className="text-xs text-purple-700 leading-relaxed">
+                Rule: <strong>{minLimit} Minimum</strong> / <strong>{maxLimit} Maximum</strong> programmes per candidate. 
+                Teams with any candidate having 0 or fewer than {minLimit} programme(s) are flagged as <strong>Not Eligible</strong>.
+              </p>
+            </div>
           </div>
         </ShowcaseSection>
 
-        {/* Add Team Button */}
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">All Teams ({teams.length})</h2>
+        {/* Add Team Button & Summary Bar */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">All Teams ({teams.length})</h2>
+            <p className="text-xs text-gray-500">Live eligibility indicators update automatically as candidates register.</p>
+          </div>
           <button
             onClick={() => setShowAddForm(true)}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-2 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg"
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2.5 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-md font-medium text-sm"
           >
             + Add New Team
           </button>
@@ -239,113 +369,83 @@ export default function TeamsPage() {
           <ShowcaseSection title={editingTeam ? "Edit Team" : "Add New Team"}>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Team Code */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Team Code *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Team Code *</label>
                   <input
                     type="text"
                     value={formData.code}
                     onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., SMD, INT, AQS"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                    placeholder="e.g., SMD, AQS, INT"
                     required
-                    maxLength={5}
+                    disabled={!!editingTeam}
                   />
+                  {editingTeam && (
+                    <p className="text-xs text-gray-500 mt-1">Team code cannot be changed after creation</p>
+                  )}
                 </div>
 
-                {/* Team Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Team Name *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Team Name *</label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., SUMUD, INTIFADA, AQSA"
+                    placeholder="e.g., SUMUD, AQSA, INTHIFADA"
                     required
                   />
                 </div>
 
-                {/* Team Color */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Team Color *
-                  </label>
-                  <div className="space-y-3">
-                    <div className="flex gap-3">
-                      <div 
-                        className="w-12 h-10 rounded-lg border-2 border-gray-300 cursor-pointer flex items-center justify-center"
-                        style={{ backgroundColor: formData.color }}
-                        onClick={() => setShowColorPicker(!showColorPicker)}
-                      >
-                        <span style={{ color: getContrastColor(formData.color) }} className="text-xs font-bold">
-                          {formData.code || 'CLR'}
-                        </span>
-                      </div>
-                      <input
-                        type="text"
-                        value={formData.color}
-                        onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="#3B82F6"
-                        pattern="^#[0-9A-Fa-f]{6}$"
-                        required
-                      />
-                    </div>
-                    
-                    {/* Color Palette */}
-                    {showColorPicker && (
-                      <div className="border border-gray-200 rounded-lg p-4 bg-white shadow-lg">
-                        <p className="text-sm font-medium text-gray-700 mb-3">Choose a color:</p>
-                        <div className="grid grid-cols-8 gap-2">
-                          {colorPalette.map((color) => (
-                            <button
-                              key={color}
-                              type="button"
-                              className="w-8 h-8 rounded-lg border-2 border-gray-200 hover:border-gray-400 transition-colors"
-                              style={{ backgroundColor: color }}
-                              onClick={() => selectColor(color)}
-                              title={color}
-                            />
-                          ))}
-                        </div>
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <input
-                            type="color"
-                            value={formData.color}
-                            onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-                            className="w-full h-10 rounded-lg border border-gray-300 cursor-pointer"
-                          />
-                        </div>
-                      </div>
-                    )}
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Team Color *</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={formData.color}
+                      onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                      placeholder="#3B82F6"
+                      required
+                    />
+                    <div 
+                      className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer shadow-sm"
+                      style={{ backgroundColor: formData.color }}
+                      onClick={() => setShowColorPicker(!showColorPicker)}
+                      title="Click to pick a color"
+                    />
                   </div>
+
+                  {showColorPicker && (
+                    <div className="mt-3 p-3 bg-white border border-gray-200 rounded-lg shadow-lg">
+                      <div className="grid grid-cols-8 gap-2">
+                        {colorPalette.map((color, index) => (
+                          <div
+                            key={index}
+                            className="w-6 h-6 rounded cursor-pointer hover:scale-110 transition-transform border border-gray-200"
+                            style={{ backgroundColor: color }}
+                            onClick={() => selectColor(color)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Team Captain */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Team Captain *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Team Captain *</label>
                   <input
                     type="text"
                     value={formData.captain}
                     onChange={(e) => setFormData(prev => ({ ...prev, captain: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Captain name"
+                    placeholder="Captain's full name"
                     required
                   />
                 </div>
 
-                {/* Team Captain Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Team Captain Email
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Primary Captain Email</label>
                   <input
                     type="email"
                     value={formData.captainEmail}
@@ -356,26 +456,69 @@ export default function TeamsPage() {
                 </div>
               </div>
 
-              {/* Description */}
+              {/* Authorized Admin Emails for Portal Access */}
+              <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800">
+                      Team Admin Emails (Multi-User Access)
+                    </label>
+                    <p className="text-xs text-gray-500">
+                      Users logging in with any of these emails will get full access to the Team Portal (/team-admin).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addAdminEmailField}
+                    className="self-start sm:self-auto inline-flex items-center gap-1 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg shadow-sm transition-colors"
+                  >
+                    + Add Another Admin Email
+                  </button>
+                </div>
+
+                <div className="space-y-2 mt-3">
+                  {formData.adminEmails.map((emailVal, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-xs">
+                          ✉️
+                        </span>
+                        <input
+                          type="email"
+                          value={emailVal}
+                          onChange={(e) => updateAdminEmail(index, e.target.value)}
+                          className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+                          placeholder={index === 0 ? "admin1@gmail.com (e.g. Captain)" : `admin${index + 1}@gmail.com (e.g. Vice-Captain / Convener)`}
+                        />
+                      </div>
+                      {formData.adminEmails.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeAdminEmailField(index)}
+                          className="px-3 py-2 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg border border-red-200 transition-colors"
+                          title="Remove email"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows={3}
-                  placeholder="Team description"
-                  required
+                  placeholder="Brief description of the team"
                 />
               </div>
 
-              {/* Team Motto */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Team Motto
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Team Motto</label>
                 <input
                   type="text"
                   value={formData.motto}
@@ -440,94 +583,179 @@ export default function TeamsPage() {
         )}
 
         {/* Teams List */}
-        <ShowcaseSection title="All Teams">
+        <ShowcaseSection title="All Teams & Participation Eligibility">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {teams.map((team) => {
               const textColor = getContrastColor(team.color);
+              const stats = getTeamCandidateStats(team.code);
               
               return (
-                <div key={team._id?.toString()} className="bg-white border border-gray-200 rounded-lg p-6 relative shadow-sm hover:shadow-md transition-shadow">
-                  {/* Main Team Info */}
-                  <div className="flex items-center space-x-3 mb-4">
-                    <div 
-                      className="w-12 h-12 rounded-lg flex items-center justify-center shadow-lg"
-                      style={{ backgroundColor: team.color }}
-                    >
-                      <span style={{ color: textColor }} className="font-bold text-lg">
-                        {team.code}
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-gray-900 text-lg">{team.name}</h4>
-                      <p className="text-xs text-gray-500 font-medium">Code: {team.code}</p>
-                      <div className="flex items-center gap-2 mt-1">
+                <div 
+                  key={team._id?.toString()} 
+                  className={`bg-white border-2 rounded-xl p-6 relative shadow-sm hover:shadow-md transition-all flex flex-col justify-between ${
+                    stats.isEligible 
+                      ? 'border-emerald-200 hover:border-emerald-400' 
+                      : 'border-rose-200 hover:border-rose-400'
+                  }`}
+                >
+                  <div>
+                    {/* Top Row: Team Code Badge + Eligibility Status Badge */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-3">
                         <div 
-                          className="w-4 h-4 rounded-full border border-gray-300"
-                          style={{ backgroundColor: team.color }}
-                        />
-                        <span className="text-xs text-gray-600">{team.color}</span>
+                          className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md font-bold text-lg"
+                          style={{ backgroundColor: team.color, color: textColor }}
+                        >
+                          {team.code}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-gray-900 text-lg leading-tight">{team.name}</h4>
+                          <p className="text-xs text-gray-500 font-medium">Code: {team.code}</p>
+                        </div>
+                      </div>
+
+                      {/* Prominent Eligibility Badge */}
+                      <div>
+                        {stats.teamCandidates.length === 0 ? (
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-300">
+                            ⚪ No Candidates
+                          </span>
+                        ) : stats.isEligible ? (
+                          <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-sm">
+                            <span>🟢</span> ELIGIBLE
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1 shadow-sm animate-pulse">
+                            <span>🔴</span> NOT ELIGIBLE
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </div>
 
-                  {/* Description */}
-                  <p className="text-sm text-gray-600 mb-3">{team.description}</p>
-
-                  {/* Motto */}
-                  {team.motto && (
-                    <div className="mb-3">
-                      <p className="text-xs font-medium text-gray-500 mb-1">MOTTO</p>
-                      <p className="text-sm italic text-gray-700">"{team.motto}"</p>
+                    {/* Eligibility Banner inside Card */}
+                    <div className={`p-3 rounded-lg border mb-4 text-xs ${
+                      stats.teamCandidates.length === 0 
+                        ? 'bg-gray-50 border-gray-200 text-gray-600'
+                        : stats.isEligible 
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900' 
+                        : 'bg-rose-50 border-rose-200 text-rose-900'
+                    }`}>
+                      {stats.teamCandidates.length === 0 ? (
+                        <p>No candidates assigned to this team yet.</p>
+                      ) : stats.isEligible ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">✓</span>
+                          <span>
+                            <strong>Eligible to compete:</strong> All {stats.teamCandidates.length} candidates meet the minimum ({minLimit}) programme requirement.
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-center gap-1.5 font-bold mb-1">
+                            <span className="text-sm">⚠️</span>
+                            <span>Not Eligible ({stats.underMinCount} candidate{stats.underMinCount > 1 ? 's' : ''} below min)</span>
+                          </div>
+                          <p className="text-[11px] text-rose-700 leading-normal">
+                            {stats.zeroCount > 0 ? `${stats.zeroCount} candidate(s) have 0 programmes registered.` : ''} Each candidate must participate in at least {minLimit} programme(s).
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  {/* Captain */}
-                  <div className="mb-3">
-                    <p className="text-xs font-medium text-gray-500 mb-1">CAPTAIN</p>
-                    <p className="text-sm font-medium text-gray-800">{team.captain}</p>
-                    {team.captainEmail && (
-                      <p className="text-xs text-gray-600 mt-1">📧 {team.captainEmail}</p>
+                    {/* Description & Motto */}
+                    {team.description && (
+                      <p className="text-xs text-gray-600 mb-3 line-clamp-2">{team.description}</p>
                     )}
-                  </div>
+                    {team.motto && (
+                      <div className="mb-3 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Motto</p>
+                        <p className="text-xs italic text-gray-700">"{team.motto}"</p>
+                      </div>
+                    )}
 
-                  {/* Leaders */}
-                  {team.leaders && team.leaders.length > 0 && (
+                    {/* Captain & Admin Emails */}
+                    <div className="mb-2 text-xs">
+                      <span className="text-gray-500 font-semibold uppercase text-[10px] block">Captain</span>
+                      <span className="font-medium text-gray-800">{team.captain}</span>
+                      {team.captainEmail && (
+                        <span className="text-gray-500 text-[11px] ml-1">({team.captainEmail})</span>
+                      )}
+                    </div>
+
+                    {/* Admin Access Emails */}
                     <div className="mb-3">
-                      <p className="text-xs font-medium text-gray-500 mb-1">LEADERS ({team.leaders.length})</p>
-                      <div className="space-y-1">
-                        {team.leaders.map((leader, index) => (
-                          <p key={index} className="text-sm text-gray-700">• {leader}</p>
+                      <span className="text-gray-500 font-semibold uppercase text-[10px] block mb-1">
+                        Portal Admins ({((team.adminEmails && team.adminEmails.length > 0) ? team.adminEmails : (team.captainEmail ? [team.captainEmail] : [])).length})
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {((team.adminEmails && team.adminEmails.length > 0) 
+                          ? team.adminEmails 
+                          : (team.captainEmail ? [team.captainEmail] : [])
+                        ).map((email, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100"
+                            title={email}
+                          >
+                            <span>✉️</span>
+                            <span className="truncate max-w-[140px]">{email}</span>
+                          </span>
                         ))}
+                        {(!team.adminEmails || team.adminEmails.length === 0) && !team.captainEmail && (
+                          <span className="text-gray-400 italic text-[11px]">No login emails assigned</span>
+                        )}
                       </div>
                     </div>
-                  )}
 
-                  {/* Stats */}
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-gray-900">{team.members}</p>
-                      <p className="text-xs text-gray-500">Members</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-bold text-gray-900">{team.points}</p>
-                      <p className="text-xs text-gray-500">Points</p>
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-3 gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200 mb-4 text-center">
+                      <div>
+                        <p className="text-base font-bold text-gray-900">{stats.teamCandidates.length}</p>
+                        <p className="text-[10px] text-gray-500 font-medium">Candidates</p>
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-emerald-600">
+                          {stats.teamCandidates.length - stats.underMinCount}
+                        </p>
+                        <p className="text-[10px] text-gray-500 font-medium">Ready (≥{minLimit})</p>
+                      </div>
+                      <div>
+                        <p className={`text-base font-bold ${stats.underMinCount > 0 ? 'text-rose-600' : 'text-gray-400'}`}>
+                          {stats.underMinCount}
+                        </p>
+                        <p className="text-[10px] text-gray-500 font-medium">Under Min</p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2">
+                  <div>
+                    {/* View Eligibility Details Button */}
                     <button
-                      onClick={() => handleEdit(team)}
-                      className="flex-1 bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                      onClick={() => {
+                        setSelectedTeamForEligibility(team);
+                        setEligibilityFilter(stats.underMinCount > 0 ? 'under-min' : 'all');
+                        setEligibilitySearch('');
+                      }}
+                      className="w-full mb-3 py-2 px-3 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 border border-purple-200 text-purple-900 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
                     >
-                      Edit
+                      <span>🔍</span> View Candidate Eligibility ({stats.teamCandidates.length})
                     </button>
-                    <button
-                      onClick={() => handleDelete(team)}
-                      className="flex-1 bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"
-                    >
-                      Delete
-                    </button>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEdit(team)}
+                        className="flex-1 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors text-xs font-medium"
+                      >
+                        Edit Team
+                      </button>
+                      <button
+                        onClick={() => handleDelete(team)}
+                        className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors text-xs font-medium"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -542,6 +770,178 @@ export default function TeamsPage() {
           )}
         </ShowcaseSection>
       </div>
+
+      {/* Candidate Eligibility Details Modal */}
+      {selectedTeamForEligibility && activeModalStats && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-in">
+            {/* Modal Header */}
+            <div className="p-6 border-b flex items-center justify-between bg-gradient-to-r from-gray-50 to-purple-50">
+              <div className="flex items-center space-x-3">
+                <div 
+                  className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md"
+                  style={{ backgroundColor: selectedTeamForEligibility.color }}
+                >
+                  {selectedTeamForEligibility.code}
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    {selectedTeamForEligibility.name} • Candidate Participation
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Rule Requirement: Minimum <strong>{minLimit}</strong>, Maximum <strong>{maxLimit}</strong> programme(s) per student
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedTeamForEligibility(null)}
+                className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 font-bold transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Stats & Filter Bar */}
+            <div className="p-4 bg-gray-50 border-b flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setEligibilityFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    eligibilityFilter === 'all'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-white border text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  All ({activeModalStats.teamCandidates.length})
+                </button>
+                <button
+                  onClick={() => setEligibilityFilter('under-min')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 ${
+                    eligibilityFilter === 'under-min'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'bg-white border text-rose-700 hover:bg-rose-50'
+                  }`}
+                >
+                  <span>⚠️</span> Under Min ({activeModalStats.underMinCount})
+                </button>
+                <button
+                  onClick={() => setEligibilityFilter('ready')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 ${
+                    eligibilityFilter === 'ready'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-white border text-emerald-700 hover:bg-emerald-50'
+                  }`}
+                >
+                  <span>✓</span> Eligible ({activeModalStats.teamCandidates.length - activeModalStats.underMinCount})
+                </button>
+              </div>
+
+              <input
+                type="text"
+                placeholder="Search candidate name or chest #..."
+                value={eligibilitySearch}
+                onChange={(e) => setEligibilitySearch(e.target.value)}
+                className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+              />
+            </div>
+
+            {/* Candidate List Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-3">
+              {filteredModalCandidates.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <span className="text-4xl block mb-2">🔍</span>
+                  <p className="text-sm">No candidates match your current filter.</p>
+                </div>
+              ) : (
+                filteredModalCandidates.map((item) => (
+                  <div
+                    key={item.candidate._id?.toString() || item.candidate.chestNumber}
+                    className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-colors ${
+                      item.isUnderMin 
+                        ? 'bg-rose-50/60 border-rose-200' 
+                        : 'bg-emerald-50/50 border-emerald-200'
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-gray-900 text-sm">
+                          {item.candidate.chestNumber}
+                        </span>
+                        <span className="font-semibold text-gray-900 text-sm">
+                          {item.candidate.name}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600 uppercase font-medium">
+                          {item.candidate.section}
+                        </span>
+                      </div>
+
+                      {/* Registered Programmes List */}
+                      <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] text-gray-500 font-medium">Programmes:</span>
+                        {item.programmes.length === 0 ? (
+                          <span className="text-[11px] text-rose-700 font-bold italic">None registered yet</span>
+                        ) : (
+                          item.programmes.map((progName, idx) => (
+                            <span 
+                              key={idx} 
+                              className="text-[11px] bg-white border border-gray-200 text-gray-700 px-2 py-0.5 rounded-md shadow-2xs"
+                            >
+                              {progName}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Status Pill */}
+                    <div className="text-right flex items-center gap-3">
+                      <div>
+                        <div className="text-xs font-bold text-gray-900">
+                          {item.registeredCount} / {maxLimit} prog
+                        </div>
+                        <div className="text-[10px] text-gray-500">
+                          Min required: {minLimit}
+                        </div>
+                      </div>
+
+                      {item.hasZero ? (
+                        <span className="text-xs px-3 py-1 rounded-full font-bold bg-rose-200 text-rose-900 border border-rose-300">
+                          0 Programmes
+                        </span>
+                      ) : item.isUnderMin ? (
+                        <span className="text-xs px-3 py-1 rounded-full font-bold bg-amber-200 text-amber-900 border border-amber-300">
+                          Needs {minLimit - item.registeredCount} More
+                        </span>
+                      ) : (
+                        <span className="text-xs px-3 py-1 rounded-full font-bold bg-emerald-200 text-emerald-900 border border-emerald-300 flex items-center gap-1">
+                          <span>✓</span> Ready
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t bg-gray-50 flex items-center justify-between">
+              <div className="text-xs text-gray-500">
+                Team Eligibility Status: {activeModalStats.isEligible ? (
+                  <strong className="text-emerald-700 font-bold">🟢 Eligible</strong>
+                ) : (
+                  <strong className="text-rose-700 font-bold">🔴 Not Eligible ({activeModalStats.underMinCount} candidates under minimum)</strong>
+                )}
+              </div>
+              <button
+                onClick={() => setSelectedTeamForEligibility(null)}
+                className="bg-gray-800 hover:bg-gray-900 text-white px-5 py-2 rounded-lg text-xs font-bold transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -6,7 +6,21 @@ import { Team } from '@/types';
 
 export default function TeamDetailsPage() {
   const searchParams = useSearchParams();
-  const teamCode = searchParams.get('team') || 'SMD';
+  const getFallbackTeam = () => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('selectedTeam');
+      if (saved) return saved;
+      try {
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (u.team?.code) return u.team.code;
+        }
+      } catch (e) {}
+    }
+    return 'SMD';
+  };
+  const teamCode = searchParams.get('team') || getFallbackTeam();
   
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
@@ -276,6 +290,28 @@ export default function TeamDetailsPage() {
               <p className="text-sm text-gray-600">{team.description}</p>
               {team.motto && (
                 <p className="text-sm text-gray-500 italic mt-2">"{team.motto}"</p>
+              )}
+            </div>
+          </div>
+
+          {/* Authorized Admin Accounts */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Authorized Admin Accounts</h2>
+              <p className="text-xs text-gray-500 mt-1">Google accounts with access to this team's admin portal.</p>
+            </div>
+            <div className="p-6 space-y-2">
+              {((team.adminEmails && team.adminEmails.length > 0) ? team.adminEmails : (team.captainEmail ? [team.captainEmail] : [])).map((email, idx) => (
+                <div key={idx} className="flex items-center space-x-2 text-sm text-gray-700 bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                  <span className="text-blue-600">✉️</span>
+                  <span className="font-mono text-xs">{email}</span>
+                  {idx === 0 && (
+                    <span className="ml-auto text-[10px] bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">Primary</span>
+                  )}
+                </div>
+              ))}
+              {(!team.adminEmails || team.adminEmails.length === 0) && !team.captainEmail && (
+                <p className="text-sm text-gray-500 italic">No admin emails configured. Contact festival administrators.</p>
               )}
             </div>
           </div>

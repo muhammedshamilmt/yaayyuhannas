@@ -57,7 +57,9 @@ export async function GET(request: Request) {
     // Let's get all programmes and match them manually since it's easier and usually a small collection
     let programmeQuery: any = {};
     if (activeFestId) {
-      programmeQuery.festId = activeFestId;
+      programmeQuery.festId = ObjectId.isValid(activeFestId) 
+        ? { $in: [activeFestId, new ObjectId(activeFestId)] } 
+        : activeFestId;
     }
     const programmes = await db.collection<Programme>('programmes').find(programmeQuery).toArray();
     

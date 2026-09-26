@@ -21,12 +21,22 @@ export async function GET() {
         venue: 'Wattaqa School Campus',
         description: 'Annual arts and sports festival celebrating creativity, talent, and teamwork among students.',
         status: 'ongoing',
+        minCandidateParticipation: 1,
+        maxCandidateParticipation: 3,
         createdAt: new Date(),
         updatedAt: new Date()
       };
       
       const result = await collection.insertOne(defaultInfo);
       festivalInfo = { ...defaultInfo, _id: result.insertedId.toString() };
+    } else {
+      // Ensure defaults if missing in existing document
+      if (festivalInfo.minCandidateParticipation === undefined) {
+        festivalInfo.minCandidateParticipation = 1;
+      }
+      if (festivalInfo.maxCandidateParticipation === undefined) {
+        festivalInfo.maxCandidateParticipation = 3;
+      }
     }
     
     return NextResponse.json(festivalInfo);
@@ -39,6 +49,13 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
+    
+    if (body.minCandidateParticipation !== undefined) {
+      body.minCandidateParticipation = parseInt(body.minCandidateParticipation, 10) || 1;
+    }
+    if (body.maxCandidateParticipation !== undefined) {
+      body.maxCandidateParticipation = parseInt(body.maxCandidateParticipation, 10) || 3;
+    }
     
     // Update record in MongoDB
     const db = await getDatabase();

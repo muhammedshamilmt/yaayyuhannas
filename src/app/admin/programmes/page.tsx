@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
 import { Programme, ProgrammeParticipant, Team } from '@/types';
+import ProgrammesExcelExport from '@/components/admin/ProgrammesExcelExport';
 
 export default function ProgrammesPage() {
   const [programmes, setProgrammes] = useState<Programme[]>([]);
@@ -40,17 +41,11 @@ export default function ProgrammesPage() {
 
   // Filter out blank/empty programmes
   const filterValidProgrammes = (programmes: Programme[]) => {
+    if (!Array.isArray(programmes)) return [];
     return programmes.filter(programme =>
-      programme.name &&
-      programme.name.trim() !== '' &&
-      programme.code &&
-      programme.code.trim() !== '' &&
-      programme.category &&
-      programme.category.trim() !== '' &&
-      programme.section &&
-      programme.section.trim() !== '' &&
-      programme.positionType &&
-      programme.positionType.trim() !== ''
+      programme &&
+      programme.name && String(programme.name).trim() !== '' &&
+      programme.code && String(programme.code).trim() !== ''
     );
   };
 
@@ -65,17 +60,17 @@ export default function ProgrammesPage() {
       ]);
 
       const [programmesData, participantsData, teamsData] = await Promise.all([
-        programmesRes.json(),
-        participantsRes.json(),
-        teamsRes.json()
+        programmesRes.ok ? programmesRes.json() : [],
+        participantsRes.ok ? participantsRes.json() : [],
+        teamsRes.ok ? teamsRes.json() : []
       ]);
 
       // Filter out blank/empty programmes
       const validProgrammes = filterValidProgrammes(programmesData);
 
       setProgrammes(validProgrammes);
-      setParticipants(participantsData);
-      setTeams(teamsData);
+      setParticipants(Array.isArray(participantsData) ? participantsData : []);
+      setTeams(Array.isArray(teamsData) ? teamsData : []);
     } catch (error) {
       console.error('Error fetching programmes:', error);
     } finally {
@@ -247,22 +242,69 @@ export default function ProgrammesPage() {
     }
   };
 
+  const [togglingOver, setTogglingOver] = useState<string | null>(null);
+
+  const handleToggleOver = async (programme: Programme) => {
+    const isCurrentlyOver = programme.status === 'completed' || (programme as any).isOver === true;
+    const newStatus = isCurrentlyOver ? 'active' : 'completed';
+    const confirmMessage = isCurrentlyOver
+      ? `Reopen programme "${programme.name}" (${programme.code})?\nTeams will be allowed to register and edit candidates again.`
+      : `Mark programme "${programme.name}" (${programme.code}) as OVER?\nTeams will NOT be able to register or edit candidates for this programme.`;
+
+    if (!confirm(confirmMessage)) return;
+
+    const progId = programme._id?.toString() || programme.id;
+    setTogglingOver(progId || null);
+
+    try {
+      const response = await fetch(`/api/programmes?id=${progId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: newStatus,
+          isOver: !isCurrentlyOver
+        })
+      });
+
+      if (response.ok) {
+        setProgrammes(prev => prev.map(p => {
+          const currentId = p._id?.toString() || p.id;
+          return currentId === progId
+            ? { ...p, status: newStatus, isOver: !isCurrentlyOver }
+            : p;
+        }));
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to update programme status');
+      }
+    } catch (error) {
+      console.error('Error toggling programme status:', error);
+      alert('Error updating programme status');
+    } finally {
+      setTogglingOver(null);
+    }
+  };
+
   // Get programme registrations with team info
   const getProgrammeRegistrations = () => {
+    if (!Array.isArray(programmes)) return [];
+    
     return programmes.map(programme => {
-      const programmeParticipants = participants.filter(p => p.programmeId === programme._id?.toString());
+      const programmeParticipants = Array.isArray(participants) 
+        ? participants.filter(p => p.programmeId === programme._id?.toString())
+        : [];
       return {
         ...programme,
         registrations: programmeParticipants.map(p => ({
           ...p,
-          teamInfo: teams.find(t => t.code === p.teamCode)
+          teamInfo: Array.isArray(teams) ? teams.find(t => t.code === p.teamCode) : undefined
         }))
       };
     });
   };
 
   const programmeRegistrations = getProgrammeRegistrations();
-  const totalRegistrations = participants.length;
+  const totalRegistrations = Array.isArray(participants) ? participants.length : 0;
 
   const handleExportCSV = () => {
     const programmesToExport = programmes.filter((programme) => {
@@ -554,16 +596,25 @@ export default function ProgrammesPage() {
 
             {/* Programmes List */}
             <ShowcaseSection title="Programmes List">
-              <div className="flex justify-end gap-3 mb-4 print:hidden">
+              <div className="flex flex-wrap items-center justify-end gap-3 mb-4 print:hidden">
+                <ProgrammesExcelExport
+                  programmes={programmes}
+                  filterCategory={filterCategory}
+                  filterSubcategory={filterSubcategory}
+                  filterSection={filterSection}
+                  filterPositionType={filterPositionType}
+                  searchQuery={searchQuery}
+                />
                 <button
                   onClick={handleExportCSV}
-                  className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium"
+                  title="Export filtered programmes as CSV"
                 >
-                  <span className="mr-2">📊</span> Export CSV
+                  <span className="mr-2">📄</span> Export CSV
                 </button>
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  className="flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
                 >
                   <span className="mr-2">🖨️</span> Print List
                 </button>
@@ -719,25 +770,47 @@ export default function ProgrammesPage() {
                             </span>
                           </td>
                           <td className="py-3 px-4">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${programme.status === 'active' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'
-                              }`}>
-                              {programme.status ? programme.status.charAt(0).toUpperCase() + programme.status.slice(1) : 'Unknown'}
-                            </span>
+                            {programme.status === 'completed' || (programme as any).isOver ? (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                <span>🛑</span> OVER
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <span>🟢</span> ACTIVE
+                              </span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 print:hidden">
-                            <div className="flex space-x-3">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleToggleOver(programme)}
+                                disabled={togglingOver === (programme._id?.toString() || programme.id)}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shadow-xs ${
+                                  programme.status === 'completed' || (programme as any).isOver
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                    : 'bg-rose-600 hover:bg-rose-700 text-white'
+                                } disabled:opacity-50`}
+                                title={programme.status === 'completed' || (programme as any).isOver ? 'Reopen programme' : 'Mark as Over / Finished'}
+                              >
+                                {togglingOver === (programme._id?.toString() || programme.id) ? (
+                                  'Updating...'
+                                ) : programme.status === 'completed' || (programme as any).isOver ? (
+                                  'Reopen'
+                                ) : (
+                                  'Mark Over'
+                                )}
+                              </button>
                               <button
                                 onClick={() => handleEditProgramme(programme)}
-                                className="text-blue-600 hover:text-blue-900"
+                                className="text-blue-600 hover:text-blue-900 text-xs font-semibold px-2 py-1 hover:bg-blue-50 rounded"
                                 title="Edit programme"
                               >
                                 Edit
                               </button>
-                              <span className="text-gray-300">|</span>
                               <button
                                 onClick={() => handleDelete(programme._id?.toString() || '', programme.name)}
                                 disabled={deleting === programme._id?.toString()}
-                                className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-red-600 hover:text-red-900 text-xs font-semibold px-2 py-1 hover:bg-red-50 rounded disabled:opacity-50"
                                 title="Delete programme"
                               >
                                 {deleting === programme._id?.toString() ? 'Deleting...' : 'Delete'}

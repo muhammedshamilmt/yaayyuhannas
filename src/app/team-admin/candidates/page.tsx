@@ -7,9 +7,25 @@ import { ImageUpload } from '@/components/ui/ImageUpload';
 
 export default function TeamCandidatesPage() {
   const searchParams = useSearchParams();
-  const teamCode = searchParams.get('team') || 'SMD';
+  const getFallbackTeam = () => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('selectedTeam');
+      if (saved) return saved;
+      try {
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (u.team?.code) return u.team.code;
+        }
+      } catch (e) {}
+    }
+    return 'SMD';
+  };
+  const teamCode = searchParams.get('team') || getFallbackTeam();
   
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSection, setSelectedSection] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -162,6 +178,45 @@ export default function TeamCandidatesPage() {
     'sub-junior': candidates.filter(c => c.section === 'sub-junior')
   };
 
+  const filteredCandidates = candidates.filter(candidate => {
+    const matchesSection = selectedSection === 'all' || candidate.section === selectedSection;
+    const matchesSearch = searchQuery === '' || 
+      candidate.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      candidate.chestNumber?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSection && matchesSearch;
+  }).sort((a, b) => {
+    // Parse chest numbers to integers for numeric sorting
+    const numA = parseInt(a.chestNumber) || 99999;
+    const numB = parseInt(b.chestNumber) || 99999;
+    return numA - numB;
+  });
+
+  const exportToCSV = () => {
+    const headers = ['Chest Number', 'Name', 'Section', 'Points'];
+    
+    const csvData = filteredCandidates.map(candidate => [
+      candidate.chestNumber || '',
+      `"${(candidate.name || '').replace(/"/g, '""')}"`,
+      candidate.section || '',
+      candidate.points || 0
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `team_${teamCode}_candidates_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -281,8 +336,33 @@ export default function TeamCandidatesPage() {
 
       {/* Candidates List */}
       <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
           <h2 className="text-lg font-semibold text-gray-900">All Candidates</h2>
+          <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+            <select
+              value={selectedSection}
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+            >
+              <option value="all">All Sections</option>
+              <option value="senior">Senior</option>
+              <option value="junior">Junior</option>
+              <option value="sub-junior">Sub Junior</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Search name or chest no..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full sm:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+            />
+            <button
+              onClick={exportToCSV}
+              className="w-full sm:w-auto px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm transition-colors flex items-center justify-center whitespace-nowrap"
+            >
+              Export CSV
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -309,7 +389,7 @@ export default function TeamCandidatesPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {candidates.map((candidate) => (
+              {filteredCandidates.map((candidate) => (
                 <tr key={candidate._id?.toString()} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingId === candidate._id?.toString() ? (
@@ -419,11 +499,15 @@ export default function TeamCandidatesPage() {
               ))}
             </tbody>
           </table>
-          {candidates.length === 0 && (
+          {filteredCandidates.length === 0 && (
             <div className="text-center py-12">
               <div className="text-gray-400 text-6xl mb-4">👥</div>
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">No Candidates Yet</h3>
-              <p className="text-gray-500">Add your first team member using the form above.</p>
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">No Candidates Found</h3>
+              <p className="text-gray-500">
+                {candidates.length === 0 
+                  ? "Add your first team member using the form above." 
+                  : "No candidates match your filters."}
+              </p>
             </div>
           )}
         </div>
