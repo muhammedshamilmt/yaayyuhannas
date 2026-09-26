@@ -106,7 +106,8 @@ export default function TeamResultsPage() {
     return { class: badges[position], icon: icons[position] };
   };
 
-  const getProgrammeName = (programmeCode: string) => {
+  const getProgrammeName = (programmeCode?: string) => {
+    if (!programmeCode) return 'Unknown Programme';
     const programme = programmes.find(p => p.code === programmeCode);
     return programme ? programme.name : programmeCode;
   };

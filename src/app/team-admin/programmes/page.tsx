@@ -28,6 +28,8 @@ export default function TeamProgrammesPage() {
   const [programmes, setProgrammes] = useState<Programme[]>([]);
   const [participants, setParticipants] = useState<ProgrammeParticipant[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSection, setSelectedSection] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'registered' | 'unregistered'>('all');
   const [teamData, setTeamData] = useState<Team | null>(null);
   const [festInfo, setFestInfo] = useState<{ minCandidateParticipation?: number; maxCandidateParticipation?: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,28 +88,56 @@ export default function TeamProgrammesPage() {
     }
   };
 
-  // Get team's available sections from candidates
-  const teamSections = [...new Set(candidates.map(c => c.section))];
-  
-  // Filter programmes that the team can participate in
-  const availableProgrammes = programmes.filter(p => {
-    // General programmes are available to all teams
-    if (p.section === 'general') return true;
-    // Section-specific programmes are only available if team has candidates in that section
-    return teamSections.includes(p.section);
+  // Section options
+  const sectionOptions = [
+    { value: 'all', label: 'All Sections' },
+    { value: 'senior', label: 'Senior' },
+    { value: 'junior', label: 'Junior' },
+    { value: 'sub-junior', label: 'Sub Junior' },
+    { value: 'general', label: 'General' },
+  ];
+
+  const availableProgrammes = programmes;
+
+  // Calculate unique registered programme IDs for this team
+  const registeredProgrammeIds = [...new Set(participants.map(p => p.programmeId))];
+  const registeredProgIdSet = new Set(registeredProgrammeIds);
+
+  // Section counts
+  const sectionCounts = {
+    all: availableProgrammes.length,
+    senior: availableProgrammes.filter(p => p.section === 'senior').length,
+    junior: availableProgrammes.filter(p => p.section === 'junior').length,
+    'sub-junior': availableProgrammes.filter(p => p.section === 'sub-junior').length,
+    general: availableProgrammes.filter(p => p.section === 'general').length,
+  };
+
+  const filteredProgrammes = availableProgrammes.filter(p => {
+    // 1. Search filter
+    const matchesSearch = 
+      searchQuery === '' || 
+      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      p.code?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // 2. Section filter
+    const matchesSection = 
+      selectedSection === 'all' || 
+      p.section === selectedSection;
+
+    // 3. Status filter
+    const isProgRegistered = registeredProgIdSet.has(p._id?.toString() || '');
+    const matchesStatus = 
+      statusFilter === 'all' || 
+      (statusFilter === 'registered' && isProgRegistered) || 
+      (statusFilter === 'unregistered' && !isProgRegistered);
+
+    return matchesSearch && matchesSection && matchesStatus;
   });
   
-  const filteredProgrammes = availableProgrammes.filter(p => 
-    searchQuery === '' || 
-    p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    p.code?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  
   // Calculate correct statistics
-  const registeredProgrammeIds = [...new Set(participants.map(p => p.programmeId))]; // Unique programme IDs
   const availableProgrammesCount = availableProgrammes.length;
-  const registeredCount = registeredProgrammeIds.length; // Count unique registered programmes
-  const unregisteredCount = Math.max(0, availableProgrammesCount - registeredCount); // Ensure non-negative
+  const registeredCount = registeredProgrammeIds.length;
+  const unregisteredCount = Math.max(0, availableProgrammesCount - registeredCount);
 
   const groupedProgrammes = {
     sports: filteredProgrammes.filter(p => p.category === 'sports' && p.section !== 'general'),
@@ -116,7 +146,7 @@ export default function TeamProgrammesPage() {
     artsStageGeneral: filteredProgrammes.filter(p => p.category === 'arts' && (p.subcategory === 'stage' || !p.subcategory) && p.section === 'general'),
     artsNonStage: filteredProgrammes.filter(p => p.category === 'arts' && p.subcategory === 'non-stage' && p.section !== 'general'),
     artsNonStageGeneral: filteredProgrammes.filter(p => p.category === 'arts' && p.subcategory === 'non-stage' && p.section === 'general'),
-    general: filteredProgrammes.filter(p => p.category === 'general')
+    general: filteredProgrammes.filter(p => (p.category as any) === 'general')
   };
 
   if (loading) {
@@ -155,20 +185,129 @@ export default function TeamProgrammesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Programme Registration</h1>
           <p className="text-gray-600">Register your team for competitions and events</p>
         </div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
-          <input
-            type="text"
-            placeholder="Search programme name or code..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full sm:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
-          />
-          <div className="text-right px-4 py-2 rounded-lg border shadow-sm text-white w-full sm:w-auto"
+        <div className="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-end">
+          <div className="text-right px-4 py-2 rounded-lg border shadow-sm text-white"
                style={{ backgroundColor: teamData?.color || '#3B82F6' }}>
             <div className="text-2xl font-bold">{registeredCount}</div>
-            <div className="text-sm opacity-90">Registered</div>
+            <div className="text-xs uppercase tracking-wider opacity-90">Registered</div>
           </div>
         </div>
+      </div>
+
+      {/* Section and Status Filter Toolbar */}
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Section Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mr-1 hidden sm:inline">
+              Section:
+            </span>
+            {sectionOptions.map((opt) => {
+              const isSelected = selectedSection === opt.value;
+              const count = sectionCounts[opt.value as keyof typeof sectionCounts] ?? 0;
+
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSelectedSection(opt.value)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/25 ring-2 ring-blue-600/30'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900'
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    isSelected ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right Controls: Status Filter & Search Box */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full lg:w-auto">
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="text-xs font-medium px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700"
+            >
+              <option value="all">All Status</option>
+              <option value="registered">Registered Only</option>
+              <option value="unregistered">Not Registered Only</option>
+            </select>
+
+            {/* Search Box */}
+            <div className="relative flex-1 sm:w-60">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-xs">
+                🔍
+              </span>
+              <input
+                type="text"
+                placeholder="Search name or code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-7 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-xs text-gray-800 placeholder-gray-400"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Reset button if filter is active */}
+            {(selectedSection !== 'all' || statusFilter !== 'all' || searchQuery) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSection('all');
+                  setStatusFilter('all');
+                  setSearchQuery('');
+                }}
+                className="text-xs font-semibold text-rose-600 hover:text-rose-700 px-2 py-2 rounded-lg hover:bg-rose-50 transition-colors whitespace-nowrap"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Active Filter Indicator / Summary */}
+        {(selectedSection !== 'all' || statusFilter !== 'all' || searchQuery) && (
+          <div className="flex items-center gap-2 pt-2 border-t border-gray-100 text-xs text-gray-500 flex-wrap">
+            <span>Filtering by:</span>
+            {selectedSection !== 'all' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-medium border border-blue-100">
+                Section: <strong className="capitalize">{selectedSection}</strong>
+                <button type="button" onClick={() => setSelectedSection('all')} className="hover:text-blue-900 ml-0.5">×</button>
+              </span>
+            )}
+            {statusFilter !== 'all' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-medium border border-purple-100">
+                Status: <strong className="capitalize">{statusFilter}</strong>
+                <button type="button" onClick={() => setStatusFilter('all')} className="hover:text-purple-900 ml-0.5">×</button>
+              </span>
+            )}
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 font-medium border border-amber-100">
+                Query: <strong>"{searchQuery}"</strong>
+                <button type="button" onClick={() => setSearchQuery('')} className="hover:text-amber-900 ml-0.5">×</button>
+              </span>
+            )}
+            <span className="ml-auto text-gray-400 font-medium">
+              Showing {filteredProgrammes.length} of {availableProgrammes.length} programmes
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Team Participation & Eligibility Banner */}
@@ -419,10 +558,28 @@ export default function TeamProgrammesPage() {
 
         {/* No Programmes Message */}
         {Object.values(groupedProgrammes).every(group => group.length === 0) && (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <div className="text-gray-400 text-6xl mb-4">📋</div>
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">No Programmes Available</h3>
-            <p className="text-gray-500">Programmes will appear here once they are added by the admin.</p>
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <div className="text-gray-400 text-5xl mb-3">🔍</div>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">No Programmes Found</h3>
+            <p className="text-sm text-gray-500 max-w-md mx-auto">
+              {searchQuery || selectedSection !== 'all' || statusFilter !== 'all'
+                ? `No programmes match your current filters (Section: ${selectedSection === 'all' ? 'All' : selectedSection}${statusFilter !== 'all' ? `, Status: ${statusFilter}` : ''}${searchQuery ? `, Query: "${searchQuery}"` : ''}).`
+                : 'Programmes will appear here once they are added by the administrator.'
+              }
+            </p>
+            {(selectedSection !== 'all' || statusFilter !== 'all' || searchQuery) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSection('all');
+                  setStatusFilter('all');
+                  setSearchQuery('');
+                }}
+                className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+              >
+                Reset All Filters
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -489,7 +646,7 @@ function ProgrammeCard({
     }
     // Pre-populate with existing participants
     if (existingParticipant) {
-      setSelectedParticipants(existingParticipant.participants.map(p => p.candidateId || p));
+      setSelectedParticipants(existingParticipant.participants.map((p: any) => p?.candidateId || p));
     }
     setSearchTerm('');
     setShowEditModal(true);

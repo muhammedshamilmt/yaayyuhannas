@@ -82,7 +82,7 @@ export default function TeamDashboard() {
     senior: candidates.filter(c => c.section === 'senior').length,
     junior: candidates.filter(c => c.section === 'junior').length,
     'sub-junior': candidates.filter(c => c.section === 'sub-junior').length,
-    general: candidates.filter(c => c.section === 'general').length
+    general: candidates.filter(c => (c.section as string) === 'general').length
   };
 
   // Recent activities (mock data for now)
