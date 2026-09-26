@@ -18,12 +18,12 @@ export default function TeamProgrammesPage() {
           const u = JSON.parse(stored);
           if (u.team?.code) return u.team.code;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return 'SMD';
   };
   const teamCode = searchParams.get('team') || getFallbackTeam();
-  
+
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [programmes, setProgrammes] = useState<Programme[]>([]);
   const [participants, setParticipants] = useState<ProgrammeParticipant[]>([]);
@@ -114,26 +114,26 @@ export default function TeamProgrammesPage() {
 
   const filteredProgrammes = availableProgrammes.filter(p => {
     // 1. Search filter
-    const matchesSearch = 
-      searchQuery === '' || 
-      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch =
+      searchQuery === '' ||
+      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.code?.toLowerCase().includes(searchQuery.toLowerCase());
 
     // 2. Section filter
-    const matchesSection = 
-      selectedSection === 'all' || 
+    const matchesSection =
+      selectedSection === 'all' ||
       p.section === selectedSection;
 
     // 3. Status filter
     const isProgRegistered = registeredProgIdSet.has(p._id?.toString() || '');
-    const matchesStatus = 
-      statusFilter === 'all' || 
-      (statusFilter === 'registered' && isProgRegistered) || 
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'registered' && isProgRegistered) ||
       (statusFilter === 'unregistered' && !isProgRegistered);
 
     return matchesSearch && matchesSection && matchesStatus;
   });
-  
+
   // Calculate correct statistics
   const availableProgrammesCount = availableProgrammes.length;
   const registeredCount = registeredProgrammeIds.length;
@@ -178,7 +178,7 @@ export default function TeamProgrammesPage() {
     <div className="space-y-6">
       {/* Breadcrumb */}
       <TeamBreadcrumb pageName="Programme Registration" teamData={teamData || undefined} />
-      
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
         <div>
@@ -187,7 +187,7 @@ export default function TeamProgrammesPage() {
         </div>
         <div className="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-end">
           <div className="text-right px-4 py-2 rounded-lg border shadow-sm text-white"
-               style={{ backgroundColor: teamData?.color || '#3B82F6' }}>
+            style={{ backgroundColor: teamData?.color || '#3B82F6' }}>
             <div className="text-2xl font-bold">{registeredCount}</div>
             <div className="text-xs uppercase tracking-wider opacity-90">Registered</div>
           </div>
@@ -211,16 +211,14 @@ export default function TeamProgrammesPage() {
                   key={opt.value}
                   type="button"
                   onClick={() => setSelectedSection(opt.value)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
-                    isSelected
-                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/25 ring-2 ring-blue-600/30'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900'
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 ${isSelected
+                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/25 ring-2 ring-blue-600/30'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900'
+                    }`}
                 >
                   <span>{opt.label}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                    isSelected ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200'
-                  }`}>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${isSelected ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200'
+                    }`}>
                     {count}
                   </span>
                 </button>
@@ -311,11 +309,10 @@ export default function TeamProgrammesPage() {
       </div>
 
       {/* Team Participation & Eligibility Banner */}
-      <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm ${
-        isTeamEligible 
-          ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-300 text-emerald-900' 
-          : 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300 text-amber-900'
-      }`}>
+      <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm ${isTeamEligible
+        ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-300 text-emerald-900'
+        : 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300 text-amber-900'
+        }`}>
         <div className="flex items-start gap-3">
           <span className="text-3xl">{isTeamEligible ? '🟢' : '⚠️'}</span>
           <div>
@@ -323,9 +320,8 @@ export default function TeamProgrammesPage() {
               <h3 className="font-bold text-base">
                 Team Eligibility: {isTeamEligible ? 'Eligible' : 'Not Eligible (Under Minimum)'}
               </h3>
-              <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${
-                isTeamEligible ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900'
-              }`}>
+              <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${isTeamEligible ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900'
+                }`}>
                 {isTeamEligible ? 'All Requirements Met' : `${underMinCandidates.length} Under Minimum`}
               </span>
             </div>
@@ -384,9 +380,9 @@ export default function TeamProgrammesPage() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {groupedProgrammes.sports.map((programme) => (
-                  <ProgrammeCard 
-                    key={programme._id?.toString()} 
-                    programme={programme} 
+                  <ProgrammeCard
+                    key={programme._id?.toString()}
+                    programme={programme}
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
@@ -410,9 +406,9 @@ export default function TeamProgrammesPage() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {groupedProgrammes.sportsGeneral.map((programme) => (
-                  <ProgrammeCard 
-                    key={programme._id?.toString()} 
-                    programme={programme} 
+                  <ProgrammeCard
+                    key={programme._id?.toString()}
+                    programme={programme}
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
@@ -436,9 +432,9 @@ export default function TeamProgrammesPage() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {groupedProgrammes.artsStage.map((programme) => (
-                  <ProgrammeCard 
-                    key={programme._id?.toString()} 
-                    programme={programme} 
+                  <ProgrammeCard
+                    key={programme._id?.toString()}
+                    programme={programme}
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
@@ -462,9 +458,9 @@ export default function TeamProgrammesPage() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {groupedProgrammes.artsStageGeneral.map((programme) => (
-                  <ProgrammeCard 
-                    key={programme._id?.toString()} 
-                    programme={programme} 
+                  <ProgrammeCard
+                    key={programme._id?.toString()}
+                    programme={programme}
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
@@ -488,9 +484,9 @@ export default function TeamProgrammesPage() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {groupedProgrammes.artsNonStage.map((programme) => (
-                  <ProgrammeCard 
-                    key={programme._id?.toString()} 
-                    programme={programme} 
+                  <ProgrammeCard
+                    key={programme._id?.toString()}
+                    programme={programme}
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
@@ -514,9 +510,9 @@ export default function TeamProgrammesPage() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {groupedProgrammes.artsNonStageGeneral.map((programme) => (
-                  <ProgrammeCard 
-                    key={programme._id?.toString()} 
-                    programme={programme} 
+                  <ProgrammeCard
+                    key={programme._id?.toString()}
+                    programme={programme}
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
@@ -540,9 +536,9 @@ export default function TeamProgrammesPage() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {groupedProgrammes.general.map((programme) => (
-                  <ProgrammeCard 
-                    key={programme._id?.toString()} 
-                    programme={programme} 
+                  <ProgrammeCard
+                    key={programme._id?.toString()}
+                    programme={programme}
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
@@ -588,11 +584,11 @@ export default function TeamProgrammesPage() {
 }
 
 // Programme Card Component
-function ProgrammeCard({ 
-  programme, 
-  teamCode, 
-  candidates, 
-  participants, 
+function ProgrammeCard({
+  programme,
+  teamCode,
+  candidates,
+  participants,
   onUpdate,
   minLimit = 1,
   maxLimit = 3
@@ -614,7 +610,7 @@ function ProgrammeCard({
   const existingParticipant = participants.find(p => p.programmeId === programme._id?.toString());
   const isRegistered = !!existingParticipant;
   const isOver = programme.status === 'completed' || (programme as any).isOver === true;
-  
+
   // Filter candidates based on programme section
   const sectionCandidates = candidates.filter(candidate => {
     // For general programmes, all team candidates are eligible
@@ -671,15 +667,15 @@ function ProgrammeCard({
     }
     setSelectedParticipants(prev => {
       const isCurrentlySelected = prev.includes(chestNumber);
-      
+
       if (isCurrentlySelected) {
         return prev.filter(p => p !== chestNumber);
       } else {
         // Check maximum participation limit across other programmes
         const otherProgCount = participants.filter(
-          p => p.status !== 'withdrawn' && 
-               p.programmeId !== programme._id?.toString() && 
-               p.participants?.includes(chestNumber)
+          p => p.status !== 'withdrawn' &&
+            p.programmeId !== programme._id?.toString() &&
+            p.participants?.includes(chestNumber)
         ).length;
 
         if (otherProgCount >= maxLimit) {
@@ -780,16 +776,15 @@ function ProgrammeCard({
 
   return (
     <>
-      <div className={`border-2 rounded-xl p-5 transition-all duration-200 relative ${
-        isOver
-          ? 'border-rose-300 bg-rose-50/40 shadow-xs'
-          : isRegistered 
-          ? 'border-green-300 bg-green-50 shadow-md' 
+      <div className={`border-2 rounded-xl p-5 transition-all duration-200 relative ${isOver
+        ? 'border-rose-300 bg-rose-50/40 shadow-xs'
+        : isRegistered
+          ? 'border-green-300 bg-green-50 shadow-md'
           : 'border-gray-200 hover:border-blue-300 hover:shadow-lg bg-white'
-      }`}>
+        }`}>
         <div className="flex justify-between items-start mb-3 gap-2">
           <div className="flex-1">
-            <Link 
+            <Link
               href={`/programmes/${programme._id}`}
               className="font-bold text-base text-gray-900 hover:text-blue-600 hover:underline leading-tight transition-colors block"
             >
@@ -812,7 +807,7 @@ function ProgrammeCard({
             </span>
           </div>
         </div>
-        
+
         <div className="space-y-2 mb-4">
           <div className="flex items-center text-sm text-gray-600">
             <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
@@ -832,7 +827,7 @@ function ProgrammeCard({
             <span className="font-medium">{programme.requiredParticipants} Participant{programme.requiredParticipants > 1 ? 's' : ''} Required</span>
           </div>
         </div>
-        
+
         {isOver ? (
           isRegistered ? (
             <div className="space-y-3">
@@ -904,7 +899,7 @@ function ProgrammeCard({
       {/* Registration Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl">
+          <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[100vh] overflow-hidden shadow-2xl">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
               <div className="flex justify-between items-start">
@@ -944,7 +939,7 @@ function ProgrammeCard({
                   <div className="text-6xl mb-4">😔</div>
                   <h4 className="text-lg font-semibold text-gray-700 mb-2">No Eligible Candidates</h4>
                   <p className="text-gray-500">
-                    {programme.section === 'general' 
+                    {programme.section === 'general'
                       ? 'No team candidates available for this programme.'
                       : `No ${programme.section} section candidates available. This programme requires ${programme.section} section participants.`
                     }
@@ -957,7 +952,7 @@ function ProgrammeCard({
                       <span className="text-xl mr-2">👥</span>
                       Select Team Participants
                     </h4>
-                    
+
                     {/* Search Box */}
                     <div className="mb-4">
                       <div className="relative">
@@ -1010,9 +1005,9 @@ function ProgrammeCard({
                               const candidate = candidates.find(c => c.chestNumber === chestNumber);
                               if (candidate && !selectedParticipants.includes(chestNumber) && selectedParticipants.length < Number(programme.requiredParticipants)) {
                                 const otherProgCount = participants.filter(
-                                  p => p.status !== 'withdrawn' && 
-                                       p.programmeId !== programme._id?.toString() && 
-                                       p.participants?.includes(chestNumber)
+                                  p => p.status !== 'withdrawn' &&
+                                    p.programmeId !== programme._id?.toString() &&
+                                    p.participants?.includes(chestNumber)
                                 ).length;
                                 if (otherProgCount >= maxLimit) {
                                   alert(`🚫 Cannot add ${candidate.name}: Candidate has reached the maximum allowed limit of ${maxLimit} programme(s).`);
@@ -1035,7 +1030,7 @@ function ProgrammeCard({
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
                       {filteredCandidates.length === 0 ? (
                         <div className="col-span-2 text-center py-8">
@@ -1046,26 +1041,25 @@ function ProgrammeCard({
                         filteredCandidates.map((candidate) => {
                           const isSelected = selectedParticipants.includes(candidate.chestNumber);
                           const otherProgCount = participants.filter(
-                            p => p.status !== 'withdrawn' && 
-                                 p.programmeId !== programme._id?.toString() && 
-                                 p.participants?.includes(candidate.chestNumber)
+                            p => p.status !== 'withdrawn' &&
+                              p.programmeId !== programme._id?.toString() &&
+                              p.participants?.includes(candidate.chestNumber)
                           ).length;
                           const hasReachedMax = !isSelected && otherProgCount >= maxLimit;
                           const isRequiredLimitReached = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
                           const isDisabled = hasReachedMax || isRequiredLimitReached;
-                          
+
                           return (
                             <div
                               key={candidate._id?.toString()}
-                              className={`border-2 rounded-lg p-4 transition-all ${
-                                isSelected
-                                  ? 'border-blue-500 bg-blue-50 shadow-md cursor-pointer'
-                                  : hasReachedMax
+                              className={`border-2 rounded-lg p-4 transition-all ${isSelected
+                                ? 'border-blue-500 bg-blue-50 shadow-md cursor-pointer'
+                                : hasReachedMax
                                   ? 'border-red-200 bg-red-50/50 opacity-60 cursor-not-allowed'
                                   : isRequiredLimitReached
-                                  ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
-                                  : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
-                              }`}
+                                    ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                                    : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
+                                }`}
                               onClick={() => {
                                 if (isSelected) {
                                   handleParticipantToggle(candidate.chestNumber);
@@ -1079,9 +1073,8 @@ function ProgrammeCard({
                               }}
                             >
                               <div className="flex items-center space-x-3">
-                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                                  isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
-                                }`}>
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                                  }`}>
                                   {isSelected && <span className="text-white text-sm font-bold">✓</span>}
                                 </div>
                                 <div className="flex-1">
@@ -1089,11 +1082,10 @@ function ProgrammeCard({
                                     <span className="font-bold text-gray-900 font-mono text-base">
                                       {candidate.chestNumber}
                                     </span>
-                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
-                                      otherProgCount >= minLimit 
-                                        ? 'bg-emerald-100 text-emerald-800' 
-                                        : 'bg-amber-100 text-amber-800'
-                                    }`}>
+                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${otherProgCount >= minLimit
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                      }`}>
                                       {otherProgCount} / {maxLimit} prog
                                     </span>
                                   </div>
@@ -1167,46 +1159,43 @@ function ProgrammeCard({
                   </div>
 
                   {/* Selection Summary */}
-                  <div className={`border-2 rounded-lg p-4 mb-4 ${
-                    selectedParticipants.length === Number(programme.requiredParticipants) 
-                      ? 'bg-green-50 border-green-300' 
-                      : selectedParticipants.length > 0 
-                      ? 'bg-yellow-50 border-yellow-300' 
+                  <div className={`border-2 rounded-lg p-4 mb-4 ${selectedParticipants.length === Number(programme.requiredParticipants)
+                    ? 'bg-green-50 border-green-300'
+                    : selectedParticipants.length > 0
+                      ? 'bg-yellow-50 border-yellow-300'
                       : 'bg-gray-50 border-gray-300'
-                  }`}>
+                    }`}>
                     <div className="flex items-center justify-between mb-2">
-                      <h5 className={`font-semibold flex items-center ${
-                        selectedParticipants.length === Number(programme.requiredParticipants) 
-                          ? 'text-green-800' 
-                          : selectedParticipants.length > 0 
-                          ? 'text-yellow-800' 
+                      <h5 className={`font-semibold flex items-center ${selectedParticipants.length === Number(programme.requiredParticipants)
+                        ? 'text-green-800'
+                        : selectedParticipants.length > 0
+                          ? 'text-yellow-800'
                           : 'text-gray-800'
-                      }`}>
+                        }`}>
                         <span className="text-lg mr-2">
-                          {selectedParticipants.length === Number(programme.requiredParticipants) ? '✅' : 
-                           selectedParticipants.length > 0 ? '⏳' : '⭕'}
+                          {selectedParticipants.length === Number(programme.requiredParticipants) ? '✅' :
+                            selectedParticipants.length > 0 ? '⏳' : '⭕'}
                         </span>
                         Selected Participants
                       </h5>
-                      <div className={`px-3 py-1 rounded-full font-bold text-lg ${
-                        selectedParticipants.length === Number(programme.requiredParticipants) 
-                          ? 'bg-green-200 text-green-800' 
-                          : selectedParticipants.length > 0 
-                          ? 'bg-yellow-200 text-yellow-800' 
+                      <div className={`px-3 py-1 rounded-full font-bold text-lg ${selectedParticipants.length === Number(programme.requiredParticipants)
+                        ? 'bg-green-200 text-green-800'
+                        : selectedParticipants.length > 0
+                          ? 'bg-yellow-200 text-yellow-800'
                           : 'bg-gray-200 text-gray-800'
-                      }`}>
+                        }`}>
                         {selectedParticipants.length} / {programme.requiredParticipants}
                       </div>
                     </div>
-                    
+
                     {selectedParticipants.length > 0 ? (
                       <div className="space-y-2">
                         <div className="flex flex-wrap gap-2">
                           {selectedParticipants.map((chestNumber) => {
                             const candidate = candidates.find(c => c.chestNumber === chestNumber);
                             return (
-                              <span 
-                                key={chestNumber} 
+                              <span
+                                key={chestNumber}
                                 className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium flex items-center"
                               >
                                 <span className="mr-1">👤</span>
@@ -1252,15 +1241,14 @@ function ProgrammeCard({
                 <div className="text-lg font-semibold text-gray-900">
                   Selected: <span className="text-blue-600">{selectedParticipants.length}</span> / <span className="text-blue-600">{programme.requiredParticipants}</span> Participants
                 </div>
-                <div className={`px-4 py-2 rounded-full text-sm font-bold ${
-                  selectedParticipants.length === Number(programme.requiredParticipants) 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-orange-100 text-orange-800'
-                }`}>
+                <div className={`px-4 py-2 rounded-full text-sm font-bold ${selectedParticipants.length === Number(programme.requiredParticipants)
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-orange-100 text-orange-800'
+                  }`}>
                   {selectedParticipants.length === Number(programme.requiredParticipants) ? '✅ Ready to Register' : '⏳ Selection Incomplete'}
                 </div>
               </div>
-              
+
               <div className="flex space-x-4">
                 <button
                   onClick={closeModal}
@@ -1268,7 +1256,7 @@ function ProgrammeCard({
                 >
                   ❌ Cancel
                 </button>
-                
+
                 {/* Always Visible Register Button */}
                 <button
                   onClick={() => {
@@ -1277,27 +1265,26 @@ function ProgrammeCard({
                     console.log('🎯 Required:', programme.requiredParticipants);
                     console.log('⏳ Is submitting:', isSubmitting);
                     console.log('✅ Button should be enabled:', selectedParticipants.length === programme.requiredParticipants && !isSubmitting);
-                    
+
                     // Force validation check
                     if (selectedParticipants.length !== Number(programme.requiredParticipants)) {
                       alert(`❌ Please select exactly ${programme.requiredParticipants} participant(s). Currently selected: ${selectedParticipants.length}`);
                       return;
                     }
-                    
+
                     if (isSubmitting) {
                       console.log('⏳ Already submitting, ignoring click');
                       return;
                     }
-                    
+
                     handleRegister();
                   }}
                   disabled={!(selectedParticipants.length === Number(programme.requiredParticipants) && !isSubmitting)}
-                  className={`flex-1 px-6 py-3 font-bold text-lg rounded-lg transition-all duration-200 border-2 ${
-                    selectedParticipants.length === Number(programme.requiredParticipants) && !isSubmitting
-                      ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105 border-green-600 hover:border-green-700'
-                      : 'bg-gray-400 text-white cursor-not-allowed opacity-75 border-gray-400'
-                  }`}
-                  title={selectedParticipants.length !== Number(programme.requiredParticipants) 
+                  className={`flex-1 px-6 py-3 font-bold text-lg rounded-lg transition-all duration-200 border-2 ${selectedParticipants.length === Number(programme.requiredParticipants) && !isSubmitting
+                    ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105 border-green-600 hover:border-green-700'
+                    : 'bg-gray-400 text-white cursor-not-allowed opacity-75 border-gray-400'
+                    }`}
+                  title={selectedParticipants.length !== Number(programme.requiredParticipants)
                     ? `Select exactly ${programme.requiredParticipants} participants to enable registration`
                     : 'Click to register your team for this programme'
                   }
@@ -1315,7 +1302,7 @@ function ProgrammeCard({
                   ) : (
                     <span className="flex items-center justify-center">
                       <span className="mr-2">⚠️</span>
-                      {selectedParticipants.length === 0 
+                      {selectedParticipants.length === 0
                         ? `SELECT ${programme.requiredParticipants} PARTICIPANTS`
                         : `NEED ${Number(programme.requiredParticipants) - selectedParticipants.length} MORE`
                       }
@@ -1383,7 +1370,7 @@ function ProgrammeCard({
                   <div className="text-6xl mb-4">😔</div>
                   <h4 className="text-lg font-semibold text-gray-700 mb-2">No Eligible Candidates</h4>
                   <p className="text-gray-500">
-                    {programme.section === 'general' 
+                    {programme.section === 'general'
                       ? 'No team candidates available for this programme.'
                       : `No ${programme.section} section candidates available. This programme requires ${programme.section} section participants.`
                     }
@@ -1396,7 +1383,7 @@ function ProgrammeCard({
                       <span className="text-xl mr-2">👥</span>
                       Select New Team Participants
                     </h4>
-                    
+
                     {/* Search Box */}
                     <div className="mb-4">
                       <div className="relative">
@@ -1420,7 +1407,7 @@ function ProgrammeCard({
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
                       {filteredCandidates.length === 0 ? (
                         <div className="col-span-2 text-center py-8">
@@ -1431,26 +1418,25 @@ function ProgrammeCard({
                         filteredCandidates.map((candidate) => {
                           const isSelected = selectedParticipants.includes(candidate.chestNumber);
                           const otherProgCount = participants.filter(
-                            p => p.status !== 'withdrawn' && 
-                                 p.programmeId !== programme._id?.toString() && 
-                                 p.participants?.includes(candidate.chestNumber)
+                            p => p.status !== 'withdrawn' &&
+                              p.programmeId !== programme._id?.toString() &&
+                              p.participants?.includes(candidate.chestNumber)
                           ).length;
                           const hasReachedMax = !isSelected && otherProgCount >= maxLimit;
                           const isRequiredLimitReached = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
                           const isDisabled = hasReachedMax || isRequiredLimitReached;
-                          
+
                           return (
                             <div
                               key={candidate._id?.toString()}
-                              className={`border-2 rounded-lg p-4 transition-all ${
-                                isSelected
-                                  ? 'border-orange-500 bg-orange-50 shadow-md cursor-pointer'
-                                  : hasReachedMax
+                              className={`border-2 rounded-lg p-4 transition-all ${isSelected
+                                ? 'border-orange-500 bg-orange-50 shadow-md cursor-pointer'
+                                : hasReachedMax
                                   ? 'border-red-200 bg-red-50/50 opacity-60 cursor-not-allowed'
                                   : isRequiredLimitReached
-                                  ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
-                                  : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50 cursor-pointer'
-                              }`}
+                                    ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                                    : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50 cursor-pointer'
+                                }`}
                               onClick={() => {
                                 if (isSelected) {
                                   handleParticipantToggle(candidate.chestNumber);
@@ -1464,9 +1450,8 @@ function ProgrammeCard({
                               }}
                             >
                               <div className="flex items-center space-x-3">
-                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                                  isSelected ? 'border-orange-500 bg-orange-500' : 'border-gray-300'
-                                }`}>
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-orange-500 bg-orange-500' : 'border-gray-300'
+                                  }`}>
                                   {isSelected && <span className="text-white text-sm font-bold">✓</span>}
                                 </div>
                                 <div className="flex-1">
@@ -1474,11 +1459,10 @@ function ProgrammeCard({
                                     <span className="font-bold text-gray-900 font-mono text-base">
                                       {candidate.chestNumber}
                                     </span>
-                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
-                                      otherProgCount >= minLimit 
-                                        ? 'bg-emerald-100 text-emerald-800' 
-                                        : 'bg-amber-100 text-amber-800'
-                                    }`}>
+                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${otherProgCount >= minLimit
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                      }`}>
                                       {otherProgCount} / {maxLimit} prog
                                     </span>
                                   </div>
@@ -1506,46 +1490,43 @@ function ProgrammeCard({
                   </div>
 
                   {/* Selection Summary */}
-                  <div className={`border-2 rounded-lg p-4 mb-4 ${
-                    selectedParticipants.length === Number(programme.requiredParticipants) 
-                      ? 'bg-green-50 border-green-300' 
-                      : selectedParticipants.length > 0 
-                      ? 'bg-yellow-50 border-yellow-300' 
+                  <div className={`border-2 rounded-lg p-4 mb-4 ${selectedParticipants.length === Number(programme.requiredParticipants)
+                    ? 'bg-green-50 border-green-300'
+                    : selectedParticipants.length > 0
+                      ? 'bg-yellow-50 border-yellow-300'
                       : 'bg-gray-50 border-gray-300'
-                  }`}>
+                    }`}>
                     <div className="flex items-center justify-between mb-2">
-                      <h5 className={`font-semibold flex items-center ${
-                        selectedParticipants.length === Number(programme.requiredParticipants) 
-                          ? 'text-green-800' 
-                          : selectedParticipants.length > 0 
-                          ? 'text-yellow-800' 
+                      <h5 className={`font-semibold flex items-center ${selectedParticipants.length === Number(programme.requiredParticipants)
+                        ? 'text-green-800'
+                        : selectedParticipants.length > 0
+                          ? 'text-yellow-800'
                           : 'text-gray-800'
-                      }`}>
+                        }`}>
                         <span className="text-lg mr-2">
-                          {selectedParticipants.length === Number(programme.requiredParticipants) ? '✅' : 
-                           selectedParticipants.length > 0 ? '⏳' : '⭕'}
+                          {selectedParticipants.length === Number(programme.requiredParticipants) ? '✅' :
+                            selectedParticipants.length > 0 ? '⏳' : '⭕'}
                         </span>
                         New Selection
                       </h5>
-                      <div className={`px-3 py-1 rounded-full font-bold text-lg ${
-                        selectedParticipants.length === Number(programme.requiredParticipants) 
-                          ? 'bg-green-200 text-green-800' 
-                          : selectedParticipants.length > 0 
-                          ? 'bg-yellow-200 text-yellow-800' 
+                      <div className={`px-3 py-1 rounded-full font-bold text-lg ${selectedParticipants.length === Number(programme.requiredParticipants)
+                        ? 'bg-green-200 text-green-800'
+                        : selectedParticipants.length > 0
+                          ? 'bg-yellow-200 text-yellow-800'
                           : 'bg-gray-200 text-gray-800'
-                      }`}>
+                        }`}>
                         {selectedParticipants.length} / {programme.requiredParticipants}
                       </div>
                     </div>
-                    
+
                     {selectedParticipants.length > 0 ? (
                       <div className="space-y-2">
                         <div className="flex flex-wrap gap-2">
                           {selectedParticipants.map((chestNumber) => {
                             const candidate = candidates.find(c => c.chestNumber === chestNumber);
                             return (
-                              <span 
-                                key={chestNumber} 
+                              <span
+                                key={chestNumber}
                                 className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium flex items-center"
                               >
                                 <span className="mr-1">👤</span>
@@ -1591,15 +1572,14 @@ function ProgrammeCard({
                 <div className="text-lg font-semibold text-gray-900">
                   Selected: <span className="text-orange-600">{selectedParticipants.length}</span> / <span className="text-orange-600">{programme.requiredParticipants}</span> Participants
                 </div>
-                <div className={`px-4 py-2 rounded-full text-sm font-bold ${
-                  selectedParticipants.length === Number(programme.requiredParticipants) 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-orange-100 text-orange-800'
-                }`}>
+                <div className={`px-4 py-2 rounded-full text-sm font-bold ${selectedParticipants.length === Number(programme.requiredParticipants)
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-orange-100 text-orange-800'
+                  }`}>
                   {selectedParticipants.length === Number(programme.requiredParticipants) ? '✅ Ready to Update' : '⏳ Selection Incomplete'}
                 </div>
               </div>
-              
+
               <div className="flex space-x-4">
                 <button
                   onClick={closeEditModal}
@@ -1607,15 +1587,14 @@ function ProgrammeCard({
                 >
                   ❌ Cancel
                 </button>
-                
+
                 <button
                   onClick={handleUpdate}
                   disabled={!(selectedParticipants.length === Number(programme.requiredParticipants) && !isSubmitting)}
-                  className={`flex-1 px-6 py-3 font-bold text-lg rounded-lg transition-all duration-200 border-2 ${
-                    selectedParticipants.length === Number(programme.requiredParticipants) && !isSubmitting
-                      ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105 border-orange-600 hover:border-orange-700'
-                      : 'bg-gray-400 text-white cursor-not-allowed opacity-75 border-gray-400'
-                  }`}
+                  className={`flex-1 px-6 py-3 font-bold text-lg rounded-lg transition-all duration-200 border-2 ${selectedParticipants.length === Number(programme.requiredParticipants) && !isSubmitting
+                    ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105 border-orange-600 hover:border-orange-700'
+                    : 'bg-gray-400 text-white cursor-not-allowed opacity-75 border-gray-400'
+                    }`}
                 >
                   {isSubmitting ? (
                     <span className="flex items-center justify-center">
@@ -1630,7 +1609,7 @@ function ProgrammeCard({
                   ) : (
                     <span className="flex items-center justify-center">
                       <span className="mr-2">⚠️</span>
-                      {selectedParticipants.length === 0 
+                      {selectedParticipants.length === 0
                         ? `SELECT ${programme.requiredParticipants} PARTICIPANTS`
                         : `NEED ${Number(programme.requiredParticipants) - selectedParticipants.length} MORE`
                       }
