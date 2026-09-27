@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
-import { Team, Candidate, ProgrammeParticipant, FestivalInfo } from '@/types';
+import { Team, Candidate, ProgrammeParticipant, FestivalInfo, Programme } from '@/types';
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [participants, setParticipants] = useState<ProgrammeParticipant[]>([]);
   const [festInfo, setFestInfo] = useState<FestivalInfo | null>(null);
+  const [programmes, setProgrammes] = useState<Programme[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -44,24 +45,27 @@ export default function TeamsPage() {
 
   const fetchAllData = async () => {
     try {
-      const [teamsRes, candidatesRes, participantsRes, festRes] = await Promise.all([
+      const [teamsRes, candidatesRes, participantsRes, festRes, progsRes] = await Promise.all([
         fetch('/api/teams'),
         fetch('/api/candidates'),
         fetch('/api/programme-participants'),
-        fetch('/api/festival-info')
+        fetch('/api/festival-info'),
+        fetch('/api/programmes')
       ]);
 
-      const [teamsData, candidatesData, participantsData, festData] = await Promise.all([
+      const [teamsData, candidatesData, participantsData, festData, progsData] = await Promise.all([
         teamsRes.json(),
         candidatesRes.json(),
         participantsRes.json(),
-        festRes.json()
+        festRes.json(),
+        progsRes.json()
       ]);
 
       setTeams(Array.isArray(teamsData) ? teamsData : []);
       setCandidates(Array.isArray(candidatesData) ? candidatesData : []);
       setParticipants(Array.isArray(participantsData) ? participantsData : []);
       setFestInfo(festData);
+      setProgrammes(Array.isArray(progsData) ? progsData : []);
     } catch (error) {
       console.error('Error fetching admin team data:', error);
     } finally {
@@ -266,10 +270,21 @@ export default function TeamsPage() {
 
   // Compute stats helper for any team
   const getTeamCandidateStats = (teamCode: string) => {
+    const individualProgIdSet = new Set<string>();
+    programmes.forEach((p: any) => {
+      if (p.positionType === 'individual' || p.type === 'individual') {
+        if (p._id) individualProgIdSet.add(p._id.toString());
+        if (p.id) individualProgIdSet.add(p.id.toString());
+        if (p.code) individualProgIdSet.add(p.code);
+      }
+    });
+
     const teamCandidates = candidates.filter(c => c.team === teamCode);
     const candidateStats = teamCandidates.map(c => {
       const registrations = participants.filter(
-        p => p.status !== 'withdrawn' && p.participants?.includes(c.chestNumber)
+        p => p.status !== 'withdrawn' &&
+          (individualProgIdSet.size === 0 || individualProgIdSet.has(p.programmeId) || individualProgIdSet.has(p.programmeCode)) &&
+          p.participants?.includes(c.chestNumber)
       );
       return {
         candidate: c,
@@ -343,8 +358,8 @@ export default function TeamsPage() {
                 </Link>
               </div>
               <p className="text-xs text-purple-700 leading-relaxed">
-                Rule: <strong>{minLimit} Minimum</strong> / <strong>{maxLimit} Maximum</strong> programmes per candidate. 
-                Teams with any candidate having 0 or fewer than {minLimit} programme(s) are flagged as <strong>Not Eligible</strong>.
+                Rule: <strong>{minLimit} Minimum</strong> / <strong>{maxLimit} Maximum</strong> individual programmes per candidate. 
+                Teams with any candidate having 0 or fewer than {minLimit} individual programme(s) are flagged as <strong>Not Eligible</strong>.
               </p>
             </div>
           </div>
@@ -646,7 +661,7 @@ export default function TeamsPage() {
                         <div className="flex items-center gap-2">
                           <span className="text-base">✓</span>
                           <span>
-                            <strong>Eligible to compete:</strong> All {stats.teamCandidates.length} candidates meet the minimum ({minLimit}) programme requirement.
+                            <strong>Eligible to compete:</strong> All {stats.teamCandidates.length} candidates meet the minimum ({minLimit}) individual programme requirement.
                           </span>
                         </div>
                       ) : (
@@ -656,7 +671,7 @@ export default function TeamsPage() {
                             <span>Not Eligible ({stats.underMinCount} candidate{stats.underMinCount > 1 ? 's' : ''} below min)</span>
                           </div>
                           <p className="text-[11px] text-rose-700 leading-normal">
-                            {stats.zeroCount > 0 ? `${stats.zeroCount} candidate(s) have 0 programmes registered.` : ''} Each candidate must participate in at least {minLimit} programme(s).
+                            {stats.zeroCount > 0 ? `${stats.zeroCount} candidate(s) have 0 individual programmes registered.` : ''} Each candidate must participate in at least {minLimit} individual programme(s).
                           </p>
                         </div>
                       )}
@@ -897,7 +912,7 @@ export default function TeamsPage() {
                     <div className="text-right flex items-center gap-3">
                       <div>
                         <div className="text-xs font-bold text-gray-900">
-                          {item.registeredCount} / {maxLimit} prog
+                          {item.registeredCount} / {maxLimit} individual prog
                         </div>
                         <div className="text-[10px] text-gray-500">
                           Min required: {minLimit}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Candidate, Programme, ProgrammeParticipant, Team } from '@/types';
@@ -103,6 +103,19 @@ export default function TeamProgrammesPage() {
   const registeredProgrammeIds = [...new Set(participants.map(p => p.programmeId))];
   const registeredProgIdSet = new Set(registeredProgrammeIds);
 
+  // Set of individual programme IDs and codes
+  const individualProgIdSet = useMemo(() => {
+    const set = new Set<string>();
+    programmes.forEach(p => {
+      if (p.positionType === 'individual' || (p as any).type === 'individual') {
+        if (p._id) set.add(p._id.toString());
+        if (p.id) set.add(p.id.toString());
+        if (p.code) set.add(p.code);
+      }
+    });
+    return set;
+  }, [programmes]);
+
   // Section counts
   const sectionCounts = {
     all: availableProgrammes.length,
@@ -163,10 +176,12 @@ export default function TeamProgrammesPage() {
   const minLimit = festInfo?.minCandidateParticipation ?? 1;
   const maxLimit = festInfo?.maxCandidateParticipation ?? 3;
 
-  // Calculate candidate participation counts
+  // Calculate candidate individual participation counts (only individual programmes count towards min/max)
   const candidateProgCounts = candidates.reduce((acc, c) => {
     acc[c.chestNumber] = participants.filter(
-      p => p.status !== 'withdrawn' && p.participants?.includes(c.chestNumber)
+      p => p.status !== 'withdrawn' &&
+        (individualProgIdSet.has(p.programmeId) || individualProgIdSet.has(p.programmeCode)) &&
+        p.participants?.includes(c.chestNumber)
     ).length;
     return acc;
   }, {} as Record<string, number>);
@@ -326,17 +341,17 @@ export default function TeamProgrammesPage() {
               </span>
             </div>
             <p className="text-xs mt-1 text-gray-700">
-              Rule: Every candidate must have between <strong>{minLimit}</strong> (min) and <strong>{maxLimit}</strong> (max) programmes.
+              Rule: Every candidate must have between <strong>{minLimit}</strong> (min) and <strong>{maxLimit}</strong> (max) individual programmes.
               {!isTeamEligible && underMinCandidates.length > 0 && (
                 <span className="text-rose-700 font-semibold block mt-1">
-                  Need more programmes: {underMinCandidates.slice(0, 5).map(c => `${c.name} (${candidateProgCounts[c.chestNumber] || 0}/${minLimit})`).join(', ')}{underMinCandidates.length > 5 ? ` +${underMinCandidates.length - 5} more` : ''}
+                  Need more individual programmes: {underMinCandidates.slice(0, 5).map(c => `${c.name} (${candidateProgCounts[c.chestNumber] || 0}/${minLimit})`).join(', ')}{underMinCandidates.length > 5 ? ` +${underMinCandidates.length - 5} more` : ''}
                 </span>
               )}
             </p>
           </div>
         </div>
         <div className="text-xs text-right text-gray-600 bg-white/70 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-gray-200">
-          <div>Limits: <strong>{minLimit} min / {maxLimit} max</strong></div>
+          <div>Limits: <strong>{minLimit} min / {maxLimit} max (Individual)</strong></div>
         </div>
       </div>
 
@@ -389,6 +404,7 @@ export default function TeamProgrammesPage() {
                     onUpdate={fetchParticipants}
                     minLimit={minLimit}
                     maxLimit={maxLimit}
+                    individualProgIdSet={individualProgIdSet}
                   />
                 ))}
               </div>
@@ -415,6 +431,7 @@ export default function TeamProgrammesPage() {
                     onUpdate={fetchParticipants}
                     minLimit={minLimit}
                     maxLimit={maxLimit}
+                    individualProgIdSet={individualProgIdSet}
                   />
                 ))}
               </div>
@@ -441,6 +458,7 @@ export default function TeamProgrammesPage() {
                     onUpdate={fetchParticipants}
                     minLimit={minLimit}
                     maxLimit={maxLimit}
+                    individualProgIdSet={individualProgIdSet}
                   />
                 ))}
               </div>
@@ -467,6 +485,7 @@ export default function TeamProgrammesPage() {
                     onUpdate={fetchParticipants}
                     minLimit={minLimit}
                     maxLimit={maxLimit}
+                    individualProgIdSet={individualProgIdSet}
                   />
                 ))}
               </div>
@@ -493,6 +512,7 @@ export default function TeamProgrammesPage() {
                     onUpdate={fetchParticipants}
                     minLimit={minLimit}
                     maxLimit={maxLimit}
+                    individualProgIdSet={individualProgIdSet}
                   />
                 ))}
               </div>
@@ -519,6 +539,7 @@ export default function TeamProgrammesPage() {
                     onUpdate={fetchParticipants}
                     minLimit={minLimit}
                     maxLimit={maxLimit}
+                    individualProgIdSet={individualProgIdSet}
                   />
                 ))}
               </div>
@@ -545,6 +566,7 @@ export default function TeamProgrammesPage() {
                     onUpdate={fetchParticipants}
                     minLimit={minLimit}
                     maxLimit={maxLimit}
+                    individualProgIdSet={individualProgIdSet}
                   />
                 ))}
               </div>
@@ -591,7 +613,8 @@ function ProgrammeCard({
   participants,
   onUpdate,
   minLimit = 1,
-  maxLimit = 3
+  maxLimit = 3,
+  individualProgIdSet
 }: {
   programme: Programme;
   teamCode: string;
@@ -600,12 +623,26 @@ function ProgrammeCard({
   onUpdate: () => void;
   minLimit?: number;
   maxLimit?: number;
+  individualProgIdSet?: Set<string>;
 }) {
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const isIndividualProgramme = programme.positionType === 'individual' || (programme as any).type === 'individual';
+
+  // Helper to count other individual programme participations for a candidate
+  const getCandidateIndividualProgCount = (chestNumber: string) => {
+    return participants.filter(
+      p => p.status !== 'withdrawn' &&
+        p.programmeId !== programme._id?.toString() &&
+        p.programmeCode !== programme.code &&
+        p.participants?.includes(chestNumber) &&
+        (individualProgIdSet ? (individualProgIdSet.has(p.programmeId) || individualProgIdSet.has(p.programmeCode)) : true)
+    ).length;
+  };
 
   const existingParticipant = participants.find(p => p.programmeId === programme._id?.toString());
   const isRegistered = !!existingParticipant;
@@ -671,17 +708,14 @@ function ProgrammeCard({
       if (isCurrentlySelected) {
         return prev.filter(p => p !== chestNumber);
       } else {
-        // Check maximum participation limit across other programmes
-        const otherProgCount = participants.filter(
-          p => p.status !== 'withdrawn' &&
-            p.programmeId !== programme._id?.toString() &&
-            p.participants?.includes(chestNumber)
-        ).length;
-
-        if (otherProgCount >= maxLimit) {
-          const cand = candidates.find(c => c.chestNumber === chestNumber);
-          alert(`🚫 Cannot select ${cand?.name || chestNumber}: Candidate has already reached the maximum participation limit of ${maxLimit} programme(s).`);
-          return prev;
+        // Enforce maximum participation limit ONLY for individual programmes
+        if (isIndividualProgramme) {
+          const individualCount = getCandidateIndividualProgCount(chestNumber);
+          if (individualCount >= maxLimit) {
+            const cand = candidates.find(c => c.chestNumber === chestNumber);
+            alert(`🚫 Cannot select ${cand?.name || chestNumber}: Candidate has already reached the maximum allowed limit of ${maxLimit} individual programme(s).`);
+            return prev;
+          }
         }
 
         // Check if we can add more
@@ -1004,14 +1038,12 @@ function ProgrammeCard({
                               const chestNumber = e.currentTarget.value.toUpperCase();
                               const candidate = candidates.find(c => c.chestNumber === chestNumber);
                               if (candidate && !selectedParticipants.includes(chestNumber) && selectedParticipants.length < Number(programme.requiredParticipants)) {
-                                const otherProgCount = participants.filter(
-                                  p => p.status !== 'withdrawn' &&
-                                    p.programmeId !== programme._id?.toString() &&
-                                    p.participants?.includes(chestNumber)
-                                ).length;
-                                if (otherProgCount >= maxLimit) {
-                                  alert(`🚫 Cannot add ${candidate.name}: Candidate has reached the maximum allowed limit of ${maxLimit} programme(s).`);
-                                  return;
+                                if (isIndividualProgramme) {
+                                  const individualCount = getCandidateIndividualProgCount(chestNumber);
+                                  if (individualCount >= maxLimit) {
+                                    alert(`🚫 Cannot add ${candidate.name}: Candidate has reached the maximum allowed limit of ${maxLimit} individual programme(s).`);
+                                    return;
+                                  }
                                 }
                                 handleParticipantToggle(chestNumber);
                                 e.currentTarget.value = '';
@@ -1040,12 +1072,8 @@ function ProgrammeCard({
                       ) : (
                         filteredCandidates.map((candidate) => {
                           const isSelected = selectedParticipants.includes(candidate.chestNumber);
-                          const otherProgCount = participants.filter(
-                            p => p.status !== 'withdrawn' &&
-                              p.programmeId !== programme._id?.toString() &&
-                              p.participants?.includes(candidate.chestNumber)
-                          ).length;
-                          const hasReachedMax = !isSelected && otherProgCount >= maxLimit;
+                          const individualCount = getCandidateIndividualProgCount(candidate.chestNumber);
+                          const hasReachedMax = isIndividualProgramme && !isSelected && individualCount >= maxLimit;
                           const isRequiredLimitReached = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
                           const isDisabled = hasReachedMax || isRequiredLimitReached;
 
@@ -1064,7 +1092,7 @@ function ProgrammeCard({
                                 if (isSelected) {
                                   handleParticipantToggle(candidate.chestNumber);
                                 } else if (hasReachedMax) {
-                                  alert(`🚫 Candidate ${candidate.name} (#${candidate.chestNumber}) has already reached the maximum participation limit of ${maxLimit} programme(s).`);
+                                  alert(`🚫 Candidate ${candidate.name} (#${candidate.chestNumber}) has already reached the maximum participation limit of ${maxLimit} individual programme(s).`);
                                 } else if (!isRequiredLimitReached) {
                                   handleParticipantToggle(candidate.chestNumber);
                                 } else {
@@ -1082,12 +1110,18 @@ function ProgrammeCard({
                                     <span className="font-bold text-gray-900 font-mono text-base">
                                       {candidate.chestNumber}
                                     </span>
-                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${otherProgCount >= minLimit
-                                      ? 'bg-emerald-100 text-emerald-800'
-                                      : 'bg-amber-100 text-amber-800'
-                                      }`}>
-                                      {otherProgCount} / {maxLimit} prog
-                                    </span>
+                                    {isIndividualProgramme ? (
+                                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${individualCount >= minLimit
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : 'bg-amber-100 text-amber-800'
+                                        }`}>
+                                        {individualCount} / {maxLimit} individual prog
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                                        Group Event
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="text-gray-700 font-medium">{candidate.name}</div>
                                   <div className="text-xs text-gray-500 capitalize">
@@ -1095,7 +1129,7 @@ function ProgrammeCard({
                                   </div>
                                   {hasReachedMax && (
                                     <div className="text-[11px] font-bold text-red-600 mt-1">
-                                      ⛔ Max Limit Reached
+                                      ⛔ Max Limit Reached ({maxLimit} Individual Progs)
                                     </div>
                                   )}
                                 </div>
@@ -1417,12 +1451,8 @@ function ProgrammeCard({
                       ) : (
                         filteredCandidates.map((candidate) => {
                           const isSelected = selectedParticipants.includes(candidate.chestNumber);
-                          const otherProgCount = participants.filter(
-                            p => p.status !== 'withdrawn' &&
-                              p.programmeId !== programme._id?.toString() &&
-                              p.participants?.includes(candidate.chestNumber)
-                          ).length;
-                          const hasReachedMax = !isSelected && otherProgCount >= maxLimit;
+                          const individualCount = getCandidateIndividualProgCount(candidate.chestNumber);
+                          const hasReachedMax = isIndividualProgramme && !isSelected && individualCount >= maxLimit;
                           const isRequiredLimitReached = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
                           const isDisabled = hasReachedMax || isRequiredLimitReached;
 
@@ -1441,7 +1471,7 @@ function ProgrammeCard({
                                 if (isSelected) {
                                   handleParticipantToggle(candidate.chestNumber);
                                 } else if (hasReachedMax) {
-                                  alert(`🚫 Candidate ${candidate.name} (#${candidate.chestNumber}) has already reached the maximum participation limit of ${maxLimit} programme(s).`);
+                                  alert(`🚫 Candidate ${candidate.name} (#${candidate.chestNumber}) has already reached the maximum participation limit of ${maxLimit} individual programme(s).`);
                                 } else if (!isRequiredLimitReached) {
                                   handleParticipantToggle(candidate.chestNumber);
                                 } else {
@@ -1459,12 +1489,18 @@ function ProgrammeCard({
                                     <span className="font-bold text-gray-900 font-mono text-base">
                                       {candidate.chestNumber}
                                     </span>
-                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${otherProgCount >= minLimit
-                                      ? 'bg-emerald-100 text-emerald-800'
-                                      : 'bg-amber-100 text-amber-800'
-                                      }`}>
-                                      {otherProgCount} / {maxLimit} prog
-                                    </span>
+                                    {isIndividualProgramme ? (
+                                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${individualCount >= minLimit
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : 'bg-amber-100 text-amber-800'
+                                        }`}>
+                                        {individualCount} / {maxLimit} individual prog
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                                        Group Event
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="text-gray-700 font-medium">{candidate.name}</div>
                                   <div className="text-xs text-gray-500 capitalize">
@@ -1472,7 +1508,7 @@ function ProgrammeCard({
                                   </div>
                                   {hasReachedMax && (
                                     <div className="text-[11px] font-bold text-red-600 mt-1">
-                                      ⛔ Max Limit Reached
+                                      ⛔ Max Limit Reached ({maxLimit} Individual Progs)
                                     </div>
                                   )}
                                 </div>

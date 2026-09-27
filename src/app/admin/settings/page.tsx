@@ -97,24 +97,24 @@ export default function SettingsPage() {
 
       <div className="space-y-6">
         {/* Candidate Participation Rules */}
-        <ShowcaseSection title="Candidate Participation Rules">
+        <ShowcaseSection title="Candidate Individual Participation Rules">
           <form onSubmit={handleFestivalSave} className="space-y-6">
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
               <h4 className="text-sm font-bold text-blue-900 mb-1 flex items-center gap-2">
-                <span>🎯</span> Candidate Limits & Team Eligibility Engine
+                <span>🎯</span> Individual Programme Limits & Team Eligibility Engine
               </h4>
               <p className="text-xs text-blue-700 leading-relaxed">
-                Define the mandatory minimum and maximum programmes allowed per candidate. Teams with any student falling below the minimum programme requirement will automatically be marked as <strong>Not Eligible</strong> in the Admin Panel. Students will be strictly blocked from registering in more programmes than the maximum.
+                Define the mandatory minimum and maximum <strong>individual</strong> programmes allowed per candidate. Teams with any student falling below the minimum individual programme requirement will automatically be marked as <strong>Not Eligible</strong> in the Admin Panel. Candidates will be blocked from registering in more individual programmes than the maximum. (Note: Group items do not count towards this limit).
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
                 <label className="block text-sm font-bold text-gray-800 mb-1">
-                  Minimum Programmes per Candidate *
+                  Minimum Individual Programmes per Candidate *
                 </label>
                 <p className="text-xs text-gray-500 mb-3">
-                  Each candidate in a team must participate in at least this many programmes for the team to be eligible.
+                  Each candidate in a team must participate in at least this many individual programmes for the team to be eligible.
                 </p>
                 <div className="flex items-center space-x-3">
                   <input
@@ -126,16 +126,16 @@ export default function SettingsPage() {
                     className="w-32 px-4 py-2 text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800"
                     required
                   />
-                  <span className="text-xs font-semibold text-gray-600">programme(s) minimum</span>
+                  <span className="text-xs font-semibold text-gray-600">individual programme(s) minimum</span>
                 </div>
               </div>
 
               <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
                 <label className="block text-sm font-bold text-gray-800 mb-1">
-                  Maximum Programmes per Candidate *
+                  Maximum Individual Programmes per Candidate *
                 </label>
                 <p className="text-xs text-gray-500 mb-3">
-                  A student cannot be registered for more than this number of programmes across the festival.
+                  A candidate cannot be registered for more than this number of individual programmes across the festival.
                 </p>
                 <div className="flex items-center space-x-3">
                   <input
@@ -147,14 +147,14 @@ export default function SettingsPage() {
                     className="w-32 px-4 py-2 text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800"
                     required
                   />
-                  <span className="text-xs font-semibold text-gray-600">programme(s) maximum limit</span>
+                  <span className="text-xs font-semibold text-gray-600">individual programme(s) maximum limit</span>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center justify-between pt-2">
               <div className="text-xs text-gray-500">
-                Current rule: Each candidate must do <strong>{formData.minCandidateParticipation}–{formData.maxCandidateParticipation}</strong> programme(s).
+                Current rule: Each candidate must do <strong>{formData.minCandidateParticipation}–{formData.maxCandidateParticipation}</strong> individual programme(s).
               </div>
               <button
                 type="submit"

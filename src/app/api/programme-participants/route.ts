@@ -63,27 +63,56 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Team already registered for this programme' }, { status: 400 });
     }
 
-    const maxCandidateParticipation = festInfo?.maxCandidateParticipation ?? 3;
+    const isIndividual = programmeDoc?.positionType === 'individual' || (programmeDoc as any)?.type === 'individual';
 
-    // Check maximum participation limit for each candidate in parallel
-    const candidatesCollection = db.collection('candidates');
-    const checks = await Promise.all(
-      participants.map(async (chestNumber: string) => {
-        const count = await collection.countDocuments({
-          participants: chestNumber,
-          status: { $ne: 'withdrawn' }
-        });
-        return { chestNumber, count };
-      })
-    );
+    if (isIndividual) {
+      const maxCandidateParticipation = festInfo?.maxCandidateParticipation ?? 3;
 
-    const exceeded = checks.find(c => c.count >= maxCandidateParticipation);
-    if (exceeded) {
-      const candidateDoc = await candidatesCollection.findOne({ chestNumber: exceeded.chestNumber });
-      const candidateName = candidateDoc?.name || exceeded.chestNumber;
-      return NextResponse.json({
-        error: `Candidate ${candidateName} (#${exceeded.chestNumber}) has reached the maximum allowed limit of ${maxCandidateParticipation} programme(s). Cannot register for more.`
-      }, { status: 400 });
+      // Find all individual programme IDs and codes
+      const individualProgs = await programmesCollection.find({
+        $or: [
+          { positionType: 'individual' },
+          { type: 'individual' }
+        ]
+      }, { projection: { _id: 1, id: 1, code: 1 } }).toArray();
+
+      const individualProgIds: string[] = [];
+      const individualProgCodes: string[] = [];
+
+      individualProgs.forEach((p: any) => {
+        if (p._id) individualProgIds.push(p._id.toString());
+        if (p.id) individualProgIds.push(p.id.toString());
+        if (p.code) individualProgCodes.push(p.code);
+      });
+
+      const individualProgFilter = {
+        $or: [
+          { programmeId: { $in: individualProgIds } },
+          { programmeCode: { $in: individualProgCodes } }
+        ]
+      };
+
+      // Check maximum individual participation limit for each candidate in parallel
+      const candidatesCollection = db.collection('candidates');
+      const checks = await Promise.all(
+        participants.map(async (chestNumber: string) => {
+          const count = await collection.countDocuments({
+            ...individualProgFilter,
+            participants: chestNumber,
+            status: { $ne: 'withdrawn' }
+          });
+          return { chestNumber, count };
+        })
+      );
+
+      const exceeded = checks.find(c => c.count >= maxCandidateParticipation);
+      if (exceeded) {
+        const candidateDoc = await candidatesCollection.findOne({ chestNumber: exceeded.chestNumber });
+        const candidateName = candidateDoc?.name || exceeded.chestNumber;
+        return NextResponse.json({
+          error: `Candidate ${candidateName} (#${exceeded.chestNumber}) has reached the maximum allowed limit of ${maxCandidateParticipation} individual programme(s). Cannot register for more.`
+        }, { status: 400 });
+      }
     }
 
     const newParticipant = {
@@ -166,27 +195,56 @@ export async function PUT(request: NextRequest) {
         }, { status: 400 });
       }
 
-      const maxCandidateParticipation = festInfo?.maxCandidateParticipation ?? 3;
-      const candidatesCollection = db.collection('candidates');
+      const isIndividual = programmeDoc?.positionType === 'individual' || (programmeDoc as any)?.type === 'individual';
 
-      const checks = await Promise.all(
-        participants.map(async (chestNumber: string) => {
-          const otherCount = await collection.countDocuments({
-            _id: { $ne: currentRegistration._id },
-            participants: chestNumber,
-            status: { $ne: 'withdrawn' }
-          });
-          return { chestNumber, otherCount };
-        })
-      );
+      if (isIndividual) {
+        const maxCandidateParticipation = festInfo?.maxCandidateParticipation ?? 3;
+        const candidatesCollection = db.collection('candidates');
 
-      const exceeded = checks.find(c => c.otherCount >= maxCandidateParticipation);
-      if (exceeded) {
-        const candidateDoc = await candidatesCollection.findOne({ chestNumber: exceeded.chestNumber });
-        const candidateName = candidateDoc?.name || exceeded.chestNumber;
-        return NextResponse.json({
-          error: `Candidate ${candidateName} (#${exceeded.chestNumber}) has already reached the maximum allowed limit of ${maxCandidateParticipation} programme(s). Cannot register for more.`
-        }, { status: 400 });
+        // Find all individual programme IDs and codes
+        const individualProgs = await programmesCollection.find({
+          $or: [
+            { positionType: 'individual' },
+            { type: 'individual' }
+          ]
+        }, { projection: { _id: 1, id: 1, code: 1 } }).toArray();
+
+        const individualProgIds: string[] = [];
+        const individualProgCodes: string[] = [];
+
+        individualProgs.forEach((p: any) => {
+          if (p._id) individualProgIds.push(p._id.toString());
+          if (p.id) individualProgIds.push(p.id.toString());
+          if (p.code) individualProgCodes.push(p.code);
+        });
+
+        const individualProgFilter = {
+          $or: [
+            { programmeId: { $in: individualProgIds } },
+            { programmeCode: { $in: individualProgCodes } }
+          ]
+        };
+
+        const checks = await Promise.all(
+          participants.map(async (chestNumber: string) => {
+            const otherCount = await collection.countDocuments({
+              _id: { $ne: currentRegistration._id },
+              ...individualProgFilter,
+              participants: chestNumber,
+              status: { $ne: 'withdrawn' }
+            });
+            return { chestNumber, otherCount };
+          })
+        );
+
+        const exceeded = checks.find(c => c.otherCount >= maxCandidateParticipation);
+        if (exceeded) {
+          const candidateDoc = await candidatesCollection.findOne({ chestNumber: exceeded.chestNumber });
+          const candidateName = candidateDoc?.name || exceeded.chestNumber;
+          return NextResponse.json({
+            error: `Candidate ${candidateName} (#${exceeded.chestNumber}) has already reached the maximum allowed limit of ${maxCandidateParticipation} individual programme(s). Cannot register for more.`
+          }, { status: 400 });
+        }
       }
     }
 
