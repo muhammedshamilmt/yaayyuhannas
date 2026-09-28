@@ -3,17 +3,35 @@
 import { useState, useEffect } from 'react';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
-import { Candidate, Team } from '@/types';
+import { Candidate, Team, FestivalInfo } from '@/types';
 import { ImageUpload } from '@/components/ui/ImageUpload';
+import {
+  generateCandidatesPdf,
+  generateCandidatesExcel,
+  generateCandidatesCsv,
+  CandidateExportOptions
+} from '@/components/admin/CandidateExportHelper';
 
 export default function CandidatesPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [festInfo, setFestInfo] = useState<FestivalInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTeam, setSelectedTeam] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
+
+  // Export Modal & Options States
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportTeam, setExportTeam] = useState<string>('all');
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'xls' | 'xlsx' | 'csv'>('xls');
+  const [exportSortBy, setExportSortBy] = useState<'chestNumber' | 'name' | 'section'>('chestNumber');
+  const [exportStrictPdf, setExportStrictPdf] = useState(true); // Strictly Chest Number and Name only
+  const [exportIncludeSection, setExportIncludeSection] = useState(false);
+  const [exportIncludePoints, setExportIncludePoints] = useState(false);
+  const [exportIncludeTeam, setExportIncludeTeam] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCandidate, setEditCandidate] = useState({
@@ -47,18 +65,20 @@ export default function CandidatesPage() {
     );
   };
 
-  // Fetch candidates and teams from API
+  // Fetch candidates, teams, and festival-info from API
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [candidatesRes, teamsRes] = await Promise.all([
+      const [candidatesRes, teamsRes, festRes] = await Promise.all([
         fetch('/api/candidates'),
-        fetch('/api/teams')
+        fetch('/api/teams'),
+        fetch('/api/festival-info')
       ]);
 
-      const [candidatesData, teamsData] = await Promise.all([
+      const [candidatesData, teamsData, festData] = await Promise.all([
         candidatesRes.json(),
-        teamsRes.json()
+        teamsRes.json(),
+        festRes.json()
       ]);
 
       // Filter out blank/empty candidates
@@ -66,6 +86,7 @@ export default function CandidatesPage() {
 
       setCandidates(validCandidates);
       setTeams(teamsData);
+      setFestInfo(festData);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -180,6 +201,144 @@ export default function CandidatesPage() {
       profileImageSize: undefined,
       team: ''
     });
+  };
+
+  // Quick Export PDF for current team filter (Chest Number & Name only)
+  const handleQuickExportPdf = (teamCode: string = selectedTeam) => {
+    try {
+      setIsExporting(true);
+      generateCandidatesPdf(candidates, teams, {
+        teamCode,
+        format: 'pdf',
+        includeFields: {
+          chestNumber: true,
+          name: true,
+          section: false,
+          points: false,
+          team: false,
+        },
+        sortBy: 'chestNumber',
+        festivalName: festInfo?.name || 'Wattaqa Arts Festival 2K25',
+        venue: festInfo?.venue || 'Campus Venue',
+      });
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Quick Export XLS for current team filter (Chest Number & Name)
+  const handleQuickExportXls = (teamCode: string = selectedTeam) => {
+    try {
+      setIsExporting(true);
+      generateCandidatesExcel(candidates, teams, {
+        teamCode,
+        format: 'xls',
+        includeFields: {
+          chestNumber: true,
+          name: true,
+          section: false,
+          points: false,
+          team: teamCode === 'all',
+        },
+        sortBy: 'chestNumber',
+        festivalName: festInfo?.name || 'Wattaqa Arts Festival 2K25',
+        venue: festInfo?.venue || 'Campus Venue',
+      });
+    } catch (err) {
+      console.error('Error generating XLS:', err);
+      alert('Failed to generate XLS. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Custom Export from Modal
+  const handleCustomExport = () => {
+    try {
+      setIsExporting(true);
+      const isPdf = exportFormat === 'pdf';
+      const options: CandidateExportOptions = {
+        teamCode: exportTeam,
+        format: exportFormat,
+        includeFields: {
+          chestNumber: true,
+          name: true,
+          section: isPdf && exportStrictPdf ? false : exportIncludeSection,
+          points: isPdf && exportStrictPdf ? false : exportIncludePoints,
+          team: isPdf && exportStrictPdf ? false : exportIncludeTeam,
+        },
+        sortBy: exportSortBy,
+        festivalName: festInfo?.name || 'Wattaqa Arts Festival 2K25',
+        venue: festInfo?.venue || 'Campus Venue',
+      };
+
+      if (exportFormat === 'pdf') {
+        generateCandidatesPdf(candidates, teams, options);
+      } else if (exportFormat === 'xlsx' || exportFormat === 'xls') {
+        generateCandidatesExcel(candidates, teams, options);
+      } else if (exportFormat === 'csv') {
+        generateCandidatesCsv(candidates, teams, options);
+      }
+      setShowExportModal(false);
+    } catch (err) {
+      console.error('Error exporting candidates data:', err);
+      alert('Failed to export candidates data. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Batch Export All Teams as separate individual PDFs
+  const handleBatchExportAllTeamsPdf = async () => {
+    try {
+      setIsExporting(true);
+      const teamsWithCandidates = teams.filter(t => candidates.some(c => c.team === t.code));
+      for (const team of teamsWithCandidates) {
+        generateCandidatesPdf(candidates, teams, {
+          teamCode: team.code,
+          format: 'pdf',
+          includeFields: { chestNumber: true, name: true },
+          sortBy: exportSortBy,
+          festivalName: festInfo?.name || 'Wattaqa Arts Festival 2K25',
+          venue: festInfo?.venue || 'Campus Venue',
+        });
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+      setShowExportModal(false);
+    } catch (err) {
+      console.error('Error in batch export:', err);
+      alert('Failed to batch export all team PDFs.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Batch Export All Teams as separate individual XLS files
+  const handleBatchExportAllTeamsXls = async () => {
+    try {
+      setIsExporting(true);
+      const teamsWithCandidates = teams.filter(t => candidates.some(c => c.team === t.code));
+      for (const team of teamsWithCandidates) {
+        generateCandidatesExcel(candidates, teams, {
+          teamCode: team.code,
+          format: 'xls',
+          includeFields: { chestNumber: true, name: true, section: false, points: false, team: false },
+          sortBy: exportSortBy,
+          festivalName: festInfo?.name || 'Wattaqa Arts Festival 2K25',
+          venue: festInfo?.venue || 'Campus Venue',
+        });
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+      setShowExportModal(false);
+    } catch (err) {
+      console.error('Error in batch export:', err);
+      alert('Failed to batch export all team XLS files.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Filter candidates by selected team and search query
@@ -313,12 +472,49 @@ export default function CandidatesPage() {
                   <div className="text-sm text-gray-600">
                     Showing {Math.min((currentPage - 1) * itemsPerPage + 1, allFilteredCandidates.length)}-{Math.min(currentPage * itemsPerPage, allFilteredCandidates.length)} of {allFilteredCandidates.length} candidates
                   </div>
-                  <button
-                    onClick={() => setIsAdding(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition whitespace-nowrap"
-                  >
-                    + Add Candidate
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Quick PDF Export button for the currently active team filter */}
+                    <button
+                      onClick={() => handleQuickExportPdf(selectedTeam)}
+                      disabled={isExporting}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg font-bold text-xs sm:text-sm transition shadow-2xs whitespace-nowrap cursor-pointer"
+                      title="Download PDF containing only Chest Number and Name for the filtered team"
+                    >
+                      <span>📄</span>
+                      <span>PDF {selectedTeam === 'all' ? '(All Teams)' : `(${selectedTeam})`}</span>
+                    </button>
+
+                    {/* Quick XLS Export button for the currently active team filter */}
+                    <button
+                      onClick={() => handleQuickExportXls(selectedTeam)}
+                      disabled={isExporting}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white rounded-lg font-bold text-xs sm:text-sm transition shadow-2xs whitespace-nowrap cursor-pointer"
+                      title="Download Excel XLS containing Chest Number and Name for the filtered team"
+                    >
+                      <span>📊</span>
+                      <span>XLS {selectedTeam === 'all' ? '(All Teams)' : `(${selectedTeam})`}</span>
+                    </button>
+
+                    {/* Advanced Export Options Modal Trigger */}
+                    <button
+                      onClick={() => {
+                        setExportTeam(selectedTeam);
+                        setShowExportModal(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold text-xs sm:text-sm transition shadow-2xs whitespace-nowrap cursor-pointer"
+                      title="Export options: filter by any team, pick format (.xls, .pdf, .xlsx, .csv), and customize fields"
+                    >
+                      <span>📥</span>
+                      <span>Export Options</span>
+                    </button>
+
+                    <button
+                      onClick={() => setIsAdding(true)}
+                      className="bg-blue-600 text-white px-3.5 py-2 rounded-lg font-bold text-xs sm:text-sm hover:bg-blue-700 transition whitespace-nowrap shadow-2xs cursor-pointer"
+                    >
+                      + Add Candidate
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -625,6 +821,355 @@ export default function CandidatesPage() {
           </div>
         </ShowcaseSection>
       </div>
+
+      {/* Export Candidates Modal */}
+      {showExportModal && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setShowExportModal(false)}
+        >
+          <div 
+            className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl space-y-6 my-8 border border-gray-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-gray-100 pb-4">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 mb-1.5">
+                  <span>📥 Export Center</span>
+                </div>
+                <h3 className="text-xl font-black text-gray-900 tracking-tight">
+                  Export Candidate Call Sheets
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Filter by team, choose file format, and download official records.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center text-sm font-bold transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-5 text-sm">
+              {/* Step 1: Team Filter */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                  1. Filter by Team
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExportTeam('all')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-left transition-all flex flex-col justify-between cursor-pointer ${
+                      exportTeam === 'all'
+                        ? 'border-blue-600 bg-blue-50/70 text-blue-900 ring-2 ring-blue-500/20'
+                        : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
+                    }`}
+                  >
+                    <span>All Teams</span>
+                    <span className="text-[11px] font-normal text-gray-500 mt-1">
+                      {candidates.length} candidates
+                    </span>
+                  </button>
+
+                  {teams.map((t) => {
+                    const count = candidates.filter((c) => c.team === t.code).length;
+                    const isSelected = exportTeam === t.code;
+                    return (
+                      <button
+                        key={t.code}
+                        type="button"
+                        onClick={() => setExportTeam(t.code)}
+                        className={`p-2.5 rounded-xl border text-xs font-bold text-left transition-all flex flex-col justify-between cursor-pointer ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50/70 text-blue-900 ring-2 ring-blue-500/20'
+                            : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: t.color || '#3B82F6' }}
+                          />
+                          <span className="truncate">{t.name}</span>
+                        </div>
+                        <span className="text-[11px] font-normal text-gray-500 mt-1">
+                          {count} candidates
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Step 2: File Format Selection */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                  2. File Format
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {/* XLS (Excel) */}
+                  <button
+                    type="button"
+                    onClick={() => setExportFormat('xls')}
+                    className={`p-3 rounded-2xl border text-left transition-all flex flex-col gap-1.5 cursor-pointer ${
+                      exportFormat === 'xls'
+                        ? 'border-teal-600 bg-teal-50/60 ring-2 ring-teal-500/20'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl">📊</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-teal-600 text-white">
+                        XLS
+                      </span>
+                    </div>
+                    <div className="font-bold text-xs text-gray-900">Excel XLS</div>
+                    <div className="text-[11px] text-gray-500 leading-tight">
+                      Classic Excel format (.xls)
+                    </div>
+                  </button>
+
+                  {/* PDF */}
+                  <button
+                    type="button"
+                    onClick={() => setExportFormat('pdf')}
+                    className={`p-3 rounded-2xl border text-left transition-all flex flex-col gap-1.5 cursor-pointer ${
+                      exportFormat === 'pdf'
+                        ? 'border-emerald-600 bg-emerald-50/60 ring-2 ring-emerald-500/20'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl">📄</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-600 text-white">
+                        PDF
+                      </span>
+                    </div>
+                    <div className="font-bold text-xs text-gray-900">PDF Call Sheet</div>
+                    <div className="text-[11px] text-gray-500 leading-tight">
+                      Printable (Chest No & Name)
+                    </div>
+                  </button>
+
+                  {/* XLSX */}
+                  <button
+                    type="button"
+                    onClick={() => setExportFormat('xlsx')}
+                    className={`p-3 rounded-2xl border text-left transition-all flex flex-col gap-1.5 cursor-pointer ${
+                      exportFormat === 'xlsx'
+                        ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl">📈</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-600 text-white">
+                        XLSX
+                      </span>
+                    </div>
+                    <div className="font-bold text-xs text-gray-900">Modern Excel</div>
+                    <div className="text-[11px] text-gray-500 leading-tight">
+                      Office Open XML (.xlsx)
+                    </div>
+                  </button>
+
+                  {/* CSV */}
+                  <button
+                    type="button"
+                    onClick={() => setExportFormat('csv')}
+                    className={`p-3 rounded-2xl border text-left transition-all flex flex-col gap-1.5 cursor-pointer ${
+                      exportFormat === 'csv'
+                        ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-500/20'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl">📋</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-indigo-600 text-white">
+                        CSV
+                      </span>
+                    </div>
+                    <div className="font-bold text-xs text-gray-900">CSV File</div>
+                    <div className="text-[11px] text-gray-500 leading-tight">
+                      Plain UTF-8 text (.csv)
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 3: Fields & Options */}
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-150 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    3. Column / Field Options
+                  </span>
+                  {exportFormat === 'pdf' && (
+                    <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      Chest No & Name Only (Official)
+                    </span>
+                  )}
+                </div>
+
+                {exportFormat === 'pdf' ? (
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={exportStrictPdf}
+                        onChange={(e) => setExportStrictPdf(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-xs font-bold text-gray-800">
+                        Strict Mode: Only Chest Number & Name in PDF
+                      </span>
+                    </label>
+                    <p className="text-[11px] text-gray-500 pl-6">
+                      Produces clean, uncluttered call sheets showing Sl No, Chest Number, and Full Name.
+                    </p>
+
+                    {!exportStrictPdf && (
+                      <div className="pt-2 pl-6 grid grid-cols-2 gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer text-xs">
+                          <input
+                            type="checkbox"
+                            checked={exportIncludeSection}
+                            onChange={(e) => setExportIncludeSection(e.target.checked)}
+                            className="w-3.5 h-3.5 text-blue-600 rounded"
+                          />
+                          <span>Include Section</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer text-xs">
+                          <input
+                            type="checkbox"
+                            checked={exportIncludePoints}
+                            onChange={(e) => setExportIncludePoints(e.target.checked)}
+                            className="w-3.5 h-3.5 text-blue-600 rounded"
+                          />
+                          <span>Include Points</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-600">
+                      Chest Number and Name are included by default. Toggle optional columns:
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-medium">
+                        <input
+                          type="checkbox"
+                          checked={exportIncludeTeam}
+                          onChange={(e) => setExportIncludeTeam(e.target.checked)}
+                          className="w-3.5 h-3.5 text-blue-600 rounded"
+                        />
+                        <span>Team Info</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-medium">
+                        <input
+                          type="checkbox"
+                          checked={exportIncludeSection}
+                          onChange={(e) => setExportIncludeSection(e.target.checked)}
+                          className="w-3.5 h-3.5 text-blue-600 rounded"
+                        />
+                        <span>Section</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-medium">
+                        <input
+                          type="checkbox"
+                          checked={exportIncludePoints}
+                          onChange={(e) => setExportIncludePoints(e.target.checked)}
+                          className="w-3.5 h-3.5 text-blue-600 rounded"
+                        />
+                        <span>Points</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sort Order */}
+                <div className="pt-2 border-t border-gray-200/80 flex items-center justify-between text-xs">
+                  <span className="font-bold text-gray-700">Sort Candidates By:</span>
+                  <select
+                    value={exportSortBy}
+                    onChange={(e) => setExportSortBy(e.target.value as any)}
+                    className="px-2.5 py-1 border border-gray-300 rounded-lg bg-white text-xs font-medium"
+                  >
+                    <option value="chestNumber">Chest Number (Ascending)</option>
+                    <option value="name">Candidate Name (A-Z)</option>
+                    <option value="section">Section</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Batch Action Option */}
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-blue-900">
+                    Need separate files for each team?
+                  </div>
+                  <div className="text-[11px] text-blue-700">
+                    Download individual files for each of the {teams.length} teams in one click.
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleBatchExportAllTeamsXls}
+                    disabled={isExporting}
+                    className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition shadow-xs disabled:opacity-50 cursor-pointer"
+                    title="Download separate XLS files for all teams"
+                  >
+                    All Teams XLS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchExportAllTeamsPdf}
+                    disabled={isExporting}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs disabled:opacity-50 cursor-pointer"
+                    title="Download separate PDF files for all teams"
+                  >
+                    All Teams PDF
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCustomExport}
+                disabled={isExporting}
+                className="px-6 py-2.5 bg-slate-900 hover:bg-black disabled:bg-slate-400 text-white text-xs sm:text-sm font-bold rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer"
+              >
+                {isExporting ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📥 Download {exportFormat.toUpperCase()}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

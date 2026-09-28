@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Programme, ProgrammeParticipant, Candidate } from '@/types';
 
 export default function AdminPrintPage() {
@@ -110,11 +111,17 @@ export default function AdminPrintPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Print & Judgment Center</h1>
           <p className="text-gray-600">Generate printable scorecards and documents for programme evaluation</p>
         </div>
+        <Link
+          href="/admin/schedule"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold rounded-xl text-sm shadow-sm transition-all"
+        >
+          📅 Schedule & Call Sheet Generator &rarr;
+        </Link>
       </div>
 
       {!showPreview ? (

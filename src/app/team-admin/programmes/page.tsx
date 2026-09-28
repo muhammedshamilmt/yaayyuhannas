@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Candidate, Programme, ProgrammeParticipant, Team } from '@/types';
 import TeamBreadcrumb from '@/components/TeamAdmin/TeamBreadcrumb';
+import { Eye, Printer } from 'lucide-react';
 
 export default function TeamProgrammesPage() {
   const searchParams = useSearchParams();
@@ -200,7 +201,25 @@ export default function TeamProgrammesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Programme Registration</h1>
           <p className="text-gray-600">Register your team for competitions and events</p>
         </div>
-        <div className="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto justify-between sm:justify-end">
+          <Link
+            href={`/team-admin/programmes/pdf?team=${teamCode}&mode=preview`}
+            target="_blank"
+            className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs sm:text-sm flex items-center gap-1.5 shadow-xs transition-all active:scale-95 border border-slate-300 hover:border-slate-400"
+            title="Open Document Preview in New Tab"
+          >
+            <Eye className="w-4 h-4 text-blue-600" />
+            <span>Preview in New Tab</span>
+          </Link>
+          <Link
+            href={`/team-admin/programmes/pdf?team=${teamCode}`}
+            target="_blank"
+            className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all active:scale-95 border border-slate-700 hover:border-slate-500"
+            title="Open 3-Column Grid PDF Generator & Selection in New Tab"
+          >
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>PDF Generator (3-Col)</span>
+          </Link>
           <div className="text-right px-4 py-2 rounded-lg border shadow-sm text-white"
             style={{ backgroundColor: teamData?.color || '#3B82F6' }}>
             <div className="text-2xl font-bold">{registeredCount}</div>

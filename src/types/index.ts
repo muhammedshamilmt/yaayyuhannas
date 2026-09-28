@@ -60,6 +60,7 @@ export interface Result {
   programme?: string; // Keep for backward compatibility
   section: 'senior' | 'junior' | 'sub-junior' | 'general';
   positionType: 'individual' | 'group' | 'general';
+  status?: 'draft' | 'published';
   // For individual/group programmes (participant-based)
   firstPlace: { chestNumber: string; grade?: 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D+' | 'D' | 'D-' | 'E+' | 'E' | 'E-' | 'F' }[];
   secondPlace: { chestNumber: string; grade?: 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D+' | 'D' | 'D-' | 'E+' | 'E' | 'E-' | 'F' }[];

@@ -364,26 +364,24 @@ export default function ProgrammesPage() {
 
       <div className="space-y-6">
         {/* Tab Navigation */}
-        <div className="flex space-x-1 print:hidden">
-          <button
-            onClick={() => setActiveTab('manage')}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${activeTab === 'manage'
-              ? 'bg-blue-600 text-white shadow-md'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-          >
-            📝 Manage Programmes ({programmes.length})
-          </button>
-          {/* <button
-            onClick={() => setActiveTab('registrations')}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              activeTab === 'registrations'
+        <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setActiveTab('manage')}
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${activeTab === 'manage'
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+                }`}
+            >
+              📝 Manage Programmes ({programmes.length})
+            </button>
+          </div>
+          <Link
+            href="/admin/schedule"
+            className="px-5 py-2.5 rounded-xl font-bold transition-all bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white shadow-sm flex items-center gap-2 text-sm"
           >
-            👥 View Registrations ({totalRegistrations})
-          </button> */}
+            📅 Open Schedule & Call Sheet Generator &rarr;
+          </Link>
         </div>
         {/* Manage Programmes Tab */}
         {activeTab === 'manage' && (

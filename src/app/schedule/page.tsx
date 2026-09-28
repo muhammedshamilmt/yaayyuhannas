@@ -193,8 +193,8 @@ export default function SchedulePage() {
 
       <div className="container mx-auto px-4 py-8">
         {/* View Mode Toggle */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex space-x-2">
+        <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setViewMode('grid')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -215,6 +215,12 @@ export default function SchedulePage() {
             >
               📅 Timeline View
             </button>
+            <Link
+              href="/admin/schedule"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-all shadow-xs"
+            >
+              📋 Call Sheet Generator &rarr;
+            </Link>
           </div>
           
           {/* Day Filter */}

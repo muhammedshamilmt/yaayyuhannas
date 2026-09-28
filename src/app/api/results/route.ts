@@ -6,8 +6,12 @@ import { syncResultToSheets } from '@/lib/googleSheets';
 import { cookies } from 'next/headers';
 
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const statusParam = searchParams.get('status');
+    const includeDrafts = searchParams.get('includeDrafts') === 'true';
+
     const db = await getDatabase();
     const collection = db.collection<Result>('results');
     
@@ -17,6 +21,17 @@ export async function GET() {
     let query: any = {};
     if (activeFestId) {
       query.festId = activeFestId;
+    }
+
+    if (statusParam === 'draft') {
+      query.status = 'draft';
+    } else if (statusParam === 'published') {
+      query.status = { $ne: 'draft' };
+    } else if (statusParam === 'all' || includeDrafts) {
+      // Return everything (both draft and published)
+    } else {
+      // Default: Public facing, only return published! (status is not 'draft')
+      query.status = { $ne: 'draft' };
     }
     
     const results = await collection.find(query).toArray();
@@ -40,8 +55,11 @@ export async function POST(request: Request) {
     const activeFestId = cookieStore.get('activeFestId')?.value;
 
     const { _id, ...bodyWithoutId } = body;
+    const status = body.status === 'draft' ? 'draft' : 'published';
+
     const newResult: Result & { festId?: string } = {
       ...bodyWithoutId,
+      status,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -52,21 +70,21 @@ export async function POST(request: Request) {
     
     const result = await collection.insertOne(newResult);
     
-    // Prepare result for Google Sheets sync
-    const resultWithId = {
-      _id: result.insertedId,
-      ...newResult
-    };
-    
-    // Auto-sync to Google Sheets
-    try {
-      await syncResultToSheets(resultWithId);
-    } catch (syncError) {
-      console.error('Error syncing to sheets:', syncError);
-      // Don't fail the main operation if sync fails
+    // Auto-sync to Google Sheets only if published
+    if (status === 'published') {
+      try {
+        const resultWithId = {
+          _id: result.insertedId,
+          ...newResult
+        };
+        await syncResultToSheets(resultWithId);
+      } catch (syncError) {
+        console.error('Error syncing to sheets:', syncError);
+        // Don't fail the main operation if sync fails
+      }
     }
     
-    return NextResponse.json({ success: true, id: result.insertedId.toString() });
+    return NextResponse.json({ success: true, id: result.insertedId.toString(), status });
   } catch (error) {
     console.error('Error creating result:', error);
     return NextResponse.json({ error: 'Failed to create result' }, { status: 500 });
@@ -98,11 +116,10 @@ export async function PUT(request: Request) {
       }
     );
 
-    // Auto-sync to Google Sheets
+    // Auto-sync to Google Sheets only if result is/becomes published
     try {
-      // Get the updated result for sync
       const updatedResult = await collection.findOne({ _id: new ObjectId(id) });
-      if (updatedResult) {
+      if (updatedResult && updatedResult.status !== 'draft') {
         await syncResultToSheets(updatedResult);
       }
     } catch (syncError) {
@@ -114,6 +131,53 @@ export async function PUT(request: Request) {
   } catch (error) {
     console.error('Error updating result:', error);
     return NextResponse.json({ error: 'Failed to update result' }, { status: 500 });
+  }
+}
+
+// Bulk update status (e.g. Publish Selected Drafts or Publish All Drafts)
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const { ids, status = 'published' } = body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: 'IDs array is required' }, { status: 400 });
+    }
+
+    const db = await getDatabase();
+    const collection = db.collection<Result>('results');
+
+    const objectIds = ids.map(id => new ObjectId(id));
+    const updateResult = await collection.updateMany(
+      { _id: { $in: objectIds } },
+      { 
+        $set: { 
+          status, 
+          updatedAt: new Date() 
+        } 
+      }
+    );
+
+    // If published, sync to Google Sheets
+    if (status === 'published') {
+      try {
+        const updatedResults = await collection.find({ _id: { $in: objectIds } }).toArray();
+        for (const res of updatedResults) {
+          await syncResultToSheets(res);
+        }
+      } catch (syncError) {
+        console.error('Error syncing to sheets after bulk update:', syncError);
+      }
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      modifiedCount: updateResult.modifiedCount,
+      message: `Successfully updated ${updateResult.modifiedCount} results to ${status}` 
+    });
+  } catch (error) {
+    console.error('Error in bulk update results:', error);
+    return NextResponse.json({ error: 'Failed to update results' }, { status: 500 });
   }
 }
 

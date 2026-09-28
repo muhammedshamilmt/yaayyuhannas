@@ -44,6 +44,12 @@ const getNavigation = (teamCode: string) => [
     description: 'Programme Participation'
   },
   {
+    name: 'Programme PDF',
+    href: `/team-admin/programmes/pdf?team=${teamCode}`,
+    icon: '📄',
+    description: '3-Col PDF Roster & Print'
+  },
+  {
     name: 'Results',
     href: `/team-admin/results?team=${teamCode}`,
     icon: '🏅',
