@@ -281,7 +281,6 @@ export default function TeamsPage() {
         const targetSet = isSports ? individualSportsProgIdSet : individualArtsProgIdSet;
         if (p._id) targetSet.add(p._id.toString());
         if (p.id) targetSet.add(p.id.toString());
-        if (p.code) targetSet.add(p.code);
       }
     });
 
@@ -289,20 +288,19 @@ export default function TeamsPage() {
     const candidateStats = teamCandidates.map(c => {
       const artsRegistrations = participants.filter(
         p => p.status !== 'withdrawn' &&
-          (individualArtsProgIdSet.has(p.programmeId) || individualArtsProgIdSet.has(p.programmeCode)) &&
+          individualArtsProgIdSet.has(p.programmeId) &&
           p.participants?.includes(c.chestNumber)
       );
 
       const sportsRegistrations = participants.filter(
         p => p.status !== 'withdrawn' &&
-          (individualSportsProgIdSet.has(p.programmeId) || individualSportsProgIdSet.has(p.programmeCode)) &&
+          individualSportsProgIdSet.has(p.programmeId) &&
           p.participants?.includes(c.chestNumber)
       );
 
       const allRegistrations = participants.filter(
         p => p.status !== 'withdrawn' &&
-          (individualArtsProgIdSet.has(p.programmeId) || individualArtsProgIdSet.has(p.programmeCode) ||
-           individualSportsProgIdSet.has(p.programmeId) || individualSportsProgIdSet.has(p.programmeCode)) &&
+          (individualArtsProgIdSet.has(p.programmeId) || individualSportsProgIdSet.has(p.programmeId)) &&
           p.participants?.includes(c.chestNumber)
       );
 

@@ -87,20 +87,18 @@ export async function POST(request: NextRequest) {
         ]
       }, { projection: { _id: 1, id: 1, code: 1 } }).toArray();
 
-      const individualProgIds: string[] = [];
-      const individualProgCodes: string[] = [];
+      const individualProgIds: any[] = [];
 
       individualProgs.forEach((p: any) => {
-        if (p._id) individualProgIds.push(p._id.toString());
+        if (p._id) {
+          individualProgIds.push(p._id.toString());
+          if (ObjectId.isValid(p._id)) individualProgIds.push(new ObjectId(p._id));
+        }
         if (p.id) individualProgIds.push(p.id.toString());
-        if (p.code) individualProgCodes.push(p.code);
       });
 
       const individualProgFilter = {
-        $or: [
-          { programmeId: { $in: individualProgIds } },
-          { programmeCode: { $in: individualProgCodes } }
-        ]
+        programmeId: { $in: individualProgIds }
       };
 
       // Check maximum individual participation limit for each candidate in parallel
@@ -231,20 +229,18 @@ export async function PUT(request: NextRequest) {
           ]
         }, { projection: { _id: 1, id: 1, code: 1 } }).toArray();
 
-        const individualProgIds: string[] = [];
-        const individualProgCodes: string[] = [];
+        const individualProgIds: any[] = [];
 
         individualProgs.forEach((p: any) => {
-          if (p._id) individualProgIds.push(p._id.toString());
+          if (p._id) {
+            individualProgIds.push(p._id.toString());
+            if (ObjectId.isValid(p._id)) individualProgIds.push(new ObjectId(p._id));
+          }
           if (p.id) individualProgIds.push(p.id.toString());
-          if (p.code) individualProgCodes.push(p.code);
         });
 
         const individualProgFilter = {
-          $or: [
-            { programmeId: { $in: individualProgIds } },
-            { programmeCode: { $in: individualProgCodes } }
-          ]
+          programmeId: { $in: individualProgIds }
         };
 
         const checks = await Promise.all(

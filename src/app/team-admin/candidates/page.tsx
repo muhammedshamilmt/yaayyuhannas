@@ -122,21 +122,38 @@ export default function TeamCandidatesPage() {
   const minSportsLimit = festInfo?.minCandidateSportsParticipation ?? 0;
   const maxSportsLimit = festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 3;
 
-  // Set of individual programme IDs and codes separated by Arts and Sports
-  const { individualArtsProgIdSet, individualSportsProgIdSet } = useMemo(() => {
-    const artsSet = new Set<string>();
-    const sportsSet = new Set<string>();
+  // Map of programmes by unique ID (and string ID)
+  const programmeMap = useMemo(() => {
+    const map = new Map<string, Programme>();
     programmes.forEach(p => {
-      if (p.positionType === 'individual' || (p as any).type === 'individual') {
-        const isSports = (p.category || '').toLowerCase() === 'sports';
-        const targetSet = isSports ? sportsSet : artsSet;
-        if (p._id) targetSet.add(p._id.toString());
-        if (p.id) targetSet.add(p.id.toString());
-        if (p.code) targetSet.add(p.code);
-      }
+      if (p._id) map.set(p._id.toString(), p);
+      if (p.id) map.set(p.id.toString(), p);
     });
-    return { individualArtsProgIdSet: artsSet, individualSportsProgIdSet: sportsSet };
+    return map;
   }, [programmes]);
+
+  // Helper to resolve the exact Programme object for a participation record
+  const getProgrammeForParticipant = (part: ProgrammeParticipant): Programme | undefined => {
+    // 1. Primary lookup by unique programmeId
+    if (part.programmeId && programmeMap.has(part.programmeId)) {
+      return programmeMap.get(part.programmeId);
+    }
+    // 2. Fallback: match by code AND name (since codes can be shared between Arts and Sports)
+    if (part.programmeCode && part.programmeName) {
+      const cleanName = part.programmeName.trim().toLowerCase();
+      const match = programmes.find(
+        p => p.code?.toUpperCase() === part.programmeCode?.toUpperCase() &&
+             p.name?.trim().toLowerCase() === cleanName
+      );
+      if (match) return match;
+    }
+    // 3. Fallback: if only one programme has this code
+    if (part.programmeCode) {
+      const matches = programmes.filter(p => p.code?.toUpperCase() === part.programmeCode?.toUpperCase());
+      if (matches.length === 1) return matches[0];
+    }
+    return undefined;
+  };
 
   // Compute individual and total stats for any candidate
   const getCandidateStats = (chestNumber: string) => {
@@ -144,18 +161,25 @@ export default function TeamCandidatesPage() {
       p => p.status !== 'withdrawn' && p.participants?.includes(chestNumber)
     );
 
-    const artsIndividualParticipations = candidateParticipations.filter(
-      p => individualArtsProgIdSet.has(p.programmeId) || individualArtsProgIdSet.has(p.programmeCode)
-    );
+    const artsIndividualParticipations: ProgrammeParticipant[] = [];
+    const sportsIndividualParticipations: ProgrammeParticipant[] = [];
+    const groupParticipations: ProgrammeParticipant[] = [];
 
-    const sportsIndividualParticipations = candidateParticipations.filter(
-      p => individualSportsProgIdSet.has(p.programmeId) || individualSportsProgIdSet.has(p.programmeCode)
-    );
+    candidateParticipations.forEach(part => {
+      const prog = getProgrammeForParticipant(part);
+      const isIndividual = prog ? (prog.positionType === 'individual' || (prog as any).type === 'individual') : false;
+      const isSports = (prog?.category || '').toLowerCase() === 'sports';
 
-    const groupParticipations = candidateParticipations.filter(
-      p => !individualArtsProgIdSet.has(p.programmeId) && !individualArtsProgIdSet.has(p.programmeCode) &&
-           !individualSportsProgIdSet.has(p.programmeId) && !individualSportsProgIdSet.has(p.programmeCode)
-    );
+      if (isIndividual) {
+        if (isSports) {
+          sportsIndividualParticipations.push(part);
+        } else {
+          artsIndividualParticipations.push(part);
+        }
+      } else {
+        groupParticipations.push(part);
+      }
+    });
 
     const artsCount = artsIndividualParticipations.length;
     const sportsCount = sportsIndividualParticipations.length;
@@ -1014,10 +1038,10 @@ export default function TeamCandidatesPage() {
                 ) : (
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                     {stats.candidateParticipations.map((part) => {
-                      const prog = programmes.find(
-                        p => p._id?.toString() === part.programmeId || p.code === part.programmeCode
-                      );
-                      const isIndividual = prog?.positionType === 'individual' || (prog as any)?.type === 'individual';
+                      const prog = getProgrammeForParticipant(part);
+                      const isIndividual = prog ? (prog.positionType === 'individual' || (prog as any)?.type === 'individual') : false;
+                      const isSports = (prog?.category || '').toLowerCase() === 'sports';
+                      const categoryLabel = prog ? (isSports ? 'Sports' : 'Arts') : 'Unknown';
 
                       return (
                         <div
@@ -1028,8 +1052,12 @@ export default function TeamCandidatesPage() {
                             <div className="font-bold text-gray-900">
                               {part.programmeName || prog?.name || 'Programme'}
                             </div>
-                            <div className="text-[11px] text-gray-500 font-mono mt-0.5">
-                              {part.programmeCode || prog?.code} • <span className="capitalize">{prog?.category || 'Arts'}</span>
+                            <div className="text-[11px] text-gray-500 font-mono mt-0.5 flex items-center gap-1.5">
+                              <span>{part.programmeCode || prog?.code}</span>
+                              <span>•</span>
+                              <span className={`font-semibold capitalize ${isSports ? 'text-emerald-700' : 'text-purple-700'}`}>
+                                {categoryLabel}
+                              </span>
                             </div>
                           </div>
                           <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase shrink-0 ${isIndividual

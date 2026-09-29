@@ -202,7 +202,6 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
             if (pIsSports === isSports && (p.positionType === 'individual' || (p as any).type === 'individual')) {
                 if (p._id) set.add(p._id.toString());
                 if (p.id) set.add(p.id.toString());
-                if (p.code) set.add(p.code);
             }
         });
         return set;
@@ -213,10 +212,10 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
         return allParticipants.filter(p => {
             if (p.status === 'withdrawn') return false;
             // When editing an existing registration for this programme, don't count this programme itself
-            if (isEditingCurrentTeam && (p.programmeId === programmeId || p.programmeCode === programme?.code)) {
+            if (isEditingCurrentTeam && (p.programmeId === programmeId || p.programmeId === programme?._id?.toString())) {
                 return false;
             }
-            const isProgIndividual = individualCategoryProgIdSet.has(p.programmeId) || individualCategoryProgIdSet.has(p.programmeCode);
+            const isProgIndividual = individualCategoryProgIdSet.has(p.programmeId);
             return isProgIndividual && p.participants?.includes(chestNumber);
         }).length;
     };

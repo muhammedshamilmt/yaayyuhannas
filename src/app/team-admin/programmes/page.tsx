@@ -104,7 +104,7 @@ export default function TeamProgrammesPage() {
   const registeredProgrammeIds = [...new Set(participants.map(p => p.programmeId))];
   const registeredProgIdSet = new Set(registeredProgrammeIds);
 
-  // Set of individual programme IDs and codes separated by Arts and Sports
+  // Set of individual programme IDs separated by Arts and Sports (using unique IDs to prevent cross-category code collision)
   const { individualArtsProgIdSet, individualSportsProgIdSet } = useMemo(() => {
     const artsSet = new Set<string>();
     const sportsSet = new Set<string>();
@@ -114,7 +114,6 @@ export default function TeamProgrammesPage() {
         const targetSet = isSports ? sportsSet : artsSet;
         if (p._id) targetSet.add(p._id.toString());
         if (p.id) targetSet.add(p.id.toString());
-        if (p.code) targetSet.add(p.code);
       }
     });
     return { individualArtsProgIdSet: artsSet, individualSportsProgIdSet: sportsSet };
@@ -186,7 +185,7 @@ export default function TeamProgrammesPage() {
   const candidateArtsCounts = candidates.reduce((acc, c) => {
     acc[c.chestNumber] = participants.filter(
       p => p.status !== 'withdrawn' &&
-        (individualArtsProgIdSet.has(p.programmeId) || individualArtsProgIdSet.has(p.programmeCode)) &&
+        individualArtsProgIdSet.has(p.programmeId) &&
         p.participants?.includes(c.chestNumber)
     ).length;
     return acc;
@@ -195,7 +194,7 @@ export default function TeamProgrammesPage() {
   const candidateSportsCounts = candidates.reduce((acc, c) => {
     acc[c.chestNumber] = participants.filter(
       p => p.status !== 'withdrawn' &&
-        (individualSportsProgIdSet.has(p.programmeId) || individualSportsProgIdSet.has(p.programmeCode)) &&
+        individualSportsProgIdSet.has(p.programmeId) &&
         p.participants?.includes(c.chestNumber)
     ).length;
     return acc;
@@ -710,15 +709,31 @@ function ProgrammeCard({
   const currentMaxLimit = isSports ? (maxSportsLimit ?? maxLimit) : (maxArtsLimit ?? maxLimit);
   const relevantIdSet = isSports ? individualSportsProgIdSet : individualArtsProgIdSet;
 
-  // Helper to count other individual programme participations of this category for a candidate
-  const getCandidateIndividualProgCount = (chestNumber: string) => {
+  const currentProgId = programme._id?.toString() || programme.id;
+
+  // Helper to count other individual arts programmes for a candidate (excluding current programme)
+  const getCandidateOtherArtsCount = (chestNumber: string) => {
     return participants.filter(
       p => p.status !== 'withdrawn' &&
-        p.programmeId !== programme._id?.toString() &&
-        p.programmeCode !== programme.code &&
-        p.participants?.includes(chestNumber) &&
-        (relevantIdSet ? (relevantIdSet.has(p.programmeId) || relevantIdSet.has(p.programmeCode)) : true)
+        p.programmeId !== currentProgId &&
+        (p.participants as any[])?.some(item => (typeof item === 'object' && item ? ((item as any).candidateId || (item as any).chestNumber) : item) === chestNumber) &&
+        (individualArtsProgIdSet ? individualArtsProgIdSet.has(p.programmeId) : true)
     ).length;
+  };
+
+  // Helper to count other individual sports programmes for a candidate (excluding current programme)
+  const getCandidateOtherSportsCount = (chestNumber: string) => {
+    return participants.filter(
+      p => p.status !== 'withdrawn' &&
+        p.programmeId !== currentProgId &&
+        (p.participants as any[])?.some(item => (typeof item === 'object' && item ? ((item as any).candidateId || (item as any).chestNumber) : item) === chestNumber) &&
+        (individualSportsProgIdSet ? individualSportsProgIdSet.has(p.programmeId) : true)
+    ).length;
+  };
+
+  // Helper to count other individual programme participations of this category for a candidate
+  const getCandidateIndividualProgCount = (chestNumber: string) => {
+    return isSports ? getCandidateOtherSportsCount(chestNumber) : getCandidateOtherArtsCount(chestNumber);
   };
 
   const existingParticipant = participants.find(p => p.programmeId === programme._id?.toString());
@@ -1036,11 +1051,21 @@ function ProgrammeCard({
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <div className="flex items-center">
                   <span className="text-2xl mr-3">🎯</span>
-                  <div>
+                  <div className="flex-1">
                     <h4 className="font-semibold text-blue-900">Registration Requirements</h4>
                     <p className="text-blue-700 text-sm">
                       Select exactly <strong>{programme.requiredParticipants}</strong> participant{programme.requiredParticipants > 1 ? 's' : ''} from your team
                     </p>
+                    {isIndividualProgramme && (
+                      <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                        <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-medium">
+                          🎭 Arts Limit: Min {minArtsLimit ?? 1} / Max {maxArtsLimit ?? maxLimit}
+                        </span>
+                        <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-medium">
+                          ⚽ Sports Limit: Min {minSportsLimit ?? 0} / Max {maxSportsLimit ?? maxLimit}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1149,10 +1174,18 @@ function ProgrammeCard({
                       ) : (
                         filteredCandidates.map((candidate) => {
                           const isSelected = selectedParticipants.includes(candidate.chestNumber);
-                          const individualCount = getCandidateIndividualProgCount(candidate.chestNumber);
-                          const hasReachedMax = isIndividualProgramme && !isSelected && individualCount >= currentMaxLimit;
+                          const otherArts = getCandidateOtherArtsCount(candidate.chestNumber);
+                          const otherSports = getCandidateOtherSportsCount(candidate.chestNumber);
+                          const otherCount = isSports ? otherSports : otherArts;
+                          const hasReachedMax = isIndividualProgramme && !isSelected && otherCount >= currentMaxLimit;
                           const isRequiredLimitReached = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
                           const isDisabled = hasReachedMax || isRequiredLimitReached;
+
+                          const effectiveArts = otherArts + (isIndividualProgramme && !isSports && isSelected ? 1 : 0);
+                          const effectiveSports = otherSports + (isIndividualProgramme && isSports && isSelected ? 1 : 0);
+
+                          const isArtsMaxed = effectiveArts >= (maxArtsLimit ?? maxLimit);
+                          const isSportsMaxed = effectiveSports >= (maxSportsLimit ?? maxLimit);
 
                           return (
                             <div
@@ -1178,29 +1211,55 @@ function ProgrammeCard({
                               }}
                             >
                               <div className="flex items-center space-x-3">
-                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
                                   }`}>
                                   {isSelected && <span className="text-white text-sm font-bold">✓</span>}
                                 </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
                                     <span className="font-bold text-gray-900 font-mono text-base">
                                       {candidate.chestNumber}
                                     </span>
-                                    {isIndividualProgramme ? (
-                                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${individualCount >= currentMinLimit
-                                        ? 'bg-emerald-100 text-emerald-800'
-                                        : 'bg-amber-100 text-amber-800'
-                                        }`}>
-                                        {individualCount} / {currentMaxLimit} {categoryLabel.toLowerCase()} prog
+                                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                      <span
+                                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
+                                          isArtsMaxed
+                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                            : effectiveArts >= (minArtsLimit ?? 1)
+                                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                                        }`}
+                                        title={`Arts: ${effectiveArts} of ${maxArtsLimit ?? maxLimit} (Min: ${minArtsLimit ?? 1})`}
+                                      >
+                                        🎭 {effectiveArts} / {maxArtsLimit ?? maxLimit} arts prog
                                       </span>
-                                    ) : (
-                                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-                                        Group Event
+                                      <span
+                                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
+                                          isSportsMaxed
+                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                            : effectiveSports >= (minSportsLimit ?? 0)
+                                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                                        }`}
+                                        title={`Sports: ${effectiveSports} of ${maxSportsLimit ?? maxLimit} (Min: ${minSportsLimit ?? 0})`}
+                                      >
+                                        ⚽ {effectiveSports} / {maxSportsLimit ?? maxLimit} sports prog
+                                      </span>
+                                      {!isIndividualProgramme && (
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                                          Group Event
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between mt-1">
+                                    <div className="text-gray-700 font-medium truncate">{candidate.name}</div>
+                                    {isSelected && (
+                                      <span className="text-blue-600 font-bold text-xs tracking-wider shrink-0 ml-2">
+                                        SELECTED
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-gray-700 font-medium">{candidate.name}</div>
                                   <div className="text-xs text-gray-500 capitalize">
                                     {candidate.section} Section • {candidate.points} points
                                   </div>
@@ -1210,11 +1269,6 @@ function ProgrammeCard({
                                     </div>
                                   )}
                                 </div>
-                                {isSelected && (
-                                  <div className="text-blue-500 font-bold text-sm">
-                                    SELECTED
-                                  </div>
-                                )}
                               </div>
                             </div>
                           );
@@ -1455,11 +1509,21 @@ function ProgrammeCard({
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
                 <div className="flex items-center">
                   <span className="text-2xl mr-3">✏️</span>
-                  <div>
+                  <div className="flex-1">
                     <h4 className="font-semibold text-orange-900">Edit Registration</h4>
                     <p className="text-orange-700 text-sm">
                       Update your team's participants for this programme. Select exactly <strong>{programme.requiredParticipants}</strong> participant{programme.requiredParticipants > 1 ? 's' : ''}
                     </p>
+                    {isIndividualProgramme && (
+                      <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                        <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-medium">
+                          🎭 Arts Limit: Min {minArtsLimit ?? 1} / Max {maxArtsLimit ?? maxLimit}
+                        </span>
+                        <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-medium">
+                          ⚽ Sports Limit: Min {minSportsLimit ?? 0} / Max {maxSportsLimit ?? maxLimit}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1468,11 +1532,16 @@ function ProgrammeCard({
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <h4 className="font-semibold text-blue-900 mb-2">Current Participants:</h4>
                 <div className="flex flex-wrap gap-2">
-                  {existingParticipant?.participants.map((participant, index) => (
-                    <span key={index} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                      {participant}
-                    </span>
-                  ))}
+                  {existingParticipant?.participants.map((participant: any, index) => {
+                    const cNum = typeof participant === 'object' && participant ? (participant.candidateId || participant.chestNumber) : participant;
+                    const cObj = candidates.find(c => c.chestNumber === cNum);
+                    return (
+                      <span key={index} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium inline-flex items-center gap-1.5">
+                        <span className="font-mono font-bold">{cNum}</span>
+                        {cObj && <span className="text-xs text-blue-700 font-normal">({cObj.name})</span>}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1528,10 +1597,18 @@ function ProgrammeCard({
                       ) : (
                         filteredCandidates.map((candidate) => {
                           const isSelected = selectedParticipants.includes(candidate.chestNumber);
-                          const individualCount = getCandidateIndividualProgCount(candidate.chestNumber);
-                          const hasReachedMax = isIndividualProgramme && !isSelected && individualCount >= currentMaxLimit;
+                          const otherArts = getCandidateOtherArtsCount(candidate.chestNumber);
+                          const otherSports = getCandidateOtherSportsCount(candidate.chestNumber);
+                          const otherCount = isSports ? otherSports : otherArts;
+                          const hasReachedMax = isIndividualProgramme && !isSelected && otherCount >= currentMaxLimit;
                           const isRequiredLimitReached = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
                           const isDisabled = hasReachedMax || isRequiredLimitReached;
+
+                          const effectiveArts = otherArts + (isIndividualProgramme && !isSports && isSelected ? 1 : 0);
+                          const effectiveSports = otherSports + (isIndividualProgramme && isSports && isSelected ? 1 : 0);
+
+                          const isArtsMaxed = effectiveArts >= (maxArtsLimit ?? maxLimit);
+                          const isSportsMaxed = effectiveSports >= (maxSportsLimit ?? maxLimit);
 
                           return (
                             <div
@@ -1557,29 +1634,55 @@ function ProgrammeCard({
                               }}
                             >
                               <div className="flex items-center space-x-3">
-                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-orange-500 bg-orange-500' : 'border-gray-300'
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? 'border-orange-500 bg-orange-500' : 'border-gray-300'
                                   }`}>
                                   {isSelected && <span className="text-white text-sm font-bold">✓</span>}
                                 </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
                                     <span className="font-bold text-gray-900 font-mono text-base">
                                       {candidate.chestNumber}
                                     </span>
-                                    {isIndividualProgramme ? (
-                                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${individualCount >= currentMinLimit
-                                        ? 'bg-emerald-100 text-emerald-800'
-                                        : 'bg-amber-100 text-amber-800'
-                                        }`}>
-                                        {individualCount} / {currentMaxLimit} {categoryLabel.toLowerCase()} prog
+                                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                      <span
+                                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
+                                          isArtsMaxed
+                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                            : effectiveArts >= (minArtsLimit ?? 1)
+                                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                                        }`}
+                                        title={`Arts: ${effectiveArts} of ${maxArtsLimit ?? maxLimit} (Min: ${minArtsLimit ?? 1})`}
+                                      >
+                                        🎭 {effectiveArts} / {maxArtsLimit ?? maxLimit} arts prog
                                       </span>
-                                    ) : (
-                                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-                                        Group Event
+                                      <span
+                                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
+                                          isSportsMaxed
+                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                            : effectiveSports >= (minSportsLimit ?? 0)
+                                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                                        }`}
+                                        title={`Sports: ${effectiveSports} of ${maxSportsLimit ?? maxLimit} (Min: ${minSportsLimit ?? 0})`}
+                                      >
+                                        ⚽ {effectiveSports} / {maxSportsLimit ?? maxLimit} sports prog
+                                      </span>
+                                      {!isIndividualProgramme && (
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                                          Group Event
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between mt-1">
+                                    <div className="text-gray-700 font-medium truncate">{candidate.name}</div>
+                                    {isSelected && (
+                                      <span className="text-orange-500 font-bold text-xs tracking-wider shrink-0 ml-2">
+                                        SELECTED
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-gray-700 font-medium">{candidate.name}</div>
                                   <div className="text-xs text-gray-500 capitalize">
                                     {candidate.section} Section • {candidate.points} points
                                   </div>
@@ -1589,11 +1692,6 @@ function ProgrammeCard({
                                     </div>
                                   )}
                                 </div>
-                                {isSelected && (
-                                  <div className="text-orange-500 font-bold text-sm">
-                                    SELECTED
-                                  </div>
-                                )}
                               </div>
                             </div>
                           );
