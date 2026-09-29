@@ -117,20 +117,25 @@ export default function TeamCandidatesPage() {
     }
   };
 
-  const minLimit = festInfo?.minCandidateParticipation ?? 1;
-  const maxLimit = festInfo?.maxCandidateParticipation ?? 3;
+  const minArtsLimit = festInfo?.minCandidateArtsParticipation ?? festInfo?.minCandidateParticipation ?? 1;
+  const maxArtsLimit = festInfo?.maxCandidateArtsParticipation ?? festInfo?.maxCandidateParticipation ?? 3;
+  const minSportsLimit = festInfo?.minCandidateSportsParticipation ?? 0;
+  const maxSportsLimit = festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 3;
 
-  // Set of individual programme IDs and codes
-  const individualProgIdSet = useMemo(() => {
-    const set = new Set<string>();
+  // Set of individual programme IDs and codes separated by Arts and Sports
+  const { individualArtsProgIdSet, individualSportsProgIdSet } = useMemo(() => {
+    const artsSet = new Set<string>();
+    const sportsSet = new Set<string>();
     programmes.forEach(p => {
       if (p.positionType === 'individual' || (p as any).type === 'individual') {
-        if (p._id) set.add(p._id.toString());
-        if (p.id) set.add(p.id.toString());
-        if (p.code) set.add(p.code);
+        const isSports = (p.category || '').toLowerCase() === 'sports';
+        const targetSet = isSports ? sportsSet : artsSet;
+        if (p._id) targetSet.add(p._id.toString());
+        if (p.id) targetSet.add(p.id.toString());
+        if (p.code) targetSet.add(p.code);
       }
     });
-    return set;
+    return { individualArtsProgIdSet: artsSet, individualSportsProgIdSet: sportsSet };
   }, [programmes]);
 
   // Compute individual and total stats for any candidate
@@ -139,28 +144,42 @@ export default function TeamCandidatesPage() {
       p => p.status !== 'withdrawn' && p.participants?.includes(chestNumber)
     );
 
-    const individualParticipations = candidateParticipations.filter(
-      p => individualProgIdSet.size === 0 || individualProgIdSet.has(p.programmeId) || individualProgIdSet.has(p.programmeCode)
+    const artsIndividualParticipations = candidateParticipations.filter(
+      p => individualArtsProgIdSet.has(p.programmeId) || individualArtsProgIdSet.has(p.programmeCode)
+    );
+
+    const sportsIndividualParticipations = candidateParticipations.filter(
+      p => individualSportsProgIdSet.has(p.programmeId) || individualSportsProgIdSet.has(p.programmeCode)
     );
 
     const groupParticipations = candidateParticipations.filter(
-      p => !individualProgIdSet.has(p.programmeId) && !individualProgIdSet.has(p.programmeCode)
+      p => !individualArtsProgIdSet.has(p.programmeId) && !individualArtsProgIdSet.has(p.programmeCode) &&
+           !individualSportsProgIdSet.has(p.programmeId) && !individualSportsProgIdSet.has(p.programmeCode)
     );
 
-    const registeredCount = individualParticipations.length;
-    const remainingCount = Math.max(0, maxLimit - registeredCount);
-    const isMinMet = registeredCount >= minLimit;
-    const isMaxReached = registeredCount >= maxLimit;
+    const artsCount = artsIndividualParticipations.length;
+    const sportsCount = sportsIndividualParticipations.length;
+    const isArtsMinMet = artsCount >= minArtsLimit;
+    const isSportsMinMet = minSportsLimit === 0 || sportsCount >= minSportsLimit;
+    const isMinMet = isArtsMinMet && isSportsMinMet;
+    const isArtsMaxReached = artsCount >= maxArtsLimit;
+    const isSportsMaxReached = sportsCount >= maxSportsLimit;
 
     return {
       candidateParticipations,
-      individualParticipations,
+      artsIndividualParticipations,
+      sportsIndividualParticipations,
       groupParticipations,
-      registeredCount,
-      remainingCount,
+      artsCount,
+      sportsCount,
+      registeredCount: artsCount + sportsCount,
+      remainingCount: Math.max(0, maxArtsLimit - artsCount) + Math.max(0, maxSportsLimit - sportsCount),
       totalCount: candidateParticipations.length,
       isMinMet,
-      isMaxReached
+      isArtsMinMet,
+      isSportsMinMet,
+      isArtsMaxReached,
+      isSportsMaxReached
     };
   };
 
@@ -288,7 +307,7 @@ export default function TeamCandidatesPage() {
 
   // Export to CSV
   const exportToCSV = () => {
-    const headers = ['Chest Number', 'Name', 'Section', 'Points', 'Registered Individual', 'Max Limit', 'Remaining'];
+    const headers = ['Chest Number', 'Name', 'Section', 'Points', 'Arts Registered', 'Arts Max', 'Sports Registered', 'Sports Max', 'Eligible'];
 
     const csvData = filteredCandidates.map(candidate => {
       const stats = getCandidateStats(candidate.chestNumber);
@@ -297,9 +316,11 @@ export default function TeamCandidatesPage() {
         `"${(candidate.name || '').replace(/"/g, '""')}"`,
         candidate.section || '',
         candidate.points || 0,
-        stats.registeredCount,
-        maxLimit,
-        stats.remainingCount
+        stats.artsCount,
+        maxArtsLimit,
+        stats.sportsCount,
+        maxSportsLimit,
+        stats.isMinMet ? 'Eligible' : 'Not Eligible'
       ];
     });
 
@@ -358,7 +379,7 @@ export default function TeamCandidatesPage() {
         <div>
           <h1 className="text-2xl font-black text-gray-900 tracking-tight">Team Candidates</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Manage candidates, track scored points, and monitor programme registrations ({minLimit} min / {maxLimit} max individual).
+            Manage candidates, track scored points, and monitor programme registrations (Arts: {minArtsLimit} min / {maxArtsLimit} max • Sports: {minSportsLimit} min / {maxSportsLimit} max).
           </p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -683,12 +704,20 @@ export default function TeamCandidatesPage() {
                       <span className={`w-1.5 h-1.5 rounded-full ${stats.isMinMet ? 'bg-emerald-500' : stats.registeredCount === 0 ? 'bg-rose-500' : 'bg-amber-500'
                         }`} />
                       <span>
-                        {stats.isMinMet ? 'Eligible' : stats.registeredCount === 0 ? '0 Reg' : `Need ${minLimit - stats.registeredCount}`}
+                        {stats.isMinMet
+                          ? 'Eligible'
+                          : stats.registeredCount === 0
+                            ? '0 Reg'
+                            : !stats.isArtsMinMet && !stats.isSportsMinMet
+                              ? `Need Arts & Sports`
+                              : !stats.isArtsMinMet
+                                ? `Need ${minArtsLimit - stats.artsCount} Arts`
+                                : `Need ${minSportsLimit - stats.sportsCount} Sports`}
                       </span>
                     </span>
                   </div>
 
-                  {/* 3-Column Stats Box (matches 4.5 Rating / 200 Hours / 06 Months in image) */}
+                  {/* 3-Column Stats Box (Points / Arts / Sports) */}
                   <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-2.5 sm:p-3 my-3.5 grid grid-cols-3 divide-x divide-slate-200/60 text-center shadow-2xs">
                     <div>
                       <div className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">
@@ -699,19 +728,19 @@ export default function TeamCandidatesPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-lg sm:text-xl font-bold text-blue-600  tracking-tight">
-                        {stats.registeredCount}/{maxLimit}
+                      <div className="text-lg sm:text-xl font-bold text-purple-600 tracking-tight">
+                        {stats.artsCount}/{maxArtsLimit}
                       </div>
                       <div className="text-[11px] font-semibold text-gray-400 mt-0.5 uppercase tracking-wide">
-                        Registered
+                        Arts
                       </div>
                     </div>
                     <div>
-                      <div className="text-lg sm:text-xl font-bold text-amber-600  tracking-tight">
-                        {stats.remainingCount}
+                      <div className="text-lg sm:text-xl font-bold text-emerald-600 tracking-tight">
+                        {stats.sportsCount}/{maxSportsLimit}
                       </div>
                       <div className="text-[11px] font-semibold text-gray-400 mt-0.5 uppercase tracking-wide">
-                        Remaining
+                        Sports
                       </div>
                     </div>
                   </div>
@@ -740,8 +769,8 @@ export default function TeamCandidatesPage() {
                   <th className="px-6 py-4 text-left">Candidate</th>
                   <th className="px-4 py-4 text-left">Section</th>
                   <th className="px-4 py-4 text-center">Scored Points</th>
-                  <th className="px-4 py-4 text-center">Registered</th>
-                  <th className="px-4 py-4 text-center">Remaining</th>
+                  <th className="px-4 py-4 text-center">Arts Progs</th>
+                  <th className="px-4 py-4 text-center">Sports Progs</th>
                   <th className="px-4 py-4 text-center">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
@@ -789,17 +818,17 @@ export default function TeamCandidatesPage() {
                         </span>
                       </td>
 
-                      {/* Registered (like 2/5 or 2/3) */}
+                      {/* Arts Progs */}
                       <td className="px-4 py-4 whitespace-nowrap text-center">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-blue-50 text-blue-700 border border-blue-100">
-                          {stats.registeredCount} / {maxLimit}
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-purple-50 text-purple-700 border border-purple-100">
+                          {stats.artsCount} / {maxArtsLimit}
                         </span>
                       </td>
 
-                      {/* Remaining */}
+                      {/* Sports Progs */}
                       <td className="px-4 py-4 whitespace-nowrap text-center">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-amber-50 text-amber-800 border border-amber-100">
-                          {stats.remainingCount} left
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-100">
+                          {stats.sportsCount} / {maxSportsLimit}
                         </span>
                       </td>
 
@@ -814,7 +843,15 @@ export default function TeamCandidatesPage() {
                           <span className={`w-1.5 h-1.5 rounded-full ${stats.isMinMet ? 'bg-emerald-500' : stats.registeredCount === 0 ? 'bg-rose-500' : 'bg-amber-500'
                             }`} />
                           <span>
-                            {stats.isMinMet ? 'Eligible' : stats.registeredCount === 0 ? '0 Reg' : `Need ${minLimit - stats.registeredCount}`}
+                            {stats.isMinMet
+                              ? 'Eligible'
+                              : stats.registeredCount === 0
+                                ? '0 Reg'
+                                : !stats.isArtsMinMet && !stats.isSportsMinMet
+                                  ? `Need Arts & Sports`
+                                  : !stats.isArtsMinMet
+                                    ? `Need ${minArtsLimit - stats.artsCount} Arts`
+                                    : `Need ${minSportsLimit - stats.sportsCount} Sports`}
                           </span>
                         </span>
                       </td>
@@ -929,32 +966,32 @@ export default function TeamCandidatesPage() {
                   </div>
                   <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Scored Points</div>
                 </div>
-                <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-100">
-                  <div className="text-xl font-black text-blue-700 font-mono">
-                    {stats.registeredCount}/{maxLimit}
+                <div className="p-3 rounded-2xl bg-purple-50/70 border border-purple-100">
+                  <div className="text-xl font-black text-purple-700 font-mono">
+                    {stats.artsCount}/{maxArtsLimit}
                   </div>
-                  <div className="text-[10px] text-blue-600 font-bold uppercase tracking-wider mt-0.5">Individual Progs</div>
+                  <div className="text-[10px] text-purple-600 font-bold uppercase tracking-wider mt-0.5">Arts Progs</div>
                 </div>
-                <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-100">
-                  <div className="text-xl font-black text-amber-700 font-mono">
-                    {stats.remainingCount}
+                <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-100">
+                  <div className="text-xl font-black text-emerald-700 font-mono">
+                    {stats.sportsCount}/{maxSportsLimit}
                   </div>
-                  <div className="text-[10px] text-amber-600 font-bold uppercase tracking-wider mt-0.5">Remaining</div>
+                  <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mt-0.5">Sports Progs</div>
                 </div>
               </div>
 
               {/* Quota Status Banner */}
-              <div className={`p-3 rounded-xl mb-6 text-xs flex items-center justify-between border ${stats.isMinMet
+              <div className={`p-3 rounded-xl mb-6 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 border ${stats.isMinMet
                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                 : 'bg-rose-50 text-rose-800 border-rose-200'
                 }`}>
                 <span className="font-semibold">
                   {stats.isMinMet
-                    ? `✓ Minimum requirement met (${minLimit} min required)`
-                    : `⚠️ Needs ${minLimit - stats.registeredCount} more individual programme to be eligible`}
+                    ? `✓ Minimum requirements met (Arts: ≥${minArtsLimit}${minSportsLimit > 0 ? `, Sports: ≥${minSportsLimit}` : ''})`
+                    : `⚠️ Candidate needs: ${!stats.isArtsMinMet ? `${minArtsLimit - stats.artsCount} more Arts ` : ''}${!stats.isArtsMinMet && !stats.isSportsMinMet ? 'and ' : ''}${!stats.isSportsMinMet ? `${minSportsLimit - stats.sportsCount} more Sports` : ''} to be eligible`}
                 </span>
-                <span className="font-bold font-mono">
-                  {stats.registeredCount} / {minLimit} Min
+                <span className="font-bold font-mono text-[11px] shrink-0">
+                  🎭 {stats.artsCount}/{minArtsLimit} Arts Min • ⚽ {stats.sportsCount}/{minSportsLimit} Sports Min
                 </span>
               </div>
 

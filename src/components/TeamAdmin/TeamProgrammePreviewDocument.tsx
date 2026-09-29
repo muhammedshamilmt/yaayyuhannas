@@ -72,18 +72,29 @@ export const TeamProgrammePreviewDocument: React.FC<TeamProgrammePreviewDocument
             </div>
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs uppercase font-bold tracking-wider text-amber-300">
                   {meta.festivalName || 'Arts & Sports Festival'}
                 </span>
                 <span className="text-white/40">&bull;</span>
                 <span className="text-xs font-semibold text-slate-300">Official Roster</span>
+                {meta.filterTitle && (
+                  <>
+                    <span className="text-white/40">&bull;</span>
+                    <span className="text-[11px] font-extrabold text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded-md border border-amber-400/30 uppercase tracking-wider">
+                      {meta.filterTitle}
+                    </span>
+                  </>
+                )}
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white ">
                 {meta.teamName}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
                 Team Programme Entries &amp; Registered Candidate List
+                {meta.filterTitle && (
+                  <span className="text-amber-200/90 font-medium"> &bull; {meta.filterTitle}</span>
+                )}
               </p>
             </div>
           </div>
@@ -168,7 +179,15 @@ export const TeamProgrammePreviewDocument: React.FC<TeamProgrammePreviewDocument
                   <div className="px-3 py-1.5 bg-white border-b border-slate-100 flex items-center justify-between text-[10px] font-semibold text-slate-500">
                     <span className="capitalize">{item.section}</span>
                     <span>&bull;</span>
-                    <span className="capitalize">{item.category}</span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider ${
+                        (item.category || '').toLowerCase() === 'sports'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-purple-50 text-purple-700 border border-purple-200'
+                      }`}
+                    >
+                      {item.category}
+                    </span>
                     <span>&bull;</span>
                     <span className="capitalize">{item.positionType}</span>
                   </div>

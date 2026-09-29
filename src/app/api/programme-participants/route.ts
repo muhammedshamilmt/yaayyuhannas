@@ -66,13 +66,24 @@ export async function POST(request: NextRequest) {
     const isIndividual = programmeDoc?.positionType === 'individual' || (programmeDoc as any)?.type === 'individual';
 
     if (isIndividual) {
-      const maxCandidateParticipation = festInfo?.maxCandidateParticipation ?? 3;
+      const isSports = (programmeDoc?.category || '').toLowerCase() === 'sports';
+      const maxLimit = isSports
+        ? (festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 3)
+        : (festInfo?.maxCandidateArtsParticipation ?? festInfo?.maxCandidateParticipation ?? 3);
+      const categoryLabel = isSports ? 'Sports' : 'Arts';
 
-      // Find all individual programme IDs and codes
+      // Find all individual programme IDs and codes for this category
       const individualProgs = await programmesCollection.find({
-        $or: [
-          { positionType: 'individual' },
-          { type: 'individual' }
+        $and: [
+          {
+            $or: [
+              { positionType: 'individual' },
+              { type: 'individual' }
+            ]
+          },
+          isSports
+            ? { category: { $regex: /^sports$/i } }
+            : { category: { $not: { $regex: /^sports$/i } } }
         ]
       }, { projection: { _id: 1, id: 1, code: 1 } }).toArray();
 
@@ -105,12 +116,12 @@ export async function POST(request: NextRequest) {
         })
       );
 
-      const exceeded = checks.find(c => c.count >= maxCandidateParticipation);
+      const exceeded = checks.find(c => c.count >= maxLimit);
       if (exceeded) {
         const candidateDoc = await candidatesCollection.findOne({ chestNumber: exceeded.chestNumber });
         const candidateName = candidateDoc?.name || exceeded.chestNumber;
         return NextResponse.json({
-          error: `Candidate ${candidateName} (#${exceeded.chestNumber}) has reached the maximum allowed limit of ${maxCandidateParticipation} individual programme(s). Cannot register for more.`
+          error: `Candidate ${candidateName} (#${exceeded.chestNumber}) has reached the maximum allowed limit of ${maxLimit} individual ${categoryLabel} programme(s). Cannot register for more.`
         }, { status: 400 });
       }
     }
@@ -198,14 +209,25 @@ export async function PUT(request: NextRequest) {
       const isIndividual = programmeDoc?.positionType === 'individual' || (programmeDoc as any)?.type === 'individual';
 
       if (isIndividual) {
-        const maxCandidateParticipation = festInfo?.maxCandidateParticipation ?? 3;
+        const isSports = (programmeDoc?.category || '').toLowerCase() === 'sports';
+        const maxLimit = isSports
+          ? (festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 3)
+          : (festInfo?.maxCandidateArtsParticipation ?? festInfo?.maxCandidateParticipation ?? 3);
+        const categoryLabel = isSports ? 'Sports' : 'Arts';
         const candidatesCollection = db.collection('candidates');
 
-        // Find all individual programme IDs and codes
+        // Find all individual programme IDs and codes for this category
         const individualProgs = await programmesCollection.find({
-          $or: [
-            { positionType: 'individual' },
-            { type: 'individual' }
+          $and: [
+            {
+              $or: [
+                { positionType: 'individual' },
+                { type: 'individual' }
+              ]
+            },
+            isSports
+              ? { category: { $regex: /^sports$/i } }
+              : { category: { $not: { $regex: /^sports$/i } } }
           ]
         }, { projection: { _id: 1, id: 1, code: 1 } }).toArray();
 
@@ -237,12 +259,12 @@ export async function PUT(request: NextRequest) {
           })
         );
 
-        const exceeded = checks.find(c => c.otherCount >= maxCandidateParticipation);
+        const exceeded = checks.find(c => c.otherCount >= maxLimit);
         if (exceeded) {
           const candidateDoc = await candidatesCollection.findOne({ chestNumber: exceeded.chestNumber });
           const candidateName = candidateDoc?.name || exceeded.chestNumber;
           return NextResponse.json({
-            error: `Candidate ${candidateName} (#${exceeded.chestNumber}) has already reached the maximum allowed limit of ${maxCandidateParticipation} individual programme(s). Cannot register for more.`
+            error: `Candidate ${candidateName} (#${exceeded.chestNumber}) has already reached the maximum allowed limit of ${maxLimit} individual ${categoryLabel} programme(s). Cannot register for more.`
           }, { status: 400 });
         }
       }

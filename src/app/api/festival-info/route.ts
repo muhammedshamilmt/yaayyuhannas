@@ -23,6 +23,10 @@ export async function GET() {
         status: 'ongoing',
         minCandidateParticipation: 1,
         maxCandidateParticipation: 3,
+        minCandidateArtsParticipation: 1,
+        maxCandidateArtsParticipation: 3,
+        minCandidateSportsParticipation: 0,
+        maxCandidateSportsParticipation: 3,
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -36,6 +40,18 @@ export async function GET() {
       }
       if (festivalInfo.maxCandidateParticipation === undefined) {
         festivalInfo.maxCandidateParticipation = 3;
+      }
+      if (festivalInfo.minCandidateArtsParticipation === undefined) {
+        festivalInfo.minCandidateArtsParticipation = festivalInfo.minCandidateParticipation ?? 1;
+      }
+      if (festivalInfo.maxCandidateArtsParticipation === undefined) {
+        festivalInfo.maxCandidateArtsParticipation = festivalInfo.maxCandidateParticipation ?? 3;
+      }
+      if (festivalInfo.minCandidateSportsParticipation === undefined) {
+        festivalInfo.minCandidateSportsParticipation = 0;
+      }
+      if (festivalInfo.maxCandidateSportsParticipation === undefined) {
+        festivalInfo.maxCandidateSportsParticipation = festivalInfo.maxCandidateParticipation ?? 3;
       }
     }
     
@@ -55,6 +71,18 @@ export async function PUT(request: Request) {
     }
     if (body.maxCandidateParticipation !== undefined) {
       body.maxCandidateParticipation = parseInt(body.maxCandidateParticipation, 10) || 3;
+    }
+    if (body.minCandidateArtsParticipation !== undefined) {
+      body.minCandidateArtsParticipation = Math.max(0, parseInt(body.minCandidateArtsParticipation, 10) || 0);
+    }
+    if (body.maxCandidateArtsParticipation !== undefined) {
+      body.maxCandidateArtsParticipation = Math.max(1, parseInt(body.maxCandidateArtsParticipation, 10) || 3);
+    }
+    if (body.minCandidateSportsParticipation !== undefined) {
+      body.minCandidateSportsParticipation = Math.max(0, parseInt(body.minCandidateSportsParticipation, 10) || 0);
+    }
+    if (body.maxCandidateSportsParticipation !== undefined) {
+      body.maxCandidateSportsParticipation = Math.max(1, parseInt(body.maxCandidateSportsParticipation, 10) || 3);
     }
     
     // Update record in MongoDB

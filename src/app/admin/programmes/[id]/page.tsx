@@ -185,12 +185,30 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
         return programme.positionType === 'individual' || (programme as any).type === 'individual';
     }, [programme]);
 
-    // Festival rules
-    const maxCandidateLimit = festInfo?.maxCandidateParticipation ?? 3;
+    // Festival rules & Category determination
+    const isSports = (programme?.category || '').toLowerCase() === 'sports';
+    const categoryLabel = isSports ? 'Sports' : 'Arts';
+    const maxCandidateLimit = isSports
+        ? (festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 3)
+        : (festInfo?.maxCandidateArtsParticipation ?? festInfo?.maxCandidateParticipation ?? 3);
     const minRequiredParticipants = Number(programme?.requiredParticipants || 1);
     const maxAllowedParticipants = Number(programme?.maxParticipants || programme?.requiredParticipants || 1);
 
-    // Calculate how many individual programmes a candidate is registered in
+    // Set of individual programme IDs and codes for the current programme's category
+    const individualCategoryProgIdSet = useMemo(() => {
+        const set = new Set<string>();
+        allProgrammes.forEach(p => {
+            const pIsSports = (p.category || '').toLowerCase() === 'sports';
+            if (pIsSports === isSports && (p.positionType === 'individual' || (p as any).type === 'individual')) {
+                if (p._id) set.add(p._id.toString());
+                if (p.id) set.add(p.id.toString());
+                if (p.code) set.add(p.code);
+            }
+        });
+        return set;
+    }, [allProgrammes, isSports]);
+
+    // Calculate how many individual programmes of this category a candidate is registered in
     const getCandidateIndividualCount = (chestNumber: string, isEditingCurrentTeam = false) => {
         return allParticipants.filter(p => {
             if (p.status === 'withdrawn') return false;
@@ -198,7 +216,7 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
             if (isEditingCurrentTeam && (p.programmeId === programmeId || p.programmeCode === programme?.code)) {
                 return false;
             }
-            const isProgIndividual = individualProgIdSet.has(p.programmeId) || individualProgIdSet.has(p.programmeCode);
+            const isProgIndividual = individualCategoryProgIdSet.has(p.programmeId) || individualCategoryProgIdSet.has(p.programmeCode);
             return isProgIndividual && p.participants?.includes(chestNumber);
         }).length;
     };
@@ -226,7 +244,7 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
             if (count >= maxCandidateLimit && !isAlreadySelected) {
                 return {
                     eligible: false,
-                    reason: `Max individual limit reached (${count}/${maxCandidateLimit} events)`
+                    reason: `Max ${categoryLabel} limit reached (${count}/${maxCandidateLimit} events)`
                 };
             }
         }
@@ -365,7 +383,7 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
                 const count = getCandidateIndividualCount(chestNumber, isEditingCurrent);
                 if (count >= maxCandidateLimit) {
                     const cand = candidates.find(c => c.chestNumber === chestNumber);
-                    setModalError(`Candidate ${cand?.name || chestNumber} has already reached the maximum limit of ${maxCandidateLimit} individual programmes.`);
+                    setModalError(`Candidate ${cand?.name || chestNumber} has already reached the maximum limit of ${maxCandidateLimit} individual ${categoryLabel} programmes.`);
                     return;
                 }
             }
@@ -824,7 +842,7 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
                                                                                 )}
                                                                                 {isIndividualProgramme && (
                                                                                     <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                                                                                        {indCount}/{maxCandidateLimit} ind. events
+                                                                                        {indCount}/{maxCandidateLimit} {categoryLabel.toLowerCase()} ind.
                                                                                     </span>
                                                                                 )}
                                                                             </div>
@@ -1051,7 +1069,7 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
                                     <div className="bg-white p-2.5 rounded-xl border border-blue-100">
                                         <span className="text-gray-500 block text-[11px]">Event Type Limit</span>
                                         <strong className="text-purple-700 font-semibold">
-                                            {isIndividualProgramme ? `Individual (Max ${maxCandidateLimit}/candidate)` : 'Group Event'}
+                                            {isIndividualProgramme ? `Individual (${categoryLabel} Max ${maxCandidateLimit}/candidate)` : 'Group Event'}
                                         </strong>
                                     </div>
                                 </div>
@@ -1305,7 +1323,7 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
 
                                                                 {isIndividualProgramme && (
                                                                     <div className="text-[11px] text-gray-500 mt-0.5">
-                                                                        Individual programmes: <strong>{indCount}/{maxCandidateLimit}</strong>
+                                                                        Individual {categoryLabel.toLowerCase()} programmes: <strong>{indCount}/{maxCandidateLimit}</strong>
                                                                     </div>
                                                                 )}
                                                             </div>

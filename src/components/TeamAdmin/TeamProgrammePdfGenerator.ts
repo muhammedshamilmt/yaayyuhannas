@@ -120,6 +120,16 @@ export function createTeamProgrammesGridPdf(
     doc.setTextColor(226, 232, 240); // slate-200
     doc.text('Official Roster', textStartX + festTitleWidth + 3.5, headerY + 6.5);
 
+    if (meta.filterTitle) {
+      const rosterWidth = doc.getTextWidth('Official Roster');
+      const filterX = textStartX + festTitleWidth + 3.5 + rosterWidth;
+      doc.setTextColor(148, 163, 184);
+      doc.text(' • ', filterX, headerY + 6.5);
+      doc.setTextColor(253, 224, 71); // Amber / Gold
+      doc.setFont('helvetica', 'bold');
+      doc.text(meta.filterTitle.toUpperCase(), filterX + 3.5, headerY + 6.5);
+    }
+
     // Large Bold Team Name (natural casing without tracking)
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
@@ -130,7 +140,10 @@ export function createTeamProgrammesGridPdf(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(203, 213, 225); // slate-300
-    doc.text('Team Programme Entries & Registered Candidate List', textStartX, headerY + 17);
+    const subtitle = meta.filterTitle
+      ? `Team Programme Entries & Registered Candidate List (${meta.filterTitle})`
+      : 'Team Programme Entries & Registered Candidate List';
+    doc.text(subtitle, textStartX, headerY + 17);
 
     // Right Side Statistics Pill Boxes matching the screenshot
     const boxW = 16.5;
@@ -375,7 +388,8 @@ export function generateTeamProgrammesPdf(
 ): void {
   const doc = createTeamProgrammesGridPdf(items, meta);
   const cleanTeam = (meta.teamCode || 'Team').replace(/\s+/g, '_');
-  const filename = `${cleanTeam}_Programmes_Roster_${new Date().toISOString().slice(0, 10)}.pdf`;
+  const cleanFilter = meta.filterTitle ? `_${meta.filterTitle.replace(/\s+/g, '_')}` : '';
+  const filename = `${cleanTeam}${cleanFilter}_Programmes_Roster_${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(filename);
 }
 

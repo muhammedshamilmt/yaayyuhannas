@@ -265,33 +265,62 @@ export default function TeamsPage() {
     return brightness > 128 ? '#000000' : '#FFFFFF';
   };
 
-  const minLimit = festInfo?.minCandidateParticipation ?? 1;
-  const maxLimit = festInfo?.maxCandidateParticipation ?? 3;
+  const minArtsLimit = festInfo?.minCandidateArtsParticipation ?? festInfo?.minCandidateParticipation ?? 1;
+  const maxArtsLimit = festInfo?.maxCandidateArtsParticipation ?? festInfo?.maxCandidateParticipation ?? 3;
+  const minSportsLimit = festInfo?.minCandidateSportsParticipation ?? 0;
+  const maxSportsLimit = festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 3;
 
   // Compute stats helper for any team
   const getTeamCandidateStats = (teamCode: string) => {
-    const individualProgIdSet = new Set<string>();
+    const individualArtsProgIdSet = new Set<string>();
+    const individualSportsProgIdSet = new Set<string>();
+
     programmes.forEach((p: any) => {
       if (p.positionType === 'individual' || p.type === 'individual') {
-        if (p._id) individualProgIdSet.add(p._id.toString());
-        if (p.id) individualProgIdSet.add(p.id.toString());
-        if (p.code) individualProgIdSet.add(p.code);
+        const isSports = (p.category || '').toLowerCase() === 'sports';
+        const targetSet = isSports ? individualSportsProgIdSet : individualArtsProgIdSet;
+        if (p._id) targetSet.add(p._id.toString());
+        if (p.id) targetSet.add(p.id.toString());
+        if (p.code) targetSet.add(p.code);
       }
     });
 
     const teamCandidates = candidates.filter(c => c.team === teamCode);
     const candidateStats = teamCandidates.map(c => {
-      const registrations = participants.filter(
+      const artsRegistrations = participants.filter(
         p => p.status !== 'withdrawn' &&
-          (individualProgIdSet.size === 0 || individualProgIdSet.has(p.programmeId) || individualProgIdSet.has(p.programmeCode)) &&
+          (individualArtsProgIdSet.has(p.programmeId) || individualArtsProgIdSet.has(p.programmeCode)) &&
           p.participants?.includes(c.chestNumber)
       );
+
+      const sportsRegistrations = participants.filter(
+        p => p.status !== 'withdrawn' &&
+          (individualSportsProgIdSet.has(p.programmeId) || individualSportsProgIdSet.has(p.programmeCode)) &&
+          p.participants?.includes(c.chestNumber)
+      );
+
+      const allRegistrations = participants.filter(
+        p => p.status !== 'withdrawn' &&
+          (individualArtsProgIdSet.has(p.programmeId) || individualArtsProgIdSet.has(p.programmeCode) ||
+           individualSportsProgIdSet.has(p.programmeId) || individualSportsProgIdSet.has(p.programmeCode)) &&
+          p.participants?.includes(c.chestNumber)
+      );
+
+      const isArtsUnderMin = artsRegistrations.length < minArtsLimit;
+      const isSportsUnderMin = minSportsLimit > 0 && sportsRegistrations.length < minSportsLimit;
+      const isUnderMin = isArtsUnderMin || isSportsUnderMin;
+      const hasZero = allRegistrations.length === 0;
+
       return {
         candidate: c,
-        registeredCount: registrations.length,
-        programmes: registrations.map(r => r.programmeName || r.programmeCode || 'Programme'),
-        isUnderMin: registrations.length < minLimit,
-        hasZero: registrations.length === 0,
+        registeredCount: allRegistrations.length,
+        artsCount: artsRegistrations.length,
+        sportsCount: sportsRegistrations.length,
+        programmes: allRegistrations.map(r => r.programmeName || r.programmeCode || 'Programme'),
+        isArtsUnderMin,
+        isSportsUnderMin,
+        isUnderMin,
+        hasZero,
       };
     });
 
@@ -358,8 +387,8 @@ export default function TeamsPage() {
                 </Link>
               </div>
               <p className="text-xs text-purple-700 leading-relaxed">
-                Rule: <strong>{minLimit} Minimum</strong> / <strong>{maxLimit} Maximum</strong> individual programmes per candidate. 
-                Teams with any candidate having 0 or fewer than {minLimit} individual programme(s) are flagged as <strong>Not Eligible</strong>.
+                Rules: 🎭 Arts: <strong>{minArtsLimit} Min / {maxArtsLimit} Max</strong> • ⚽ Sports: <strong>{minSportsLimit} Min / {maxSportsLimit} Max</strong>.
+                Teams with any candidate failing to meet category minimums are flagged as <strong>Not Eligible</strong>.
               </p>
             </div>
           </div>
@@ -661,7 +690,7 @@ export default function TeamsPage() {
                         <div className="flex items-center gap-2">
                           <span className="text-base">✓</span>
                           <span>
-                            <strong>Eligible to compete:</strong> All {stats.teamCandidates.length} candidates meet the minimum ({minLimit}) individual programme requirement.
+                            <strong>Eligible to compete:</strong> All {stats.teamCandidates.length} candidates meet individual minimums (Arts: ≥{minArtsLimit}{minSportsLimit > 0 ? `, Sports: ≥${minSportsLimit}` : ''}).
                           </span>
                         </div>
                       ) : (
@@ -671,7 +700,7 @@ export default function TeamsPage() {
                             <span>Not Eligible ({stats.underMinCount} candidate{stats.underMinCount > 1 ? 's' : ''} below min)</span>
                           </div>
                           <p className="text-[11px] text-rose-700 leading-normal">
-                            {stats.zeroCount > 0 ? `${stats.zeroCount} candidate(s) have 0 individual programmes registered.` : ''} Each candidate must participate in at least {minLimit} individual programme(s).
+                            {stats.zeroCount > 0 ? `${stats.zeroCount} candidate(s) have 0 programmes registered.` : ''} Candidates must participate in at least {minArtsLimit} Arts{minSportsLimit > 0 ? ` and ${minSportsLimit} Sports` : ''} individual programme(s).
                           </p>
                         </div>
                       )}
@@ -732,7 +761,7 @@ export default function TeamsPage() {
                         <p className="text-base font-bold text-emerald-600">
                           {stats.teamCandidates.length - stats.underMinCount}
                         </p>
-                        <p className="text-[10px] text-gray-500 font-medium">Ready (≥{minLimit})</p>
+                        <p className="text-[10px] text-gray-500 font-medium">Ready (Eligible)</p>
                       </div>
                       <div>
                         <p className={`text-base font-bold ${stats.underMinCount > 0 ? 'text-rose-600' : 'text-gray-400'}`}>
@@ -804,7 +833,7 @@ export default function TeamsPage() {
                     {selectedTeamForEligibility.name} • Candidate Participation
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Rule Requirement: Minimum <strong>{minLimit}</strong>, Maximum <strong>{maxLimit}</strong> programme(s) per student
+                    Rule Requirements: 🎭 Arts: <strong>{minArtsLimit} Min / {maxArtsLimit} Max</strong> • ⚽ Sports: <strong>{minSportsLimit} Min / {maxSportsLimit} Max</strong>
                   </p>
                 </div>
               </div>
@@ -912,10 +941,10 @@ export default function TeamsPage() {
                     <div className="text-right flex items-center gap-3">
                       <div>
                         <div className="text-xs font-bold text-gray-900">
-                          {item.registeredCount} / {maxLimit} individual prog
+                          🎭 {item.artsCount}/{maxArtsLimit} Arts • ⚽ {item.sportsCount}/{maxSportsLimit} Sports
                         </div>
                         <div className="text-[10px] text-gray-500">
-                          Min required: {minLimit}
+                          Min: {minArtsLimit} Arts{minSportsLimit > 0 ? `, ${minSportsLimit} Sports` : ''}
                         </div>
                       </div>
 
@@ -925,7 +954,9 @@ export default function TeamsPage() {
                         </span>
                       ) : item.isUnderMin ? (
                         <span className="text-xs px-3 py-1 rounded-full font-bold bg-amber-200 text-amber-900 border border-amber-300">
-                          Needs {minLimit - item.registeredCount} More
+                          {item.isArtsUnderMin ? `Needs ${minArtsLimit - item.artsCount} Arts` : ''}
+                          {item.isArtsUnderMin && item.isSportsUnderMin ? ', ' : ''}
+                          {item.isSportsUnderMin ? `Needs ${minSportsLimit - item.sportsCount} Sports` : ''}
                         </span>
                       ) : (
                         <span className="text-xs px-3 py-1 rounded-full font-bold bg-emerald-200 text-emerald-900 border border-emerald-300 flex items-center gap-1">

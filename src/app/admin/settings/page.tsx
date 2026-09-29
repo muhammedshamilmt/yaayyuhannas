@@ -19,6 +19,10 @@ export default function SettingsPage() {
     description: 'Annual arts and sports festival celebrating creativity, talent, and teamwork among students.',
     minCandidateParticipation: 1,
     maxCandidateParticipation: 3,
+    minCandidateArtsParticipation: 1,
+    maxCandidateArtsParticipation: 3,
+    minCandidateSportsParticipation: 0,
+    maxCandidateSportsParticipation: 3,
   });
 
   useEffect(() => {
@@ -36,6 +40,10 @@ export default function SettingsPage() {
             description: data.description || '',
             minCandidateParticipation: data.minCandidateParticipation ?? 1,
             maxCandidateParticipation: data.maxCandidateParticipation ?? 3,
+            minCandidateArtsParticipation: data.minCandidateArtsParticipation ?? data.minCandidateParticipation ?? 1,
+            maxCandidateArtsParticipation: data.maxCandidateArtsParticipation ?? data.maxCandidateParticipation ?? 3,
+            minCandidateSportsParticipation: data.minCandidateSportsParticipation ?? 0,
+            maxCandidateSportsParticipation: data.maxCandidateSportsParticipation ?? data.maxCandidateParticipation ?? 3,
           });
         }
       } catch (err) {
@@ -49,22 +57,37 @@ export default function SettingsPage() {
 
   const handleFestivalSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.minCandidateParticipation < 1) {
-      alert('Minimum candidate participation must be at least 1.');
+    if (formData.minCandidateArtsParticipation < 0) {
+      alert('Minimum Arts participation cannot be negative.');
       return;
     }
-    if (formData.maxCandidateParticipation < formData.minCandidateParticipation) {
-      alert('Maximum participation cannot be less than minimum participation.');
+    if (formData.maxCandidateArtsParticipation < formData.minCandidateArtsParticipation) {
+      alert('Maximum Arts participation cannot be less than minimum Arts participation.');
+      return;
+    }
+    if (formData.minCandidateSportsParticipation < 0) {
+      alert('Minimum Sports participation cannot be negative.');
+      return;
+    }
+    if (formData.maxCandidateSportsParticipation < formData.minCandidateSportsParticipation) {
+      alert('Maximum Sports participation cannot be less than minimum Sports participation.');
       return;
     }
 
     setSavingFestival(true);
     setSaveSuccess(null);
     try {
+      const payload = {
+        ...formData,
+        // Keep overall min/max synced for backward compatibility
+        minCandidateParticipation: formData.minCandidateArtsParticipation,
+        maxCandidateParticipation: formData.maxCandidateArtsParticipation,
+      };
+
       const res = await fetch('/api/festival-info', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -97,64 +120,155 @@ export default function SettingsPage() {
 
       <div className="space-y-6">
         {/* Candidate Participation Rules */}
-        <ShowcaseSection title="Candidate Individual Participation Rules">
+        <ShowcaseSection title="Candidate Participation Rules (Arts & Sports)">
           <form onSubmit={handleFestivalSave} className="space-y-6">
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+            <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-xl p-4">
               <h4 className="text-sm font-bold text-blue-900 mb-1 flex items-center gap-2">
-                <span>🎯</span> Individual Programme Limits & Team Eligibility Engine
+                <span>🎯</span> Category-Specific Programme Limits & Team Eligibility Engine
               </h4>
               <p className="text-xs text-blue-700 leading-relaxed">
-                Define the mandatory minimum and maximum <strong>individual</strong> programmes allowed per candidate. Teams with any student falling below the minimum individual programme requirement will automatically be marked as <strong>Not Eligible</strong> in the Admin Panel. Candidates will be blocked from registering in more individual programmes than the maximum. (Note: Group items do not count towards this limit).
+                Configure minimum and maximum <strong>individual</strong> programme limits independently for <strong>Arts</strong> and <strong>Sports</strong>.
+                Teams with any student falling below the minimum requirements will automatically be flagged as <strong>Not Eligible</strong> in the Admin Panel. Candidates are strictly blocked from registering in more individual programmes than their category maximum. (Note: Group items do not count towards individual limits).
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
-                <label className="block text-sm font-bold text-gray-800 mb-1">
-                  Minimum Individual Programmes per Candidate *
-                </label>
-                <p className="text-xs text-gray-500 mb-3">
-                  Each candidate in a team must participate in at least this many individual programmes for the team to be eligible.
-                </p>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    value={formData.minCandidateParticipation}
-                    onChange={(e) => setFormData(prev => ({ ...prev, minCandidateParticipation: parseInt(e.target.value, 10) || 1 }))}
-                    className="w-32 px-4 py-2 text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800"
-                    required
-                  />
-                  <span className="text-xs font-semibold text-gray-600">individual programme(s) minimum</span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Arts Participation Rules Card */}
+              <div className="p-5 bg-gradient-to-br from-purple-50/50 to-white border border-purple-200 rounded-2xl shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-purple-100 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-lg">
+                      🎭
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-purple-950">Arts Programmes</h3>
+                      <p className="text-xs text-purple-700">Individual rules for arts & cultural events</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full">
+                    {formData.minCandidateArtsParticipation} Min / {formData.maxCandidateArtsParticipation} Max
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      Minimum Arts Programmes *
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Minimum individual arts programmes each candidate must take for team eligibility.
+                    </p>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="number"
+                        min="0"
+                        max="50"
+                        value={formData.minCandidateArtsParticipation}
+                        onChange={(e) => setFormData(prev => ({ ...prev, minCandidateArtsParticipation: parseInt(e.target.value, 10) || 0 }))}
+                        className="w-32 px-3.5 py-2 text-base font-bold border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white text-gray-800"
+                        required
+                      />
+                      <span className="text-xs font-medium text-gray-600">Arts prog minimum</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      Maximum Arts Programmes *
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Maximum individual arts programmes allowed per candidate.
+                    </p>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="number"
+                        min={formData.minCandidateArtsParticipation}
+                        max="100"
+                        value={formData.maxCandidateArtsParticipation}
+                        onChange={(e) => setFormData(prev => ({ ...prev, maxCandidateArtsParticipation: parseInt(e.target.value, 10) || 1 }))}
+                        className="w-32 px-3.5 py-2 text-base font-bold border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white text-gray-800"
+                        required
+                      />
+                      <span className="text-xs font-medium text-gray-600">Arts prog max limit</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-xs text-purple-700 bg-purple-50/80 p-2.5 rounded-lg border border-purple-100">
+                  Current: <strong>{formData.minCandidateArtsParticipation}</strong> to <strong>{formData.maxCandidateArtsParticipation}</strong> Arts individual programme(s) per student.
                 </div>
               </div>
 
-              <div className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
-                <label className="block text-sm font-bold text-gray-800 mb-1">
-                  Maximum Individual Programmes per Candidate *
-                </label>
-                <p className="text-xs text-gray-500 mb-3">
-                  A candidate cannot be registered for more than this number of individual programmes across the festival.
-                </p>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="number"
-                    min={formData.minCandidateParticipation}
-                    max="100"
-                    value={formData.maxCandidateParticipation}
-                    onChange={(e) => setFormData(prev => ({ ...prev, maxCandidateParticipation: parseInt(e.target.value, 10) || 1 }))}
-                    className="w-32 px-4 py-2 text-lg font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800"
-                    required
-                  />
-                  <span className="text-xs font-semibold text-gray-600">individual programme(s) maximum limit</span>
+              {/* Sports Participation Rules Card */}
+              <div className="p-5 bg-gradient-to-br from-emerald-50/50 to-white border border-emerald-200 rounded-2xl shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-emerald-100 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-lg">
+                      ⚽
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-emerald-950">Sports Programmes</h3>
+                      <p className="text-xs text-emerald-700">Individual rules for sports & athletics</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full">
+                    {formData.minCandidateSportsParticipation} Min / {formData.maxCandidateSportsParticipation} Max
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      Minimum Sports Programmes *
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Minimum individual sports events required per student (set 0 if sports participation is optional).
+                    </p>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="number"
+                        min="0"
+                        max="50"
+                        value={formData.minCandidateSportsParticipation}
+                        onChange={(e) => setFormData(prev => ({ ...prev, minCandidateSportsParticipation: parseInt(e.target.value, 10) || 0 }))}
+                        className="w-32 px-3.5 py-2 text-base font-bold border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-800"
+                        required
+                      />
+                      <span className="text-xs font-medium text-gray-600">Sports prog minimum</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      Maximum Sports Programmes *
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Maximum individual sports events allowed per candidate.
+                    </p>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="number"
+                        min={formData.minCandidateSportsParticipation}
+                        max="100"
+                        value={formData.maxCandidateSportsParticipation}
+                        onChange={(e) => setFormData(prev => ({ ...prev, maxCandidateSportsParticipation: parseInt(e.target.value, 10) || 1 }))}
+                        className="w-32 px-3.5 py-2 text-base font-bold border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-800"
+                        required
+                      />
+                      <span className="text-xs font-medium text-gray-600">Sports prog max limit</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-xs text-emerald-700 bg-emerald-50/80 p-2.5 rounded-lg border border-emerald-100">
+                  Current: <strong>{formData.minCandidateSportsParticipation}</strong> to <strong>{formData.maxCandidateSportsParticipation}</strong> Sports individual event(s) per student.
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
               <div className="text-xs text-gray-500">
-                Current rule: Each candidate must do <strong>{formData.minCandidateParticipation}–{formData.maxCandidateParticipation}</strong> individual programme(s).
+                Rules Summary: 🎭 Arts: <strong>{formData.minCandidateArtsParticipation}–{formData.maxCandidateArtsParticipation}</strong> | ⚽ Sports: <strong>{formData.minCandidateSportsParticipation}–{formData.maxCandidateSportsParticipation}</strong>
               </div>
               <button
                 type="submit"

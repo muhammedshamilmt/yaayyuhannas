@@ -60,9 +60,11 @@ function TeamProgrammePdfContent() {
   const [loading, setLoading] = useState(true);
 
   // Filter & Selection states
+  const initialCategory = searchParams.get('category') || 'all';
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSection, setSelectedSection] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
+  const [docCategoryFilter, setDocCategoryFilter] = useState<string>(initialCategory);
   const [registrationFilter, setRegistrationFilter] = useState<'all' | 'registered' | 'unregistered'>('all');
   const [selectedProgIds, setSelectedProgIds] = useState<Set<string>>(new Set());
 
@@ -171,7 +173,7 @@ function TeamProgrammePdfContent() {
         programmeId: pId,
         programmeCode: prog.code,
         programmeName: prog.name,
-        category: prog.category || 'arts',
+        category: (prog.category || 'arts').toLowerCase(),
         subcategory: prog.subcategory,
         section: prog.section || 'general',
         positionType: prog.positionType || (prog as any).type || 'individual',
@@ -182,7 +184,35 @@ function TeamProgrammePdfContent() {
     });
   }, [programmes, participants, candidates, teamCode]);
 
-  // Filter programmes for the selector
+  // Category counts for catalog checklist
+  const catalogCounts = useMemo(() => {
+    let arts = 0;
+    let sports = 0;
+    let artsStage = 0;
+    let artsNonStage = 0;
+    allCardItems.forEach((item) => {
+      const isSports = (item.category || '').toLowerCase() === 'sports';
+      if (isSports) {
+        sports++;
+      } else {
+        arts++;
+        if (item.subcategory === 'non-stage') {
+          artsNonStage++;
+        } else {
+          artsStage++;
+        }
+      }
+    });
+    return {
+      total: allCardItems.length,
+      arts,
+      sports,
+      artsStage,
+      artsNonStage,
+    };
+  }, [allCardItems]);
+
+  // Filter programmes for the selector drawer
   const filteredCatalogItems = useMemo(() => {
     return allCardItems.filter((item) => {
       // Search
@@ -198,9 +228,22 @@ function TeamProgrammePdfContent() {
         return false;
       }
 
-      // Category
-      if (selectedCategory !== 'all' && item.category !== selectedCategory) {
-        return false;
+      // Category filter (all, arts, sports, arts_stage, arts_non_stage)
+      if (selectedCategory !== 'all') {
+        const itemCat = (item.category || 'arts').toLowerCase();
+        if (selectedCategory === 'arts') {
+          if (itemCat === 'sports') return false;
+        } else if (selectedCategory === 'sports') {
+          if (itemCat !== 'sports') return false;
+        } else if (selectedCategory === 'arts_stage') {
+          if (itemCat === 'sports') return false;
+          if (item.subcategory && item.subcategory !== 'stage') return false;
+        } else if (selectedCategory === 'arts_non_stage') {
+          if (itemCat === 'sports') return false;
+          if (item.subcategory !== 'non-stage') return false;
+        } else if (itemCat !== selectedCategory.toLowerCase()) {
+          return false;
+        }
       }
 
       // Registration status
@@ -215,9 +258,39 @@ function TeamProgrammePdfContent() {
     });
   }, [allCardItems, searchQuery, selectedSection, selectedCategory, registrationFilter]);
 
-  // Active items selected for PDF document
+  // Active items selected by checkbox in total
   const selectedDocItems = useMemo(() => {
     return allCardItems.filter((item) => selectedProgIds.has(item.programmeId));
+  }, [allCardItems, selectedProgIds]);
+
+  // Active items filtered for PDF & Document Preview by docCategoryFilter
+  const renderedDocItems = useMemo(() => {
+    const selected = allCardItems.filter((item) => selectedProgIds.has(item.programmeId));
+    if (docCategoryFilter === 'arts') {
+      return selected.filter((item) => (item.category || 'arts').toLowerCase() !== 'sports');
+    }
+    if (docCategoryFilter === 'sports') {
+      return selected.filter((item) => (item.category || '').toLowerCase() === 'sports');
+    }
+    return selected;
+  }, [allCardItems, selectedProgIds, docCategoryFilter]);
+
+  // Selected counts by category
+  const selectedCategoryCounts = useMemo(() => {
+    let total = 0;
+    let arts = 0;
+    let sports = 0;
+    allCardItems.forEach((item) => {
+      if (selectedProgIds.has(item.programmeId)) {
+        total++;
+        if ((item.category || '').toLowerCase() === 'sports') {
+          sports++;
+        } else {
+          arts++;
+        }
+      }
+    });
+    return { total, arts, sports };
   }, [allCardItems, selectedProgIds]);
 
   // Save selection changes to localStorage for new tab preview
@@ -259,12 +332,47 @@ function TeamProgrammePdfContent() {
     updateSelectedProgIds(next);
   };
 
+  // Quick Select: All Arts programmes
+  const handleSelectAllArts = (onlyRegistered = false) => {
+    const next = new Set(selectedProgIds);
+    allCardItems.forEach((item) => {
+      const isArts = (item.category || '').toLowerCase() !== 'sports';
+      if (isArts && (!onlyRegistered || item.isRegistered)) {
+        next.add(item.programmeId);
+      }
+    });
+    updateSelectedProgIds(next);
+  };
+
+  // Quick Select: All Sports programmes
+  const handleSelectAllSports = (onlyRegistered = false) => {
+    const next = new Set(selectedProgIds);
+    allCardItems.forEach((item) => {
+      const isSports = (item.category || '').toLowerCase() === 'sports';
+      if (isSports && (!onlyRegistered || item.isRegistered)) {
+        next.add(item.programmeId);
+      }
+    });
+    updateSelectedProgIds(next);
+  };
+
   // Deselect all
   const handleDeselectAll = () => {
     updateSelectedProgIds(new Set());
   };
 
   const exportMeta: TeamExportMeta = useMemo(() => {
+    let filterTitle: string | undefined;
+    if (docCategoryFilter === 'arts') {
+      filterTitle = 'Arts Programmes';
+    } else if (docCategoryFilter === 'sports') {
+      filterTitle = 'Sports Programmes';
+    } else if (selectedCategory === 'arts') {
+      filterTitle = 'Arts Programmes';
+    } else if (selectedCategory === 'sports') {
+      filterTitle = 'Sports Programmes';
+    }
+
     return {
       teamName: teamData?.name || teamCode,
       teamCode: teamCode,
@@ -277,32 +385,34 @@ function TeamProgrammePdfContent() {
         month: 'short',
         year: 'numeric',
       }),
+      filterTitle,
     };
-  }, [teamData, teamCode, festInfo]);
+  }, [teamData, teamCode, festInfo, docCategoryFilter, selectedCategory]);
 
-  // Action handlers
+  // Action handlers (operating on renderedDocItems)
   const handleDownloadPdf = () => {
-    if (selectedDocItems.length === 0) return alert('Please select at least one programme.');
-    generateTeamProgrammesPdf(selectedDocItems, exportMeta);
+    if (renderedDocItems.length === 0) return alert('Please select at least one programme.');
+    generateTeamProgrammesPdf(renderedDocItems, exportMeta);
   };
 
   const handleOpenPdfTab = () => {
-    if (selectedDocItems.length === 0) return alert('Please select at least one programme.');
-    openTeamProgrammesPdfInNewTab(selectedDocItems, exportMeta);
+    if (renderedDocItems.length === 0) return alert('Please select at least one programme.');
+    openTeamProgrammesPdfInNewTab(renderedDocItems, exportMeta);
   };
 
   const handleOpenPreviewTab = () => {
-    if (selectedDocItems.length === 0) return alert('Please select at least one programme.');
+    if (renderedDocItems.length === 0) return alert('Please select at least one programme.');
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(`team_pdf_selected_${teamCode}`, Array.from(selectedProgIds).join(','));
       } catch (e) {}
     }
-    window.open(`/team-admin/programmes/pdf?team=${teamCode}&mode=preview`, '_blank');
+    const catQuery = docCategoryFilter !== 'all' ? `&category=${docCategoryFilter}` : '';
+    window.open(`/team-admin/programmes/pdf?team=${teamCode}&mode=preview${catQuery}`, '_blank');
   };
 
   const handlePrint = () => {
-    if (selectedDocItems.length === 0) return alert('Please select at least one programme.');
+    if (renderedDocItems.length === 0) return alert('Please select at least one programme.');
     window.print();
   };
 
@@ -339,16 +449,56 @@ function TeamProgrammePdfContent() {
                   </span>
                 </h1>
                 <p className="text-[11px] text-slate-300">
-                  {selectedDocItems.length} programmes &bull;{' '}
-                  {selectedDocItems.reduce((acc, i) => acc + i.candidates.length, 0)} registered candidates
+                  {renderedDocItems.length} programmes &bull;{' '}
+                  {renderedDocItems.reduce((acc, i) => acc + i.candidates.length, 0)} registered candidates
+                  {docCategoryFilter !== 'all' && (
+                    <span className="capitalize font-semibold text-amber-300"> ({docCategoryFilter} view)</span>
+                  )}
                 </p>
               </div>
+            </div>
+
+            {/* Middle Category Filter in Preview Mode */}
+            <div className="flex items-center gap-1 bg-white/10 p-1 rounded-lg text-xs">
+              <button
+                type="button"
+                onClick={() => setDocCategoryFilter('all')}
+                className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                  docCategoryFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-white/80 hover:text-white'
+                }`}
+              >
+                All ({selectedCategoryCounts.total})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDocCategoryFilter('arts')}
+                className={`px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  docCategoryFilter === 'arts'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-white/80 hover:text-white'
+                }`}
+              >
+                <span>🎨 Arts ({selectedCategoryCounts.arts})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDocCategoryFilter('sports')}
+                className={`px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  docCategoryFilter === 'sports'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-white/80 hover:text-white'
+                }`}
+              >
+                <span>⚽ Sports ({selectedCategoryCounts.sports})</span>
+              </button>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <button
                 onClick={handlePrint}
-                disabled={selectedDocItems.length === 0}
+                disabled={renderedDocItems.length === 0}
                 className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white font-bold flex items-center gap-1.5 transition-all disabled:opacity-40 cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />
@@ -357,7 +507,7 @@ function TeamProgrammePdfContent() {
 
               <button
                 onClick={handleOpenPdfTab}
-                disabled={selectedDocItems.length === 0}
+                disabled={renderedDocItems.length === 0}
                 className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-40 cursor-pointer"
                 title="Open Raw PDF in New Tab"
               >
@@ -367,18 +517,18 @@ function TeamProgrammePdfContent() {
 
               <button
                 onClick={handleDownloadPdf}
-                disabled={selectedDocItems.length === 0}
+                disabled={renderedDocItems.length === 0}
                 className="px-3.5 py-1.5 rounded-lg bg-[#c89326] hover:bg-[#b0811e] text-white font-bold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-40 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
-                Download PDF ({selectedDocItems.length})
+                Download PDF ({renderedDocItems.length})
               </button>
             </div>
           </div>
         </header>
 
         <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 print:p-0 print:max-w-none">
-          <TeamProgrammePreviewDocument items={selectedDocItems} meta={exportMeta} />
+          <TeamProgrammePreviewDocument items={renderedDocItems} meta={exportMeta} />
         </main>
       </div>
     );
@@ -415,8 +565,11 @@ function TeamProgrammePdfContent() {
                 </span>
               </div>
               <p className="text-[11px] text-slate-300">
-                {selectedDocItems.length} of {allCardItems.length} programmes selected &bull;{' '}
-                {selectedDocItems.reduce((acc, i) => acc + i.candidates.length, 0)} registered candidates
+                {renderedDocItems.length} of {allCardItems.length} programmes selected &bull;{' '}
+                {renderedDocItems.reduce((acc, i) => acc + i.candidates.length, 0)} registered candidates
+                {docCategoryFilter !== 'all' && (
+                  <span className="capitalize font-semibold text-amber-300"> ({docCategoryFilter} view)</span>
+                )}
               </p>
             </div>
           </div>
@@ -425,7 +578,7 @@ function TeamProgrammePdfContent() {
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <button
               onClick={handleOpenPreviewTab}
-              disabled={selectedDocItems.length === 0}
+              disabled={renderedDocItems.length === 0}
               className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-40 cursor-pointer"
               title="Open the 3-column document preview in a separate new tab"
             >
@@ -435,7 +588,7 @@ function TeamProgrammePdfContent() {
 
             <button
               onClick={handleOpenPdfTab}
-              disabled={selectedDocItems.length === 0}
+              disabled={renderedDocItems.length === 0}
               className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-40 cursor-pointer"
               title="Open Generated PDF Document in New Tab"
             >
@@ -445,7 +598,7 @@ function TeamProgrammePdfContent() {
 
             <button
               onClick={handlePrint}
-              disabled={selectedDocItems.length === 0}
+              disabled={renderedDocItems.length === 0}
               className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white font-bold flex items-center gap-1.5 transition-all disabled:opacity-40 cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
@@ -454,11 +607,11 @@ function TeamProgrammePdfContent() {
 
             <button
               onClick={handleDownloadPdf}
-              disabled={selectedDocItems.length === 0}
+              disabled={renderedDocItems.length === 0}
               className="px-3.5 py-1.5 rounded-lg bg-[#c89326] hover:bg-[#b0811e] text-white font-bold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-40 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              Download PDF ({selectedDocItems.length})
+              Download PDF ({renderedDocItems.length})
             </button>
           </div>
         </div>
@@ -488,6 +641,7 @@ function TeamProgrammePdfContent() {
                   type="button"
                   onClick={handleSelectAllFiltered}
                   className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors cursor-pointer"
+                  title="Select all programmes visible in current checklist filter"
                 >
                   Select Filtered ({filteredCatalogItems.length})
                 </button>
@@ -496,7 +650,23 @@ function TeamProgrammePdfContent() {
                   onClick={handleSelectOnlyRegistered}
                   className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold rounded-lg border border-emerald-200 transition-colors cursor-pointer"
                 >
-                  Only Registered
+                  Registered Only
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectAllArts(false)}
+                  className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold rounded-lg border border-purple-200 transition-colors cursor-pointer"
+                  title="Select all Arts programmes"
+                >
+                  + All Arts
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectAllSports(false)}
+                  className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold rounded-lg border border-teal-200 transition-colors cursor-pointer"
+                  title="Select all Sports programmes"
+                >
+                  + All Sports
                 </button>
                 <button
                   type="button"
@@ -505,6 +675,100 @@ function TeamProgrammePdfContent() {
                 >
                   Clear All
                 </button>
+              </div>
+
+              {/* Category Filter Selector (Arts / Sports) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    Category Filter
+                  </label>
+                  {selectedCategory !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory('all')}
+                      className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      Reset Category
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('all')}
+                    className={`py-1.5 px-2 text-xs font-bold rounded-lg transition-all text-center cursor-pointer ${
+                      selectedCategory === 'all'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    All ({catalogCounts.total})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('arts')}
+                    className={`py-1.5 px-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                      selectedCategory === 'arts' || selectedCategory.startsWith('arts')
+                        ? 'bg-white text-purple-700 shadow-xs'
+                        : 'text-slate-600 hover:text-purple-700'
+                    }`}
+                  >
+                    <span>🎨</span>
+                    <span>Arts ({catalogCounts.arts})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('sports')}
+                    className={`py-1.5 px-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                      selectedCategory === 'sports'
+                        ? 'bg-white text-emerald-700 shadow-xs'
+                        : 'text-slate-600 hover:text-emerald-700'
+                    }`}
+                  >
+                    <span>⚽</span>
+                    <span>Sports ({catalogCounts.sports})</span>
+                  </button>
+                </div>
+
+                {/* Arts Subcategory pills if Arts is selected */}
+                {(selectedCategory === 'arts' || selectedCategory.startsWith('arts_')) && (
+                  <div className="flex items-center gap-1 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory('arts')}
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors cursor-pointer ${
+                        selectedCategory === 'arts'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      All Arts
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory('arts_stage')}
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors cursor-pointer ${
+                        selectedCategory === 'arts_stage'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      Stage ({catalogCounts.artsStage})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory('arts_non_stage')}
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors cursor-pointer ${
+                        selectedCategory === 'arts_non_stage'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      Non-Stage ({catalogCounts.artsNonStage})
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Search */}
@@ -589,9 +853,21 @@ function TeamProgrammePdfContent() {
                                 {item.programmeName}
                               </span>
                             </div>
-                            <span className="text-[10px] text-slate-500 capitalize">
-                              {item.section} &bull; {item.category}
-                            </span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[10px] text-slate-500 capitalize">
+                                {item.section}
+                              </span>
+                              <span className="text-slate-300">&bull;</span>
+                              <span
+                                className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider ${
+                                  (item.category || '').toLowerCase() === 'sports'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-purple-50 text-purple-700 border border-purple-200'
+                                }`}
+                              >
+                                {item.category}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
@@ -614,30 +890,67 @@ function TeamProgrammePdfContent() {
 
           {/* Right Preview Viewport (Col-span 8) with Exact Grid 3 Columns */}
           <div className="lg:col-span-8 space-y-3">
-            <div className="flex items-center justify-between text-xs text-slate-500 print:hidden px-1">
-              <span className="font-medium">
-                Live Document Preview &bull; <strong>Grid 3 Columns</strong> (Official Layout)
-              </span>
-              <div className="flex items-center gap-3">
+            {/* Viewport Category Filter Tabs & Actions */}
+            <div className="bg-white rounded-xl border border-slate-200 p-2.5 flex flex-wrap items-center justify-between gap-3 shadow-xs print:hidden">
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg">
+                <span className="text-[10px] font-bold text-slate-500 uppercase px-2">Show:</span>
+                <button
+                  type="button"
+                  onClick={() => setDocCategoryFilter('all')}
+                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                    docCategoryFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All ({selectedCategoryCounts.total})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocCategoryFilter('arts')}
+                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    docCategoryFilter === 'arts'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-purple-700'
+                  }`}
+                >
+                  <span>🎨</span>
+                  <span>Arts ({selectedCategoryCounts.arts})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocCategoryFilter('sports')}
+                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    docCategoryFilter === 'sports'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-emerald-700'
+                  }`}
+                >
+                  <span>⚽</span>
+                  <span>Sports ({selectedCategoryCounts.sports})</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
                 <button
                   onClick={handleOpenPreviewTab}
-                  className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-bold cursor-pointer transition-colors"
+                  className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
                   title="Open live preview document in new tab"
                 >
                   <Eye className="w-3.5 h-3.5" />
-                  <span>Preview in New Tab</span>
+                  <span>New Tab</span>
                 </button>
                 <button
                   onClick={handlePrint}
-                  className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer transition-colors"
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print / Save PDF</span>
+                  <span>Print</span>
                 </button>
               </div>
             </div>
 
-            <TeamProgrammePreviewDocument items={selectedDocItems} meta={exportMeta} />
+            <TeamProgrammePreviewDocument items={renderedDocItems} meta={exportMeta} />
           </div>
         </div>
       </main>

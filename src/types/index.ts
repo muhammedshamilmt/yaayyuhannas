@@ -91,6 +91,10 @@ export interface FestivalInfo {
   status: 'upcoming' | 'ongoing' | 'completed';
   minCandidateParticipation?: number;
   maxCandidateParticipation?: number;
+  minCandidateArtsParticipation?: number;
+  maxCandidateArtsParticipation?: number;
+  minCandidateSportsParticipation?: number;
+  maxCandidateSportsParticipation?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
