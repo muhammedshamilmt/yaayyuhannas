@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { Team } from '@/types';
+import { isAdminEmail } from '@/lib/adminAuth';
 
 export async function POST(request: Request) {
   try {
@@ -8,6 +9,15 @@ export async function POST(request: Request) {
     
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+    }
+
+    // Check if it's a main admin email first
+    if (isAdminEmail(email)) {
+      return NextResponse.json({
+        success: true,
+        userType: 'admin',
+        team: null
+      });
     }
 
     const db = await getDatabase();
@@ -39,16 +49,6 @@ export async function POST(request: Request) {
           captainEmail: team.captainEmail,
           adminEmails: team.adminEmails || (team.captainEmail ? [team.captainEmail] : [])
         }
-      });
-    }
-    
-    // Check if it's the admin email
-    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'dawafest@gmail.com';
-    if (email.toLowerCase() === adminEmail.toLowerCase()) {
-      return NextResponse.json({
-        success: true,
-        userType: 'admin',
-        team: null
       });
     }
     

@@ -6,6 +6,7 @@ import { signInWithGoogle, signOutUser } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { isAdminEmail } from '@/lib/adminAuth';
 
 const sampleTestimonials: Testimonial[] = [
   {
@@ -50,7 +51,7 @@ const Login = () => {
       if (data.email && data.password) {
         const displayName = data.email.split('@')[0];
         const avatarUrl = `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(displayName)}`;
-        const isAdmin = data.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+        const isAdmin = isAdminEmail(data.email);
 
         const userData = {
           name: displayName,

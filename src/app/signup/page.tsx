@@ -5,6 +5,7 @@ import { signInWithGoogle, signOutUser } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { isAdminEmail } from '@/lib/adminAuth';
 
 const Signup = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -32,20 +33,22 @@ const Signup = () => {
       // You can replace this with your actual registration logic
       const displayName = data.name || data.email.split('@')[0];
       const avatarUrl = `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(displayName)}`;
+      const isAdmin = isAdminEmail(data.email);
 
       localStorage.setItem('currentUser', JSON.stringify({
         name: displayName,
         email: data.email,
         avatarUrl,
-        isAdmin: false,
+        isAdmin,
+        userType: isAdmin ? 'admin' : 'user',
       }));
 
       toast({
         title: "Account Created!",
-        description: `Welcome ${displayName}!`,
+        description: `Welcome ${displayName}${isAdmin ? ' (Admin)' : ''}!`,
       });
 
-      router.push('/');
+      router.push(isAdmin ? '/admin' : '/');
     } catch (error: any) {
       console.error('Signup error:', error);
       toast({
@@ -72,9 +75,8 @@ const Signup = () => {
       const displayName = user.displayName || user.email.split('@')[0];
       const avatarUrl = user.photoURL || `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(displayName)}`;
       
-      // Check if the email matches the admin email from environment variables
-      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'admin@example.com';
-      const isAdmin = user.email === adminEmail;
+      // Check if the email matches any admin email
+      const isAdmin = isAdminEmail(user.email);
 
       // Store user data in localStorage
       localStorage.setItem('currentUser', JSON.stringify({
@@ -82,6 +84,7 @@ const Signup = () => {
         email: user.email,
         avatarUrl,
         isAdmin,
+        userType: isAdmin ? 'admin' : 'user',
         authProvider: 'google',
       }));
 
