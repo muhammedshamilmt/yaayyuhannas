@@ -4,6 +4,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Candidate, Programme, ProgrammeParticipant, Team, FestivalInfo } from '@/types';
+import { 
+  getCandidateParticipationStats, 
+  getSectionLimits, 
+  DEFAULT_SECTION_LIMITS 
+} from '@/lib/participationRules';
 import TeamBreadcrumb from '@/components/TeamAdmin/TeamBreadcrumb';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 
@@ -155,17 +160,54 @@ export default function TeamCandidatesPage() {
     return undefined;
   };
 
-  // Compute individual and total stats for any candidate
+  // Compute individual and total stats for any candidate using section limits
   const getCandidateStats = (chestNumber: string) => {
-    const candidateParticipations = participants.filter(
-      p => p.status !== 'withdrawn' && p.participants?.includes(chestNumber)
+    const candidate = candidates.find(c => c.chestNumber === chestNumber);
+    if (!candidate) {
+      return {
+        candidateParticipations: [],
+        artsIndividualParticipations: [],
+        sportsIndividualParticipations: [],
+        groupParticipations: [],
+        artsCount: 0,
+        stageCount: 0,
+        nonStageCount: 0,
+        sportsCount: 0,
+        songCount: 0,
+        registeredCount: 0,
+        remainingCount: 0,
+        totalCount: 0,
+        isMinMet: false,
+        isArtsMinMet: false,
+        isSportsMinMet: false,
+        isStageMinMet: false,
+        isNonStageMinMet: false,
+        isArtsMaxReached: false,
+        isSportsMaxReached: false,
+        isJunior: false,
+        warnings: [],
+        maxStage: 7,
+        minStage: 2,
+        maxNonStage: 7,
+        minNonStage: 2,
+        maxSports: 4,
+        minSports: 1,
+        maxSongs: 4,
+      };
+    }
+
+    const participationStats = getCandidateParticipationStats(
+      candidate,
+      participants,
+      programmes,
+      festInfo
     );
 
     const artsIndividualParticipations: ProgrammeParticipant[] = [];
     const sportsIndividualParticipations: ProgrammeParticipant[] = [];
     const groupParticipations: ProgrammeParticipant[] = [];
 
-    candidateParticipations.forEach(part => {
+    participationStats.candidateParticipations.forEach(part => {
       const prog = getProgrammeForParticipant(part);
       const isIndividual = prog ? (prog.positionType === 'individual' || (prog as any).type === 'individual') : false;
       const isSports = (prog?.category || '').toLowerCase() === 'sports';
@@ -181,29 +223,42 @@ export default function TeamCandidatesPage() {
       }
     });
 
-    const artsCount = artsIndividualParticipations.length;
-    const sportsCount = sportsIndividualParticipations.length;
-    const isArtsMinMet = artsCount >= minArtsLimit;
-    const isSportsMinMet = minSportsLimit === 0 || sportsCount >= minSportsLimit;
-    const isMinMet = isArtsMinMet && isSportsMinMet;
-    const isArtsMaxReached = artsCount >= maxArtsLimit;
-    const isSportsMaxReached = sportsCount >= maxSportsLimit;
+    const isStageMinMet = participationStats.stageCount >= participationStats.minStage;
+    const isNonStageMinMet = participationStats.nonStageCount >= participationStats.minNonStage;
+    const isSportsMinMet = participationStats.sportsCount >= participationStats.minSports;
+    const isArtsMinMet = isStageMinMet && isNonStageMinMet;
 
     return {
-      candidateParticipations,
+      candidateParticipations: participationStats.candidateParticipations,
       artsIndividualParticipations,
       sportsIndividualParticipations,
       groupParticipations,
-      artsCount,
-      sportsCount,
-      registeredCount: artsCount + sportsCount,
-      remainingCount: Math.max(0, maxArtsLimit - artsCount) + Math.max(0, maxSportsLimit - sportsCount),
-      totalCount: candidateParticipations.length,
-      isMinMet,
+      artsCount: participationStats.stageCount + participationStats.nonStageCount,
+      stageCount: participationStats.stageCount,
+      nonStageCount: participationStats.nonStageCount,
+      sportsCount: participationStats.sportsCount,
+      songCount: participationStats.songCount,
+      registeredCount: participationStats.stageCount + participationStats.nonStageCount + participationStats.sportsCount,
+      remainingCount: Math.max(0, participationStats.maxStage - participationStats.stageCount) +
+        Math.max(0, participationStats.maxNonStage - participationStats.nonStageCount) +
+        Math.max(0, participationStats.maxSports - participationStats.sportsCount),
+      totalCount: participationStats.candidateParticipations.length,
+      isMinMet: participationStats.isAllMinMet,
+      isStageMinMet,
+      isNonStageMinMet,
       isArtsMinMet,
       isSportsMinMet,
-      isArtsMaxReached,
-      isSportsMaxReached
+      isArtsMaxReached: participationStats.stageCount >= participationStats.maxStage && participationStats.nonStageCount >= participationStats.maxNonStage,
+      isSportsMaxReached: participationStats.sportsCount >= participationStats.maxSports,
+      isJunior: participationStats.isJunior,
+      warnings: participationStats.warnings,
+      maxStage: participationStats.maxStage,
+      minStage: participationStats.minStage,
+      maxNonStage: participationStats.maxNonStage,
+      minNonStage: participationStats.minNonStage,
+      maxSports: participationStats.maxSports,
+      minSports: participationStats.minSports,
+      maxSongs: participationStats.maxSongs,
     };
   };
 
@@ -718,7 +773,7 @@ export default function TeamCandidatesPage() {
                       </p>
                     </div>
 
-                    {/* Status Pill (matches "● Online" from image) */}
+                    {/* Status Pill */}
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 shadow-2xs ${stats.isMinMet
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
                       : stats.registeredCount === 0
@@ -732,42 +787,53 @@ export default function TeamCandidatesPage() {
                           ? 'Eligible'
                           : stats.registeredCount === 0
                             ? '0 Reg'
-                            : !stats.isArtsMinMet && !stats.isSportsMinMet
-                              ? `Need Arts & Sports`
-                              : !stats.isArtsMinMet
-                                ? `Need ${minArtsLimit - stats.artsCount} Arts`
-                                : `Need ${minSportsLimit - stats.sportsCount} Sports`}
+                            : stats.warnings[0] || 'Under Min'}
                       </span>
                     </span>
                   </div>
 
-                  {/* 3-Column Stats Box (Points / Arts / Sports) */}
-                  <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-2.5 sm:p-3 my-3.5 grid grid-cols-3 divide-x divide-slate-200/60 text-center shadow-2xs">
+                  {/* 4-Column Stats Box (Points / Stage / Non-Stage / Sports) */}
+                  <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-2 sm:p-2.5 my-3 grid grid-cols-4 divide-x divide-slate-200/60 text-center shadow-2xs">
                     <div>
-                      <div className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">
+                      <div className="text-base sm:text-lg font-bold text-gray-900 tracking-tight">
                         {candidate.points || 0}
                       </div>
-                      <div className="text-[11px] font-semibold text-gray-400 mt-0.5 uppercase tracking-wide">
+                      <div className="text-[10px] font-semibold text-gray-400 mt-0.5 uppercase tracking-wide">
                         Points
                       </div>
                     </div>
                     <div>
-                      <div className="text-lg sm:text-xl font-bold text-purple-600 tracking-tight">
-                        {stats.artsCount}/{maxArtsLimit}
+                      <div className="text-base sm:text-lg font-bold text-purple-600 tracking-tight">
+                        {stats.stageCount}/{stats.maxStage}
                       </div>
-                      <div className="text-[11px] font-semibold text-gray-400 mt-0.5 uppercase tracking-wide">
-                        Arts
+                      <div className="text-[10px] font-semibold text-gray-400 mt-0.5 uppercase tracking-wide">
+                        Stage
                       </div>
                     </div>
                     <div>
-                      <div className="text-lg sm:text-xl font-bold text-emerald-600 tracking-tight">
-                        {stats.sportsCount}/{maxSportsLimit}
+                      <div className="text-base sm:text-lg font-bold text-blue-600 tracking-tight">
+                        {stats.nonStageCount}/{stats.maxNonStage}
                       </div>
-                      <div className="text-[11px] font-semibold text-gray-400 mt-0.5 uppercase tracking-wide">
+                      <div className="text-[10px] font-semibold text-gray-400 mt-0.5 uppercase tracking-wide">
+                        Non-Stg
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-base sm:text-lg font-bold text-emerald-600 tracking-tight">
+                        {stats.sportsCount}/{stats.maxSports}
+                      </div>
+                      <div className="text-[10px] font-semibold text-gray-400 mt-0.5 uppercase tracking-wide">
                         Sports
                       </div>
                     </div>
                   </div>
+                  {stats.isJunior && (
+                    <div className="text-center -mt-1.5 mb-2">
+                      <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-semibold bg-pink-50 text-pink-700 border border-pink-200">
+                        🎤 Songs: {stats.songCount}/{stats.maxSongs} max (Excl. Poem & Malappattu)
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Bottom Action Button (matches "Get In Touch" in image) */}
@@ -792,9 +858,10 @@ export default function TeamCandidatesPage() {
                 <tr>
                   <th className="px-6 py-4 text-left">Candidate</th>
                   <th className="px-4 py-4 text-left">Section</th>
-                  <th className="px-4 py-4 text-center">Scored Points</th>
-                  <th className="px-4 py-4 text-center">Arts Progs</th>
-                  <th className="px-4 py-4 text-center">Sports Progs</th>
+                  <th className="px-3 py-4 text-center">Points</th>
+                  <th className="px-3 py-4 text-center">Stage</th>
+                  <th className="px-3 py-4 text-center">Non-Stage</th>
+                  <th className="px-3 py-4 text-center">Sports</th>
                   <th className="px-4 py-4 text-center">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
@@ -836,23 +903,55 @@ export default function TeamCandidatesPage() {
                       </td>
 
                       {/* Scored Points */}
-                      <td className="px-4 py-4 whitespace-nowrap text-center">
-                        <span className="inline-block px-3 py-1 rounded-lg bg-gray-100 font-mono font-bold text-sm text-gray-900">
+                      <td className="px-3 py-4 whitespace-nowrap text-center">
+                        <span className="inline-block px-2.5 py-1 rounded-lg bg-gray-100 font-mono font-bold text-xs text-gray-900">
                           {candidate.points || 0} pts
                         </span>
                       </td>
 
-                      {/* Arts Progs */}
-                      <td className="px-4 py-4 whitespace-nowrap text-center">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-purple-50 text-purple-700 border border-purple-100">
-                          {stats.artsCount} / {maxArtsLimit}
+                      {/* Stage Progs */}
+                      <td className="px-3 py-4 whitespace-nowrap text-center">
+                        <div>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold font-mono border ${
+                            stats.stageCount >= stats.maxStage 
+                              ? 'bg-red-50 text-red-700 border-red-200' 
+                              : stats.stageCount >= stats.minStage 
+                                ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            {stats.stageCount} / {stats.maxStage}
+                          </span>
+                          {stats.isJunior && (
+                            <div className="text-[10px] text-pink-600 font-semibold mt-0.5">
+                              🎤 {stats.songCount}/{stats.maxSongs}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Non-Stage Progs */}
+                      <td className="px-3 py-4 whitespace-nowrap text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold font-mono border ${
+                          stats.nonStageCount >= stats.maxNonStage 
+                            ? 'bg-red-50 text-red-700 border-red-200' 
+                            : stats.nonStageCount >= stats.minNonStage 
+                              ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                          {stats.nonStageCount} / {stats.maxNonStage}
                         </span>
                       </td>
 
                       {/* Sports Progs */}
-                      <td className="px-4 py-4 whitespace-nowrap text-center">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-100">
-                          {stats.sportsCount} / {maxSportsLimit}
+                      <td className="px-3 py-4 whitespace-nowrap text-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold font-mono border ${
+                          stats.sportsCount >= stats.maxSports 
+                            ? 'bg-red-50 text-red-700 border-red-200' 
+                            : stats.sportsCount >= stats.minSports 
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                          {stats.sportsCount} / {stats.maxSports}
                         </span>
                       </td>
 
@@ -871,11 +970,7 @@ export default function TeamCandidatesPage() {
                               ? 'Eligible'
                               : stats.registeredCount === 0
                                 ? '0 Reg'
-                                : !stats.isArtsMinMet && !stats.isSportsMinMet
-                                  ? `Need Arts & Sports`
-                                  : !stats.isArtsMinMet
-                                    ? `Need ${minArtsLimit - stats.artsCount} Arts`
-                                    : `Need ${minSportsLimit - stats.sportsCount} Sports`}
+                                : stats.warnings[0] || 'Under Min'}
                           </span>
                         </span>
                       </td>
@@ -983,25 +1078,39 @@ export default function TeamCandidatesPage() {
               </div>
 
               {/* Participation Quota Cards */}
-              <div className="grid grid-cols-3 gap-2.5 mb-6 text-center">
-                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                  <div className="text-xl font-black text-gray-900 font-mono">
+              <div className={`grid ${stats.isJunior ? 'grid-cols-5' : 'grid-cols-4'} gap-2 mb-6 text-center`}>
+                <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                  <div className="text-lg font-black text-gray-900 font-mono">
                     {selectedCandidateForDetails.points || 0}
                   </div>
-                  <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Scored Points</div>
+                  <div className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Points</div>
                 </div>
-                <div className="p-3 rounded-2xl bg-purple-50/70 border border-purple-100">
-                  <div className="text-xl font-black text-purple-700 font-mono">
-                    {stats.artsCount}/{maxArtsLimit}
+                <div className="p-2.5 rounded-2xl bg-purple-50/70 border border-purple-100">
+                  <div className="text-lg font-black text-purple-700 font-mono">
+                    {stats.stageCount}/{stats.maxStage}
                   </div>
-                  <div className="text-[10px] text-purple-600 font-bold uppercase tracking-wider mt-0.5">Arts Progs</div>
+                  <div className="text-[9px] text-purple-600 font-bold uppercase tracking-wider mt-0.5">Stage</div>
                 </div>
-                <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-100">
-                  <div className="text-xl font-black text-emerald-700 font-mono">
-                    {stats.sportsCount}/{maxSportsLimit}
+                <div className="p-2.5 rounded-2xl bg-blue-50/70 border border-blue-100">
+                  <div className="text-lg font-black text-blue-700 font-mono">
+                    {stats.nonStageCount}/{stats.maxNonStage}
                   </div>
-                  <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mt-0.5">Sports Progs</div>
+                  <div className="text-[9px] text-blue-600 font-bold uppercase tracking-wider mt-0.5">Non-Stage</div>
                 </div>
+                <div className="p-2.5 rounded-2xl bg-emerald-50/70 border border-emerald-100">
+                  <div className="text-lg font-black text-emerald-700 font-mono">
+                    {stats.sportsCount}/{stats.maxSports}
+                  </div>
+                  <div className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider mt-0.5">Sports</div>
+                </div>
+                {stats.isJunior && (
+                  <div className="p-2.5 rounded-2xl bg-pink-50/70 border border-pink-100">
+                    <div className="text-lg font-black text-pink-700 font-mono">
+                      {stats.songCount}/{stats.maxSongs}
+                    </div>
+                    <div className="text-[9px] text-pink-600 font-bold uppercase tracking-wider mt-0.5">Songs</div>
+                  </div>
+                )}
               </div>
 
               {/* Quota Status Banner */}
@@ -1011,11 +1120,11 @@ export default function TeamCandidatesPage() {
                 }`}>
                 <span className="font-semibold">
                   {stats.isMinMet
-                    ? `✓ Minimum requirements met (Arts: ≥${minArtsLimit}${minSportsLimit > 0 ? `, Sports: ≥${minSportsLimit}` : ''})`
-                    : `⚠️ Candidate needs: ${!stats.isArtsMinMet ? `${minArtsLimit - stats.artsCount} more Arts ` : ''}${!stats.isArtsMinMet && !stats.isSportsMinMet ? 'and ' : ''}${!stats.isSportsMinMet ? `${minSportsLimit - stats.sportsCount} more Sports` : ''} to be eligible`}
+                    ? `✓ Minimum requirements met (Stage: ≥${stats.minStage}, Non-Stage: ≥${stats.minNonStage}, Sports: ≥${stats.minSports})`
+                    : `⚠️ ${stats.warnings.join(' • ') || 'Candidate needs to register more programmes'}`}
                 </span>
                 <span className="font-bold font-mono text-[11px] shrink-0">
-                  🎭 {stats.artsCount}/{minArtsLimit} Arts Min • ⚽ {stats.sportsCount}/{minSportsLimit} Sports Min
+                  🎭 {stats.stageCount}/{stats.minStage} Stg • 📝 {stats.nonStageCount}/{stats.minNonStage} Non-Stg • ⚽ {stats.sportsCount}/{stats.minSports} Sprt
                 </span>
               </div>
 

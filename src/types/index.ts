@@ -80,6 +80,25 @@ export interface Result {
   updatedAt?: Date;
 }
 
+export interface LimitRange {
+  min: number;
+  max: number;
+}
+
+export interface SectionRuleConfig {
+  artsStage: LimitRange;
+  artsNonStage: LimitRange;
+  sports: LimitRange;
+  maxSongs?: number; // Special rule for junior category songs (e.g., max 4)
+}
+
+export interface SectionLimits {
+  senior: SectionRuleConfig;
+  junior: SectionRuleConfig;
+  'sub-junior': SectionRuleConfig;
+  general?: SectionRuleConfig;
+}
+
 export interface FestivalInfo {
   _id?: ObjectId | string;
   name: string;
@@ -95,6 +114,7 @@ export interface FestivalInfo {
   maxCandidateArtsParticipation?: number;
   minCandidateSportsParticipation?: number;
   maxCandidateSportsParticipation?: number;
+  sectionLimits?: SectionLimits;
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -5,6 +5,11 @@ import Link from 'next/link';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
 import { Team, Candidate, ProgrammeParticipant, FestivalInfo, Programme } from '@/types';
+import { 
+  getCandidateParticipationStats, 
+  getSectionLimits, 
+  DEFAULT_SECTION_LIMITS 
+} from '@/lib/participationRules';
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -270,55 +275,29 @@ export default function TeamsPage() {
   const minSportsLimit = festInfo?.minCandidateSportsParticipation ?? 0;
   const maxSportsLimit = festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 3;
 
-  // Compute stats helper for any team
+  // Compute stats helper for any team using section-aware participation rules
   const getTeamCandidateStats = (teamCode: string) => {
-    const individualArtsProgIdSet = new Set<string>();
-    const individualSportsProgIdSet = new Set<string>();
-
-    programmes.forEach((p: any) => {
-      if (p.positionType === 'individual' || p.type === 'individual') {
-        const isSports = (p.category || '').toLowerCase() === 'sports';
-        const targetSet = isSports ? individualSportsProgIdSet : individualArtsProgIdSet;
-        if (p._id) targetSet.add(p._id.toString());
-        if (p.id) targetSet.add(p.id.toString());
-      }
-    });
-
     const teamCandidates = candidates.filter(c => c.team === teamCode);
     const candidateStats = teamCandidates.map(c => {
-      const artsRegistrations = participants.filter(
-        p => p.status !== 'withdrawn' &&
-          individualArtsProgIdSet.has(p.programmeId) &&
-          p.participants?.includes(c.chestNumber)
-      );
-
-      const sportsRegistrations = participants.filter(
-        p => p.status !== 'withdrawn' &&
-          individualSportsProgIdSet.has(p.programmeId) &&
-          p.participants?.includes(c.chestNumber)
-      );
-
-      const allRegistrations = participants.filter(
-        p => p.status !== 'withdrawn' &&
-          (individualArtsProgIdSet.has(p.programmeId) || individualSportsProgIdSet.has(p.programmeId)) &&
-          p.participants?.includes(c.chestNumber)
-      );
-
-      const isArtsUnderMin = artsRegistrations.length < minArtsLimit;
-      const isSportsUnderMin = minSportsLimit > 0 && sportsRegistrations.length < minSportsLimit;
-      const isUnderMin = isArtsUnderMin || isSportsUnderMin;
-      const hasZero = allRegistrations.length === 0;
+      const stats = getCandidateParticipationStats(c, participants, programmes, festInfo);
+      const isUnderMin = !stats.isAllMinMet;
+      const hasZero = stats.registeredCount === 0;
 
       return {
         candidate: c,
-        registeredCount: allRegistrations.length,
-        artsCount: artsRegistrations.length,
-        sportsCount: sportsRegistrations.length,
-        programmes: allRegistrations.map(r => r.programmeName || r.programmeCode || 'Programme'),
-        isArtsUnderMin,
-        isSportsUnderMin,
+        registeredCount: stats.registeredCount,
+        stageCount: stats.stageCount,
+        nonStageCount: stats.nonStageCount,
+        sportsCount: stats.sportsCount,
+        songCount: stats.songCount,
+        artsCount: stats.stageCount + stats.nonStageCount,
+        programmes: stats.candidateParticipations.map(r => r.programmeName || r.programmeCode || 'Programme'),
+        isArtsUnderMin: stats.stageCount < stats.minStage || stats.nonStageCount < stats.minNonStage,
+        isSportsUnderMin: stats.sportsCount < stats.minSports,
         isUnderMin,
         hasZero,
+        warnings: stats.warnings,
+        stats,
       };
     });
 
@@ -378,15 +357,14 @@ export default function TeamsPage() {
             <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4">
               <div className="flex items-center justify-between mb-1">
                 <h4 className="text-sm font-bold text-purple-900 flex items-center gap-1.5">
-                  <span>⚙️</span> Candidate Participation Rules
+                  <span>⚙️</span> Section Participation Rules
                 </h4>
                 <Link href="/admin/settings" className="text-xs text-purple-600 hover:text-purple-800 underline font-medium">
                   Configure Settings
                 </Link>
               </div>
               <p className="text-xs text-purple-700 leading-relaxed">
-                Rules: 🎭 Arts: <strong>{minArtsLimit} Min / {maxArtsLimit} Max</strong> • ⚽ Sports: <strong>{minSportsLimit} Min / {maxSportsLimit} Max</strong>.
-                Teams with any candidate failing to meet category minimums are flagged as <strong>Not Eligible</strong>.
+                Rules: 🎓 <strong>Senior</strong> (Stage: 2–7, Non-Stage: 2–7, Sports: 1–4) • 🥈 <strong>Junior</strong> (Stage: 2–6 [🎤 Max 4 Songs], Non-Stage: 2–6, Sports: 1–4) • 🥉 <strong>Sub-Junior</strong> (Stage: 2–5, Non-Stage: 2–5, Sports: 1–4). Teams with any candidate failing section minimums are flagged as <strong>Not Eligible</strong>.
               </p>
             </div>
           </div>
@@ -831,7 +809,7 @@ export default function TeamsPage() {
                     {selectedTeamForEligibility.name} • Candidate Participation
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Rule Requirements: 🎭 Arts: <strong>{minArtsLimit} Min / {maxArtsLimit} Max</strong> • ⚽ Sports: <strong>{minSportsLimit} Min / {maxSportsLimit} Max</strong>
+                    Rules: 🎓 Senior (2–7 Stage/Non-Stage, 1–4 Sports) • 🥈 Junior (2–6 Stage [🎤 Max 4 Songs]/Non-Stage, 1–4 Sports) • 🥉 Sub-Junior (2–5 Stage/Non-Stage, 1–4 Sports)
                   </p>
                 </div>
               </div>
@@ -939,10 +917,11 @@ export default function TeamsPage() {
                     <div className="text-right flex items-center gap-3">
                       <div>
                         <div className="text-xs font-bold text-gray-900">
-                          🎭 {item.artsCount}/{maxArtsLimit} Arts • ⚽ {item.sportsCount}/{maxSportsLimit} Sports
+                          🎭 {item.stageCount}/{item.stats.maxStage} Stg • 📝 {item.nonStageCount}/{item.stats.maxNonStage} Non-Stg • ⚽ {item.sportsCount}/{item.stats.maxSports} Sprt
+                          {item.stats.isJunior && ` • 🎤 ${item.songCount}/${item.stats.maxSongs}`}
                         </div>
                         <div className="text-[10px] text-gray-500">
-                          Min: {minArtsLimit} Arts{minSportsLimit > 0 ? `, ${minSportsLimit} Sports` : ''}
+                          Min: {item.stats.minStage} Stg, {item.stats.minNonStage} Non-Stg, {item.stats.minSports} Sprt
                         </div>
                       </div>
 
@@ -952,9 +931,7 @@ export default function TeamsPage() {
                         </span>
                       ) : item.isUnderMin ? (
                         <span className="text-xs px-3 py-1 rounded-full font-bold bg-amber-200 text-amber-900 border border-amber-300">
-                          {item.isArtsUnderMin ? `Needs ${minArtsLimit - item.artsCount} Arts` : ''}
-                          {item.isArtsUnderMin && item.isSportsUnderMin ? ', ' : ''}
-                          {item.isSportsUnderMin ? `Needs ${minSportsLimit - item.sportsCount} Sports` : ''}
+                          {item.warnings[0] || 'Under Min'}
                         </span>
                       ) : (
                         <span className="text-xs px-3 py-1 rounded-full font-bold bg-emerald-200 text-emerald-900 border border-emerald-300 flex items-center gap-1">

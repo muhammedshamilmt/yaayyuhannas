@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { getDatabase } from '@/lib/mongodb';
 import { syncProgrammeRegistrationToSheets } from '@/lib/googleSheets';
+import { checkCandidateProgrammeEligibility } from '@/lib/participationRules';
 
 export async function GET(request: NextRequest) {
   try {
@@ -65,62 +66,59 @@ export async function POST(request: NextRequest) {
 
     const isIndividual = programmeDoc?.positionType === 'individual' || (programmeDoc as any)?.type === 'individual';
 
-    if (isIndividual) {
-      const isSports = (programmeDoc?.category || '').toLowerCase() === 'sports';
-      const maxLimit = isSports
-        ? (festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 3)
-        : (festInfo?.maxCandidateArtsParticipation ?? festInfo?.maxCandidateParticipation ?? 3);
-      const categoryLabel = isSports ? 'Sports' : 'Arts';
+    if (isIndividual && participants && participants.length > 0) {
+      const candidatesCollection = db.collection('candidates');
+      const candidateDocs = await candidatesCollection.find({ chestNumber: { $in: participants } }).toArray();
+      const candMap = new Map<string, any>(candidateDocs.map(c => [c.chestNumber, c]));
 
-      // Find all individual programme IDs and codes for this category
-      const individualProgs = await programmesCollection.find({
-        $and: [
-          {
-            $or: [
-              { positionType: 'individual' },
-              { type: 'individual' }
-            ]
-          },
-          isSports
-            ? { category: { $regex: /^sports$/i } }
-            : { category: { $not: { $regex: /^sports$/i } } }
-        ]
-      }, { projection: { _id: 1, id: 1, code: 1 } }).toArray();
+      // Fetch all non-withdrawn registrations for these candidates
+      const existingRegs = await collection.find({
+        participants: { $in: participants },
+        status: { $ne: 'withdrawn' }
+      }).toArray();
 
-      const individualProgIds: any[] = [];
-
-      individualProgs.forEach((p: any) => {
-        if (p._id) {
-          individualProgIds.push(p._id.toString());
-          if (ObjectId.isValid(p._id)) individualProgIds.push(new ObjectId(p._id));
+      // Collect all programme IDs from registrations to populate programme data
+      const regProgIds: any[] = [];
+      existingRegs.forEach(r => {
+        if (r.programmeId) {
+          regProgIds.push(r.programmeId);
+          if (ObjectId.isValid(r.programmeId)) {
+            regProgIds.push(new ObjectId(r.programmeId));
+          }
         }
-        if (p.id) individualProgIds.push(p.id.toString());
       });
 
-      const individualProgFilter = {
-        programmeId: { $in: individualProgIds }
-      };
+      const relatedProgs = regProgIds.length > 0
+        ? await programmesCollection.find({
+            $or: [
+              { _id: { $in: regProgIds } },
+              { id: { $in: regProgIds.map(String) } }
+            ]
+          }).toArray()
+        : [];
 
-      // Check maximum individual participation limit for each candidate in parallel
-      const candidatesCollection = db.collection('candidates');
-      const checks = await Promise.all(
-        participants.map(async (chestNumber: string) => {
-          const count = await collection.countDocuments({
-            ...individualProgFilter,
-            participants: chestNumber,
-            status: { $ne: 'withdrawn' }
-          });
-          return { chestNumber, count };
-        })
-      );
+      const allProgList: any[] = [...relatedProgs];
+      if (programmeDoc && !allProgList.some(p => p._id?.toString() === programmeDoc._id?.toString())) {
+        allProgList.push(programmeDoc);
+      }
 
-      const exceeded = checks.find(c => c.count >= maxLimit);
-      if (exceeded) {
-        const candidateDoc = await candidatesCollection.findOne({ chestNumber: exceeded.chestNumber });
-        const candidateName = candidateDoc?.name || exceeded.chestNumber;
-        return NextResponse.json({
-          error: `Candidate ${candidateName} (#${exceeded.chestNumber}) has reached the maximum allowed limit of ${maxLimit} individual ${categoryLabel} programme(s). Cannot register for more.`
-        }, { status: 400 });
+      for (const chestNumber of participants) {
+        const candidate = candMap.get(chestNumber) || { chestNumber, section: programmeDoc?.section };
+        const validation = checkCandidateProgrammeEligibility({
+          candidate,
+          programme: programmeDoc as any,
+          registrations: existingRegs as any,
+          allProgrammes: allProgList as any,
+          festInfo,
+          isEditingCurrentRegistration: false
+        });
+
+        if (!validation.eligible) {
+          const candidateName = candidate.name ? `${candidate.name} (#${chestNumber})` : `#${chestNumber}`;
+          return NextResponse.json({
+            error: `Candidate ${candidateName} cannot register: ${validation.reason}`
+          }, { status: 400 });
+        }
       }
     }
 
@@ -206,62 +204,60 @@ export async function PUT(request: NextRequest) {
 
       const isIndividual = programmeDoc?.positionType === 'individual' || (programmeDoc as any)?.type === 'individual';
 
-      if (isIndividual) {
-        const isSports = (programmeDoc?.category || '').toLowerCase() === 'sports';
-        const maxLimit = isSports
-          ? (festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 3)
-          : (festInfo?.maxCandidateArtsParticipation ?? festInfo?.maxCandidateParticipation ?? 3);
-        const categoryLabel = isSports ? 'Sports' : 'Arts';
+      if (isIndividual && participants && participants.length > 0) {
         const candidatesCollection = db.collection('candidates');
+        const candidateDocs = await candidatesCollection.find({ chestNumber: { $in: participants } }).toArray();
+        const candMap = new Map<string, any>(candidateDocs.map(c => [c.chestNumber, c]));
 
-        // Find all individual programme IDs and codes for this category
-        const individualProgs = await programmesCollection.find({
-          $and: [
-            {
-              $or: [
-                { positionType: 'individual' },
-                { type: 'individual' }
-              ]
-            },
-            isSports
-              ? { category: { $regex: /^sports$/i } }
-              : { category: { $not: { $regex: /^sports$/i } } }
-          ]
-        }, { projection: { _id: 1, id: 1, code: 1 } }).toArray();
+        // Fetch all non-withdrawn registrations for these candidates (excluding current registration)
+        const existingRegs = await collection.find({
+          _id: { $ne: currentRegistration._id },
+          participants: { $in: participants },
+          status: { $ne: 'withdrawn' }
+        }).toArray();
 
-        const individualProgIds: any[] = [];
-
-        individualProgs.forEach((p: any) => {
-          if (p._id) {
-            individualProgIds.push(p._id.toString());
-            if (ObjectId.isValid(p._id)) individualProgIds.push(new ObjectId(p._id));
+        // Collect all programme IDs from registrations
+        const regProgIds: any[] = [];
+        existingRegs.forEach(r => {
+          if (r.programmeId) {
+            regProgIds.push(r.programmeId);
+            if (ObjectId.isValid(r.programmeId)) {
+              regProgIds.push(new ObjectId(r.programmeId));
+            }
           }
-          if (p.id) individualProgIds.push(p.id.toString());
         });
 
-        const individualProgFilter = {
-          programmeId: { $in: individualProgIds }
-        };
+        const relatedProgs = regProgIds.length > 0
+          ? await programmesCollection.find({
+              $or: [
+                { _id: { $in: regProgIds } },
+                { id: { $in: regProgIds.map(String) } }
+              ]
+            }).toArray()
+          : [];
 
-        const checks = await Promise.all(
-          participants.map(async (chestNumber: string) => {
-            const otherCount = await collection.countDocuments({
-              _id: { $ne: currentRegistration._id },
-              ...individualProgFilter,
-              participants: chestNumber,
-              status: { $ne: 'withdrawn' }
-            });
-            return { chestNumber, otherCount };
-          })
-        );
+        const allProgList: any[] = [...relatedProgs];
+        if (programmeDoc && !allProgList.some(p => p._id?.toString() === programmeDoc._id?.toString())) {
+          allProgList.push(programmeDoc);
+        }
 
-        const exceeded = checks.find(c => c.otherCount >= maxLimit);
-        if (exceeded) {
-          const candidateDoc = await candidatesCollection.findOne({ chestNumber: exceeded.chestNumber });
-          const candidateName = candidateDoc?.name || exceeded.chestNumber;
-          return NextResponse.json({
-            error: `Candidate ${candidateName} (#${exceeded.chestNumber}) has already reached the maximum allowed limit of ${maxLimit} individual ${categoryLabel} programme(s). Cannot register for more.`
-          }, { status: 400 });
+        for (const chestNumber of participants) {
+          const candidate = candMap.get(chestNumber) || { chestNumber, section: programmeDoc?.section };
+          const validation = checkCandidateProgrammeEligibility({
+            candidate,
+            programme: programmeDoc as any,
+            registrations: existingRegs as any,
+            allProgrammes: allProgList as any,
+            festInfo,
+            isEditingCurrentRegistration: true
+          });
+
+          if (!validation.eligible) {
+            const candidateName = candidate.name ? `${candidate.name} (#${chestNumber})` : `#${chestNumber}`;
+            return NextResponse.json({
+              error: `Candidate ${candidateName} cannot register: ${validation.reason}`
+            }, { status: 400 });
+          }
         }
       }
     }

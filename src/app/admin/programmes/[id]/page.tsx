@@ -3,6 +3,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Programme, ProgrammeParticipant, Team, Candidate, FestivalInfo } from '@/types';
+import { 
+    checkCandidateProgrammeEligibility, 
+    getProgrammeTypeKey, 
+    getProgrammeTypeLabel, 
+    getSectionLimits, 
+    isJuniorSongProgramme 
+} from '@/lib/participationRules';
 import Link from 'next/link';
 import {
     UserPlus,
@@ -186,11 +193,12 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
     }, [programme]);
 
     // Festival rules & Category determination
-    const isSports = (programme?.category || '').toLowerCase() === 'sports';
-    const categoryLabel = isSports ? 'Sports' : 'Arts';
-    const maxCandidateLimit = isSports
-        ? (festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 3)
-        : (festInfo?.maxCandidateArtsParticipation ?? festInfo?.maxCandidateParticipation ?? 3);
+    const progTypeKey = programme ? getProgrammeTypeKey(programme) : 'artsStage';
+    const isSports = progTypeKey === 'sports';
+    const categoryLabel = getProgrammeTypeLabel(progTypeKey);
+    const sectionLimits = programme ? getSectionLimits(festInfo, programme.section) : null;
+    const maxCandidateLimit = sectionLimits ? sectionLimits[progTypeKey].max : 7;
+    const isSong = programme ? isJuniorSongProgramme(programme) : false;
     const minRequiredParticipants = Number(programme?.requiredParticipants || 1);
     const maxAllowedParticipants = Number(programme?.maxParticipants || programme?.requiredParticipants || 1);
 
@@ -198,14 +206,14 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
     const individualCategoryProgIdSet = useMemo(() => {
         const set = new Set<string>();
         allProgrammes.forEach(p => {
-            const pIsSports = (p.category || '').toLowerCase() === 'sports';
-            if (pIsSports === isSports && (p.positionType === 'individual' || (p as any).type === 'individual')) {
+            const pTypeKey = getProgrammeTypeKey(p);
+            if (pTypeKey === progTypeKey && (p.positionType === 'individual' || (p as any).type === 'individual')) {
                 if (p._id) set.add(p._id.toString());
                 if (p.id) set.add(p.id.toString());
             }
         });
         return set;
-    }, [allProgrammes, isSports]);
+    }, [allProgrammes, progTypeKey]);
 
     // Calculate how many individual programmes of this category a candidate is registered in
     const getCandidateIndividualCount = (chestNumber: string, isEditingCurrentTeam = false) => {
@@ -224,35 +232,28 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
     const evaluateCandidateEligibility = (candidate: Candidate, isAlreadySelected: boolean) => {
         if (!programme) return { eligible: false, reason: 'Programme details missing' };
 
-        // Rule 1: Section Rule
-        if (programme.section !== 'general') {
-            if (candidate.section !== programme.section) {
-                return {
-                    eligible: false,
-                    reason: `Section mismatch (${candidate.section.toUpperCase()} ≠ required ${programme.section.toUpperCase()})`
-                };
-            }
-        }
-
-        // Rule 2: Individual limit rule
-        if (isIndividualProgramme) {
-            const count = getCandidateIndividualCount(
-                candidate.chestNumber,
-                modalMode === 'edit' && !!editingRegistration?.participants.includes(candidate.chestNumber)
-            );
-            if (count >= maxCandidateLimit && !isAlreadySelected) {
-                return {
-                    eligible: false,
-                    reason: `Max ${categoryLabel} limit reached (${count}/${maxCandidateLimit} events)`
-                };
-            }
-        }
-
-        // Rule 3: Max participants capacity reached in current selection
+        // Rule 1: Capacity check in current modal selection
         if (!isAlreadySelected && selectedParticipants.length >= maxAllowedParticipants) {
             return {
                 eligible: false,
                 reason: `Maximum ${maxAllowedParticipants} participant(s) already selected`
+            };
+        }
+
+        // Rule 2: Section Rule, Category Limit, and Junior Song Rule
+        const check = checkCandidateProgrammeEligibility({
+            candidate,
+            programme,
+            registrations: allParticipants,
+            allProgrammes,
+            festInfo,
+            isEditingCurrentRegistration: modalMode === 'edit' && !!editingRegistration?.participants.includes(candidate.chestNumber)
+        });
+
+        if (!check.eligible && !isAlreadySelected) {
+            return {
+                eligible: false,
+                reason: check.reason || 'Candidate not eligible for this programme'
             };
         }
 
@@ -375,15 +376,23 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
             }
         }
 
-        // Validation 4: Individual limit validation
+        // Validation 4: Individual limit validation & Junior Song rule
         if (isIndividualProgramme) {
             for (const chestNumber of selectedParticipants) {
-                const isEditingCurrent = modalMode === 'edit' && !!editingRegistration?.participants.includes(chestNumber);
-                const count = getCandidateIndividualCount(chestNumber, isEditingCurrent);
-                if (count >= maxCandidateLimit) {
-                    const cand = candidates.find(c => c.chestNumber === chestNumber);
-                    setModalError(`Candidate ${cand?.name || chestNumber} has already reached the maximum limit of ${maxCandidateLimit} individual ${categoryLabel} programmes.`);
-                    return;
+                const cand = candidates.find(c => c.chestNumber === chestNumber);
+                if (cand) {
+                    const check = checkCandidateProgrammeEligibility({
+                        candidate: cand,
+                        programme,
+                        registrations: allParticipants,
+                        allProgrammes,
+                        festInfo,
+                        isEditingCurrentRegistration: modalMode === 'edit' && !!editingRegistration?.participants.includes(chestNumber)
+                    });
+                    if (!check.eligible) {
+                        setModalError(`Candidate ${cand.name || chestNumber} cannot be registered: ${check.reason}`);
+                        return;
+                    }
                 }
             }
         }
@@ -1068,7 +1077,7 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
                                     <div className="bg-white p-2.5 rounded-xl border border-blue-100">
                                         <span className="text-gray-500 block text-[11px]">Event Type Limit</span>
                                         <strong className="text-purple-700 font-semibold">
-                                            {isIndividualProgramme ? `Individual (${categoryLabel} Max ${maxCandidateLimit}/candidate)` : 'Group Event'}
+                                            {isIndividualProgramme ? `Individual (${categoryLabel} Max ${maxCandidateLimit}/candidate${isSong ? ' • 🎤 Max 4 Songs' : ''})` : 'Group Event'}
                                         </strong>
                                     </div>
                                 </div>

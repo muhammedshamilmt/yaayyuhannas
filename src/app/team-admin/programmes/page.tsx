@@ -4,6 +4,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Candidate, FestivalInfo, Programme, ProgrammeParticipant, Team } from '@/types';
+import { 
+  getSectionLimits, 
+  getProgrammeTypeKey, 
+  getProgrammeTypeLabel, 
+  isJuniorSongProgramme, 
+  getCandidateParticipationStats, 
+  checkCandidateProgrammeEligibility 
+} from '@/lib/participationRules';
 import TeamBreadcrumb from '@/components/TeamAdmin/TeamBreadcrumb';
 import { Eye, Printer } from 'lucide-react';
 
@@ -165,6 +173,31 @@ export default function TeamProgrammesPage() {
     general: filteredProgrammes.filter(p => (p.category as any) === 'general')
   };
 
+  const minArtsLimit = festInfo?.minCandidateArtsParticipation ?? festInfo?.minCandidateParticipation ?? 2;
+  const maxArtsLimit = festInfo?.maxCandidateArtsParticipation ?? festInfo?.maxCandidateParticipation ?? 7;
+  const minSportsLimit = festInfo?.minCandidateSportsParticipation ?? 1;
+  const maxSportsLimit = festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 4;
+
+  // Calculate detailed participation stats for every candidate using the centralized rules engine
+  const candidateStatsMap = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof getCandidateParticipationStats>>();
+    candidates.forEach(c => {
+      map.set(c.chestNumber, getCandidateParticipationStats({
+        candidate: c,
+        registrations: participants,
+        allProgrammes: programmes,
+        festInfo
+      }));
+    });
+    return map;
+  }, [candidates, participants, programmes, festInfo]);
+
+  const underMinCandidates = candidates.filter(c => {
+    const stats = candidateStatsMap.get(c.chestNumber);
+    return stats ? !stats.isAllMinMet : false;
+  });
+  const isTeamEligible = candidates.length > 0 && underMinCandidates.length === 0;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -175,37 +208,6 @@ export default function TeamProgrammesPage() {
       </div>
     );
   }
-
-  const minArtsLimit = festInfo?.minCandidateArtsParticipation ?? festInfo?.minCandidateParticipation ?? 1;
-  const maxArtsLimit = festInfo?.maxCandidateArtsParticipation ?? festInfo?.maxCandidateParticipation ?? 3;
-  const minSportsLimit = festInfo?.minCandidateSportsParticipation ?? 0;
-  const maxSportsLimit = festInfo?.maxCandidateSportsParticipation ?? festInfo?.maxCandidateParticipation ?? 3;
-
-  // Calculate candidate individual participation counts by category
-  const candidateArtsCounts = candidates.reduce((acc, c) => {
-    acc[c.chestNumber] = participants.filter(
-      p => p.status !== 'withdrawn' &&
-        individualArtsProgIdSet.has(p.programmeId) &&
-        p.participants?.includes(c.chestNumber)
-    ).length;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const candidateSportsCounts = candidates.reduce((acc, c) => {
-    acc[c.chestNumber] = participants.filter(
-      p => p.status !== 'withdrawn' &&
-        individualSportsProgIdSet.has(p.programmeId) &&
-        p.participants?.includes(c.chestNumber)
-    ).length;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const underMinCandidates = candidates.filter(c => {
-    const artsCount = candidateArtsCounts[c.chestNumber] || 0;
-    const sportsCount = candidateSportsCounts[c.chestNumber] || 0;
-    return artsCount < minArtsLimit || (minSportsLimit > 0 && sportsCount < minSportsLimit);
-  });
-  const isTeamEligible = candidates.length > 0 && underMinCandidates.length === 0;
 
   return (
     <div className="space-y-6">
@@ -377,21 +379,21 @@ export default function TeamProgrammesPage() {
               </span>
             </div>
             <p className="text-xs mt-1 text-gray-700">
-              Rules: 🎭 Arts: <strong>{minArtsLimit}–{maxArtsLimit}</strong> {minSportsLimit > 0 || maxSportsLimit > 0 ? <>• ⚽ Sports: <strong>{minSportsLimit}–{maxSportsLimit}</strong></> : null} individual programmes per student.
+              Rules: 🎓 <strong>Senior</strong> (Stage: 2–7, Non-Stage: 2–7, Sports: 1–4) • 🥈 <strong>Junior</strong> (Stage: 2–6 [🎤 Max 4 Songs], Non-Stage: 2–6, Sports: 1–4) • 🥉 <strong>Sub-Junior</strong> (Stage: 2–5, Non-Stage: 2–5, Sports: 1–4)
               {!isTeamEligible && underMinCandidates.length > 0 && (
                 <span className="text-rose-700 font-semibold block mt-1">
                   Need more individual programmes: {underMinCandidates.slice(0, 5).map(c => {
-                    const a = candidateArtsCounts[c.chestNumber] || 0;
-                    const s = candidateSportsCounts[c.chestNumber] || 0;
-                    return `${c.name} (${a}/${minArtsLimit} Arts${minSportsLimit > 0 ? `, ${s}/${minSportsLimit} Sports` : ''})`;
-                  }).join(', ')}{underMinCandidates.length > 5 ? ` +${underMinCandidates.length - 5} more` : ''}
+                    const stats = candidateStatsMap.get(c.chestNumber);
+                    const warnings = stats?.warnings?.join(', ') || 'Under minimum';
+                    return `${c.name} (${warnings})`;
+                  }).join('; ')}{underMinCandidates.length > 5 ? ` +${underMinCandidates.length - 5} more` : ''}
                 </span>
               )}
             </p>
           </div>
         </div>
         <div className="text-xs text-right text-gray-600 bg-white/70 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-gray-200">
-          <div>Limits: <strong>🎭 Arts: {minArtsLimit}m/{maxArtsLimit}M • ⚽ Sports: {minSportsLimit}m/{maxSportsLimit}M</strong></div>
+          <div>Limits: <strong>Senior 2-7 • Junior 2-6 (🎤 4 songs) • Sub-Jr 2-5 • Sports 1-4</strong></div>
         </div>
       </div>
 
@@ -441,6 +443,8 @@ export default function TeamProgrammesPage() {
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
+                    allProgrammes={programmes}
+                    festInfo={festInfo}
                     onUpdate={fetchParticipants}
                     minArtsLimit={minArtsLimit}
                     maxArtsLimit={maxArtsLimit}
@@ -471,6 +475,8 @@ export default function TeamProgrammesPage() {
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
+                    allProgrammes={programmes}
+                    festInfo={festInfo}
                     onUpdate={fetchParticipants}
                     minArtsLimit={minArtsLimit}
                     maxArtsLimit={maxArtsLimit}
@@ -501,6 +507,8 @@ export default function TeamProgrammesPage() {
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
+                    allProgrammes={programmes}
+                    festInfo={festInfo}
                     onUpdate={fetchParticipants}
                     minArtsLimit={minArtsLimit}
                     maxArtsLimit={maxArtsLimit}
@@ -531,6 +539,8 @@ export default function TeamProgrammesPage() {
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
+                    allProgrammes={programmes}
+                    festInfo={festInfo}
                     onUpdate={fetchParticipants}
                     minArtsLimit={minArtsLimit}
                     maxArtsLimit={maxArtsLimit}
@@ -561,6 +571,8 @@ export default function TeamProgrammesPage() {
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
+                    allProgrammes={programmes}
+                    festInfo={festInfo}
                     onUpdate={fetchParticipants}
                     minArtsLimit={minArtsLimit}
                     maxArtsLimit={maxArtsLimit}
@@ -591,6 +603,8 @@ export default function TeamProgrammesPage() {
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
+                    allProgrammes={programmes}
+                    festInfo={festInfo}
                     onUpdate={fetchParticipants}
                     minArtsLimit={minArtsLimit}
                     maxArtsLimit={maxArtsLimit}
@@ -621,6 +635,8 @@ export default function TeamProgrammesPage() {
                     teamCode={teamCode}
                     candidates={candidates}
                     participants={participants}
+                    allProgrammes={programmes}
+                    festInfo={festInfo}
                     onUpdate={fetchParticipants}
                     minArtsLimit={minArtsLimit}
                     maxArtsLimit={maxArtsLimit}
@@ -672,6 +688,8 @@ function ProgrammeCard({
   teamCode,
   candidates,
   participants,
+  allProgrammes,
+  festInfo,
   onUpdate,
   minLimit = 1,
   maxLimit = 3,
@@ -686,6 +704,8 @@ function ProgrammeCard({
   teamCode: string;
   candidates: Candidate[];
   participants: ProgrammeParticipant[];
+  allProgrammes?: Programme[];
+  festInfo?: FestivalInfo | null;
   onUpdate: () => void;
   minLimit?: number;
   maxLimit?: number;
@@ -802,11 +822,19 @@ function ProgrammeCard({
       } else {
         // Enforce maximum participation limit ONLY for individual programmes
         if (isIndividualProgramme) {
-          const individualCount = getCandidateIndividualProgCount(chestNumber);
-          if (individualCount >= currentMaxLimit) {
-            const cand = candidates.find(c => c.chestNumber === chestNumber);
-            alert(`🚫 Cannot select ${cand?.name || chestNumber}: Candidate has already reached the maximum allowed limit of ${currentMaxLimit} individual ${categoryLabel} programme(s).`);
-            return prev;
+          const cand = candidates.find(c => c.chestNumber === chestNumber);
+          if (cand) {
+            const eligibility = checkCandidateProgrammeEligibility(
+              cand,
+              programme,
+              participants,
+              allProgrammes || [],
+              festInfo
+            );
+            if (!eligibility.eligible) {
+              alert(`🚫 Cannot select ${cand.name} (#${chestNumber}): ${eligibility.reason}`);
+              return prev;
+            }
           }
         }
 
@@ -1174,18 +1202,18 @@ function ProgrammeCard({
                       ) : (
                         filteredCandidates.map((candidate) => {
                           const isSelected = selectedParticipants.includes(candidate.chestNumber);
-                          const otherArts = getCandidateOtherArtsCount(candidate.chestNumber);
-                          const otherSports = getCandidateOtherSportsCount(candidate.chestNumber);
-                          const otherCount = isSports ? otherSports : otherArts;
-                          const hasReachedMax = isIndividualProgramme && !isSelected && otherCount >= currentMaxLimit;
+                          const stats = getCandidateParticipationStats(
+                            candidate,
+                            participants,
+                            allProgrammes || [],
+                            festInfo
+                          );
+                          const eligibility = isIndividualProgramme && !isSelected
+                            ? checkCandidateProgrammeEligibility(candidate, programme, participants, allProgrammes || [], festInfo)
+                            : { eligible: true };
+                          const hasReachedMax = isIndividualProgramme && !isSelected && !eligibility.eligible;
                           const isRequiredLimitReached = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
                           const isDisabled = hasReachedMax || isRequiredLimitReached;
-
-                          const effectiveArts = otherArts + (isIndividualProgramme && !isSports && isSelected ? 1 : 0);
-                          const effectiveSports = otherSports + (isIndividualProgramme && isSports && isSelected ? 1 : 0);
-
-                          const isArtsMaxed = effectiveArts >= (maxArtsLimit ?? maxLimit);
-                          const isSportsMaxed = effectiveSports >= (maxSportsLimit ?? maxLimit);
 
                           return (
                             <div
@@ -1201,8 +1229,8 @@ function ProgrammeCard({
                               onClick={() => {
                                 if (isSelected) {
                                   handleParticipantToggle(candidate.chestNumber);
-                                } else if (hasReachedMax) {
-                                  alert(`🚫 Candidate ${candidate.name} (#${candidate.chestNumber}) has already reached the maximum participation limit of ${currentMaxLimit} individual ${categoryLabel} programme(s).`);
+                                } else if (!eligibility.eligible) {
+                                  alert(`🚫 ${candidate.name} (#${candidate.chestNumber}): ${eligibility.reason}`);
                                 } else if (!isRequiredLimitReached) {
                                   handleParticipantToggle(candidate.chestNumber);
                                 } else {
@@ -1223,28 +1251,52 @@ function ProgrammeCard({
                                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
                                       <span
                                         className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
-                                          isArtsMaxed
+                                          stats.stageCount >= stats.maxStage
                                             ? 'bg-red-50 text-red-700 border-red-200'
-                                            : effectiveArts >= (minArtsLimit ?? 1)
+                                            : stats.stageCount >= stats.minStage
                                               ? 'bg-purple-50 text-purple-700 border-purple-200'
                                               : 'bg-amber-50 text-amber-700 border-amber-200'
                                         }`}
-                                        title={`Arts: ${effectiveArts} of ${maxArtsLimit ?? maxLimit} (Min: ${minArtsLimit ?? 1})`}
+                                        title={`Stage: ${stats.stageCount} of ${stats.maxStage} (Min: ${stats.minStage})`}
                                       >
-                                        🎭 {effectiveArts} / {maxArtsLimit ?? maxLimit} arts prog
+                                        🎭 {stats.stageCount}/{stats.maxStage} Stage
                                       </span>
                                       <span
                                         className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
-                                          isSportsMaxed
+                                          stats.nonStageCount >= stats.maxNonStage
                                             ? 'bg-red-50 text-red-700 border-red-200'
-                                            : effectiveSports >= (minSportsLimit ?? 0)
+                                            : stats.nonStageCount >= stats.minNonStage
+                                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                                        }`}
+                                        title={`Non-Stage: ${stats.nonStageCount} of ${stats.maxNonStage} (Min: ${stats.minNonStage})`}
+                                      >
+                                        📝 {stats.nonStageCount}/{stats.maxNonStage} Non-Stage
+                                      </span>
+                                      <span
+                                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
+                                          stats.sportsCount >= stats.maxSports
+                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                            : stats.sportsCount >= stats.minSports
                                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                               : 'bg-amber-50 text-amber-700 border-amber-200'
                                         }`}
-                                        title={`Sports: ${effectiveSports} of ${maxSportsLimit ?? maxLimit} (Min: ${minSportsLimit ?? 0})`}
+                                        title={`Sports: ${stats.sportsCount} of ${stats.maxSports} (Min: ${stats.minSports})`}
                                       >
-                                        ⚽ {effectiveSports} / {maxSportsLimit ?? maxLimit} sports prog
+                                        ⚽ {stats.sportsCount}/{stats.maxSports} Sports
                                       </span>
+                                      {stats.isJunior && (
+                                        <span
+                                          className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
+                                            stats.songCount >= stats.maxSongs
+                                              ? 'bg-red-50 text-red-700 border-red-200'
+                                              : 'bg-pink-50 text-pink-700 border-pink-200'
+                                          }`}
+                                          title={`Junior Songs: ${stats.songCount} of ${stats.maxSongs} max (Excludes Poem & Malappattu)`}
+                                        >
+                                          🎤 {stats.songCount}/{stats.maxSongs} Songs
+                                        </span>
+                                      )}
                                       {!isIndividualProgramme && (
                                         <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-700 border border-blue-100">
                                           Group Event
@@ -1263,9 +1315,9 @@ function ProgrammeCard({
                                   <div className="text-xs text-gray-500 capitalize">
                                     {candidate.section} Section • {candidate.points} points
                                   </div>
-                                  {hasReachedMax && (
+                                  {hasReachedMax && !isSelected && (
                                     <div className="text-[11px] font-bold text-red-600 mt-1">
-                                      ⛔ Max Limit Reached ({currentMaxLimit} {categoryLabel} Progs)
+                                      ⛔ {eligibility.reason}
                                     </div>
                                   )}
                                 </div>
@@ -1597,18 +1649,18 @@ function ProgrammeCard({
                       ) : (
                         filteredCandidates.map((candidate) => {
                           const isSelected = selectedParticipants.includes(candidate.chestNumber);
-                          const otherArts = getCandidateOtherArtsCount(candidate.chestNumber);
-                          const otherSports = getCandidateOtherSportsCount(candidate.chestNumber);
-                          const otherCount = isSports ? otherSports : otherArts;
-                          const hasReachedMax = isIndividualProgramme && !isSelected && otherCount >= currentMaxLimit;
+                          const stats = getCandidateParticipationStats(
+                            candidate,
+                            participants,
+                            allProgrammes || [],
+                            festInfo
+                          );
+                          const eligibility = isIndividualProgramme && !isSelected
+                            ? checkCandidateProgrammeEligibility(candidate, programme, participants, allProgrammes || [], festInfo)
+                            : { eligible: true };
+                          const hasReachedMax = isIndividualProgramme && !isSelected && !eligibility.eligible;
                           const isRequiredLimitReached = !isSelected && selectedParticipants.length >= Number(programme.requiredParticipants);
                           const isDisabled = hasReachedMax || isRequiredLimitReached;
-
-                          const effectiveArts = otherArts + (isIndividualProgramme && !isSports && isSelected ? 1 : 0);
-                          const effectiveSports = otherSports + (isIndividualProgramme && isSports && isSelected ? 1 : 0);
-
-                          const isArtsMaxed = effectiveArts >= (maxArtsLimit ?? maxLimit);
-                          const isSportsMaxed = effectiveSports >= (maxSportsLimit ?? maxLimit);
 
                           return (
                             <div
@@ -1624,8 +1676,8 @@ function ProgrammeCard({
                               onClick={() => {
                                 if (isSelected) {
                                   handleParticipantToggle(candidate.chestNumber);
-                                } else if (hasReachedMax) {
-                                  alert(`🚫 Candidate ${candidate.name} (#${candidate.chestNumber}) has already reached the maximum participation limit of ${currentMaxLimit} individual ${categoryLabel} programme(s).`);
+                                } else if (!eligibility.eligible) {
+                                  alert(`🚫 ${candidate.name} (#${candidate.chestNumber}): ${eligibility.reason}`);
                                 } else if (!isRequiredLimitReached) {
                                   handleParticipantToggle(candidate.chestNumber);
                                 } else {
@@ -1646,28 +1698,52 @@ function ProgrammeCard({
                                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
                                       <span
                                         className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
-                                          isArtsMaxed
+                                          stats.stageCount >= stats.maxStage
                                             ? 'bg-red-50 text-red-700 border-red-200'
-                                            : effectiveArts >= (minArtsLimit ?? 1)
+                                            : stats.stageCount >= stats.minStage
                                               ? 'bg-purple-50 text-purple-700 border-purple-200'
                                               : 'bg-amber-50 text-amber-700 border-amber-200'
                                         }`}
-                                        title={`Arts: ${effectiveArts} of ${maxArtsLimit ?? maxLimit} (Min: ${minArtsLimit ?? 1})`}
+                                        title={`Stage: ${stats.stageCount} of ${stats.maxStage} (Min: ${stats.minStage})`}
                                       >
-                                        🎭 {effectiveArts} / {maxArtsLimit ?? maxLimit} arts prog
+                                        🎭 {stats.stageCount}/{stats.maxStage} Stage
                                       </span>
                                       <span
                                         className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
-                                          isSportsMaxed
+                                          stats.nonStageCount >= stats.maxNonStage
                                             ? 'bg-red-50 text-red-700 border-red-200'
-                                            : effectiveSports >= (minSportsLimit ?? 0)
+                                            : stats.nonStageCount >= stats.minNonStage
+                                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                                        }`}
+                                        title={`Non-Stage: ${stats.nonStageCount} of ${stats.maxNonStage} (Min: ${stats.minNonStage})`}
+                                      >
+                                        📝 {stats.nonStageCount}/{stats.maxNonStage} Non-Stage
+                                      </span>
+                                      <span
+                                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
+                                          stats.sportsCount >= stats.maxSports
+                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                            : stats.sportsCount >= stats.minSports
                                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                               : 'bg-amber-50 text-amber-700 border-amber-200'
                                         }`}
-                                        title={`Sports: ${effectiveSports} of ${maxSportsLimit ?? maxLimit} (Min: ${minSportsLimit ?? 0})`}
+                                        title={`Sports: ${stats.sportsCount} of ${stats.maxSports} (Min: ${stats.minSports})`}
                                       >
-                                        ⚽ {effectiveSports} / {maxSportsLimit ?? maxLimit} sports prog
+                                        ⚽ {stats.sportsCount}/{stats.maxSports} Sports
                                       </span>
+                                      {stats.isJunior && (
+                                        <span
+                                          className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
+                                            stats.songCount >= stats.maxSongs
+                                              ? 'bg-red-50 text-red-700 border-red-200'
+                                              : 'bg-pink-50 text-pink-700 border-pink-200'
+                                          }`}
+                                          title={`Junior Songs: ${stats.songCount} of ${stats.maxSongs} max (Excludes Poem & Malappattu)`}
+                                        >
+                                          🎤 {stats.songCount}/{stats.maxSongs} Songs
+                                        </span>
+                                      )}
                                       {!isIndividualProgramme && (
                                         <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-700 border border-blue-100">
                                           Group Event
@@ -1686,9 +1762,9 @@ function ProgrammeCard({
                                   <div className="text-xs text-gray-500 capitalize">
                                     {candidate.section} Section • {candidate.points} points
                                   </div>
-                                  {hasReachedMax && (
+                                  {hasReachedMax && !isSelected && (
                                     <div className="text-[11px] font-bold text-red-600 mt-1">
-                                      ⛔ Max Limit Reached ({currentMaxLimit} {categoryLabel} Progs)
+                                      ⛔ {eligibility.reason}
                                     </div>
                                   )}
                                 </div>

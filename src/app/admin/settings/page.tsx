@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
-import { FestivalInfo } from "@/types";
+import { FestivalInfo, SectionLimits } from "@/types";
+import { DEFAULT_SECTION_LIMITS } from "@/lib/participationRules";
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -21,9 +22,11 @@ export default function SettingsPage() {
     maxCandidateParticipation: 3,
     minCandidateArtsParticipation: 1,
     maxCandidateArtsParticipation: 3,
-    minCandidateSportsParticipation: 0,
-    maxCandidateSportsParticipation: 3,
+    minCandidateSportsParticipation: 1,
+    maxCandidateSportsParticipation: 4,
   });
+
+  const [sectionLimits, setSectionLimits] = useState<SectionLimits>(DEFAULT_SECTION_LIMITS);
 
   useEffect(() => {
     async function loadFestivalInfo() {
@@ -38,13 +41,61 @@ export default function SettingsPage() {
             endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '2025-03-16',
             venue: data.venue || 'Wattaqa School Campus',
             description: data.description || '',
-            minCandidateParticipation: data.minCandidateParticipation ?? 1,
-            maxCandidateParticipation: data.maxCandidateParticipation ?? 3,
-            minCandidateArtsParticipation: data.minCandidateArtsParticipation ?? data.minCandidateParticipation ?? 1,
-            maxCandidateArtsParticipation: data.maxCandidateArtsParticipation ?? data.maxCandidateParticipation ?? 3,
-            minCandidateSportsParticipation: data.minCandidateSportsParticipation ?? 0,
-            maxCandidateSportsParticipation: data.maxCandidateSportsParticipation ?? data.maxCandidateParticipation ?? 3,
+            minCandidateParticipation: data.minCandidateParticipation ?? 2,
+            maxCandidateParticipation: data.maxCandidateParticipation ?? 7,
+            minCandidateArtsParticipation: data.minCandidateArtsParticipation ?? 2,
+            maxCandidateArtsParticipation: data.maxCandidateArtsParticipation ?? 7,
+            minCandidateSportsParticipation: data.minCandidateSportsParticipation ?? 1,
+            maxCandidateSportsParticipation: data.maxCandidateSportsParticipation ?? 4,
           });
+
+          if (data.sectionLimits) {
+            setSectionLimits({
+              senior: {
+                artsStage: {
+                  min: data.sectionLimits.senior?.artsStage?.min ?? DEFAULT_SECTION_LIMITS.senior.artsStage.min,
+                  max: data.sectionLimits.senior?.artsStage?.max ?? DEFAULT_SECTION_LIMITS.senior.artsStage.max
+                },
+                artsNonStage: {
+                  min: data.sectionLimits.senior?.artsNonStage?.min ?? DEFAULT_SECTION_LIMITS.senior.artsNonStage.min,
+                  max: data.sectionLimits.senior?.artsNonStage?.max ?? DEFAULT_SECTION_LIMITS.senior.artsNonStage.max
+                },
+                sports: {
+                  min: data.sectionLimits.senior?.sports?.min ?? DEFAULT_SECTION_LIMITS.senior.sports.min,
+                  max: data.sectionLimits.senior?.sports?.max ?? DEFAULT_SECTION_LIMITS.senior.sports.max
+                }
+              },
+              junior: {
+                artsStage: {
+                  min: data.sectionLimits.junior?.artsStage?.min ?? DEFAULT_SECTION_LIMITS.junior.artsStage.min,
+                  max: data.sectionLimits.junior?.artsStage?.max ?? DEFAULT_SECTION_LIMITS.junior.artsStage.max
+                },
+                artsNonStage: {
+                  min: data.sectionLimits.junior?.artsNonStage?.min ?? DEFAULT_SECTION_LIMITS.junior.artsNonStage.min,
+                  max: data.sectionLimits.junior?.artsNonStage?.max ?? DEFAULT_SECTION_LIMITS.junior.artsNonStage.max
+                },
+                sports: {
+                  min: data.sectionLimits.junior?.sports?.min ?? DEFAULT_SECTION_LIMITS.junior.sports.min,
+                  max: data.sectionLimits.junior?.sports?.max ?? DEFAULT_SECTION_LIMITS.junior.sports.max
+                },
+                maxSongs: data.sectionLimits.junior?.maxSongs ?? DEFAULT_SECTION_LIMITS.junior.maxSongs ?? 4
+              },
+              'sub-junior': {
+                artsStage: {
+                  min: data.sectionLimits['sub-junior']?.artsStage?.min ?? DEFAULT_SECTION_LIMITS['sub-junior'].artsStage.min,
+                  max: data.sectionLimits['sub-junior']?.artsStage?.max ?? DEFAULT_SECTION_LIMITS['sub-junior'].artsStage.max
+                },
+                artsNonStage: {
+                  min: data.sectionLimits['sub-junior']?.artsNonStage?.min ?? DEFAULT_SECTION_LIMITS['sub-junior'].artsNonStage.min,
+                  max: data.sectionLimits['sub-junior']?.artsNonStage?.max ?? DEFAULT_SECTION_LIMITS['sub-junior'].artsNonStage.max
+                },
+                sports: {
+                  min: data.sectionLimits['sub-junior']?.sports?.min ?? DEFAULT_SECTION_LIMITS['sub-junior'].sports.min,
+                  max: data.sectionLimits['sub-junior']?.sports?.max ?? DEFAULT_SECTION_LIMITS['sub-junior'].sports.max
+                }
+              }
+            });
+          }
         }
       } catch (err) {
         console.error('Error fetching festival info:', err);
@@ -57,21 +108,23 @@ export default function SettingsPage() {
 
   const handleFestivalSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.minCandidateArtsParticipation < 0) {
-      alert('Minimum Arts participation cannot be negative.');
-      return;
-    }
-    if (formData.maxCandidateArtsParticipation < formData.minCandidateArtsParticipation) {
-      alert('Maximum Arts participation cannot be less than minimum Arts participation.');
-      return;
-    }
-    if (formData.minCandidateSportsParticipation < 0) {
-      alert('Minimum Sports participation cannot be negative.');
-      return;
-    }
-    if (formData.maxCandidateSportsParticipation < formData.minCandidateSportsParticipation) {
-      alert('Maximum Sports participation cannot be less than minimum Sports participation.');
-      return;
+
+    // Validate section limits
+    const sections: ('senior' | 'junior' | 'sub-junior')[] = ['senior', 'junior', 'sub-junior'];
+    for (const sec of sections) {
+      const cfg = sectionLimits[sec];
+      if (cfg.artsStage.max < cfg.artsStage.min) {
+        alert(`${sec.toUpperCase()}: Maximum Arts Stage cannot be less than minimum.`);
+        return;
+      }
+      if (cfg.artsNonStage.max < cfg.artsNonStage.min) {
+        alert(`${sec.toUpperCase()}: Maximum Arts Non-Stage cannot be less than minimum.`);
+        return;
+      }
+      if (cfg.sports.max < cfg.sports.min) {
+        alert(`${sec.toUpperCase()}: Maximum Sports cannot be less than minimum.`);
+        return;
+      }
     }
 
     setSavingFestival(true);
@@ -79,9 +132,13 @@ export default function SettingsPage() {
     try {
       const payload = {
         ...formData,
-        // Keep overall min/max synced for backward compatibility
-        minCandidateParticipation: formData.minCandidateArtsParticipation,
-        maxCandidateParticipation: formData.maxCandidateArtsParticipation,
+        sectionLimits,
+        minCandidateArtsParticipation: sectionLimits.senior.artsStage.min,
+        maxCandidateArtsParticipation: sectionLimits.senior.artsStage.max,
+        minCandidateSportsParticipation: sectionLimits.senior.sports.min,
+        maxCandidateSportsParticipation: sectionLimits.senior.sports.max,
+        minCandidateParticipation: sectionLimits.senior.artsStage.min,
+        maxCandidateParticipation: sectionLimits.senior.artsStage.max,
       };
 
       const res = await fetch('/api/festival-info', {
@@ -91,7 +148,7 @@ export default function SettingsPage() {
       });
 
       if (res.ok) {
-        setSaveSuccess('Festival settings & participation rules saved successfully!');
+        setSaveSuccess('Festival settings & section-specific participation rules saved successfully!');
         setTimeout(() => setSaveSuccess(null), 4000);
       } else {
         alert('Failed to save festival settings.');
@@ -119,156 +176,527 @@ export default function SettingsPage() {
       )}
 
       <div className="space-y-6">
-        {/* Candidate Participation Rules */}
-        <ShowcaseSection title="Candidate Participation Rules (Arts & Sports)">
+        {/* Candidate Participation Rules by Section */}
+        <ShowcaseSection title="Candidate Participation Rules (Senior, Junior & Sub-Junior)">
           <form onSubmit={handleFestivalSave} className="space-y-6">
             <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-xl p-4">
               <h4 className="text-sm font-bold text-blue-900 mb-1 flex items-center gap-2">
-                <span>🎯</span> Category-Specific Programme Limits & Team Eligibility Engine
+                <span>🎯</span> Dynamic Section-Wise Participation Limits & Junior Song Rule
               </h4>
               <p className="text-xs text-blue-700 leading-relaxed">
-                Configure minimum and maximum <strong>individual</strong> programme limits independently for <strong>Arts</strong> and <strong>Sports</strong>.
-                Teams with any student falling below the minimum requirements will automatically be flagged as <strong>Not Eligible</strong> in the Admin Panel. Candidates are strictly blocked from registering in more individual programmes than their category maximum. (Note: Group items do not count towards individual limits).
+                Configure minimum and maximum individual programme limits for each student section (<strong>Senior</strong>, <strong>Junior</strong>, and <strong>Sub-Junior</strong>).
+                Includes the special <strong>Junior Song Participation Rule</strong> (max 4 of 7 specified song events, excluding Poem Recitation & Malappattu).
+                Limits are enforced in real-time across candidate registration modals, team submissions, and validation APIs.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Arts Participation Rules Card */}
-              <div className="p-5 bg-gradient-to-br from-purple-50/50 to-white border border-purple-200 rounded-2xl shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-purple-100 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-lg">
-                      🎭
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-purple-950">Arts Programmes</h3>
-                      <p className="text-xs text-purple-700">Individual rules for arts & cultural events</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Senior Category Card */}
+              <div className="p-5 bg-gradient-to-br from-indigo-50/60 to-white border border-indigo-200 rounded-2xl shadow-sm space-y-4 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between border-b border-indigo-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center text-lg">
+                        🎓
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-indigo-950">Senior Category</h3>
+                        <p className="text-xs text-indigo-600">Senior student event limits</p>
+                      </div>
                     </div>
                   </div>
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-purple-100 text-purple-800 rounded-full">
-                    {formData.minCandidateArtsParticipation} Min / {formData.maxCandidateArtsParticipation} Max
-                  </span>
+
+                  <div className="space-y-4 mt-4">
+                    {/* Stage Programmes */}
+                    <div className="bg-white p-3 rounded-xl border border-indigo-100">
+                      <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
+                        Stage Programmes
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Min:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={sectionLimits.senior.artsStage.min}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              senior: {
+                                ...prev.senior,
+                                artsStage: { ...prev.senior.artsStage, min: parseInt(e.target.value, 10) || 0 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Max:</span>
+                          <input
+                            type="number"
+                            min={sectionLimits.senior.artsStage.min}
+                            max="50"
+                            value={sectionLimits.senior.artsStage.max}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              senior: {
+                                ...prev.senior,
+                                artsStage: { ...prev.senior.artsStage, max: parseInt(e.target.value, 10) || 1 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Non-Stage Programmes */}
+                    <div className="bg-white p-3 rounded-xl border border-indigo-100">
+                      <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
+                        Non-Stage Programmes
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Min:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={sectionLimits.senior.artsNonStage.min}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              senior: {
+                                ...prev.senior,
+                                artsNonStage: { ...prev.senior.artsNonStage, min: parseInt(e.target.value, 10) || 0 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Max:</span>
+                          <input
+                            type="number"
+                            min={sectionLimits.senior.artsNonStage.min}
+                            max="50"
+                            value={sectionLimits.senior.artsNonStage.max}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              senior: {
+                                ...prev.senior,
+                                artsNonStage: { ...prev.senior.artsNonStage, max: parseInt(e.target.value, 10) || 1 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sports */}
+                    <div className="bg-white p-3 rounded-xl border border-indigo-100">
+                      <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
+                        Sports Events
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Min:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={sectionLimits.senior.sports.min}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              senior: {
+                                ...prev.senior,
+                                sports: { ...prev.senior.sports, min: parseInt(e.target.value, 10) || 0 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Max:</span>
+                          <input
+                            type="number"
+                            min={sectionLimits.senior.sports.min}
+                            max="50"
+                            value={sectionLimits.senior.sports.max}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              senior: {
+                                ...prev.senior,
+                                sports: { ...prev.senior.sports, max: parseInt(e.target.value, 10) || 1 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                      Minimum Arts Programmes *
-                    </label>
-                    <p className="text-xs text-gray-500 mb-2">
-                      Minimum individual arts programmes each candidate must take for team eligibility.
-                    </p>
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="number"
-                        min="0"
-                        max="50"
-                        value={formData.minCandidateArtsParticipation}
-                        onChange={(e) => setFormData(prev => ({ ...prev, minCandidateArtsParticipation: parseInt(e.target.value, 10) || 0 }))}
-                        className="w-32 px-3.5 py-2 text-base font-bold border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white text-gray-800"
-                        required
-                      />
-                      <span className="text-xs font-medium text-gray-600">Arts prog minimum</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                      Maximum Arts Programmes *
-                    </label>
-                    <p className="text-xs text-gray-500 mb-2">
-                      Maximum individual arts programmes allowed per candidate.
-                    </p>
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="number"
-                        min={formData.minCandidateArtsParticipation}
-                        max="100"
-                        value={formData.maxCandidateArtsParticipation}
-                        onChange={(e) => setFormData(prev => ({ ...prev, maxCandidateArtsParticipation: parseInt(e.target.value, 10) || 1 }))}
-                        className="w-32 px-3.5 py-2 text-base font-bold border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white text-gray-800"
-                        required
-                      />
-                      <span className="text-xs font-medium text-gray-600">Arts prog max limit</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-xs text-purple-700 bg-purple-50/80 p-2.5 rounded-lg border border-purple-100">
-                  Current: <strong>{formData.minCandidateArtsParticipation}</strong> to <strong>{formData.maxCandidateArtsParticipation}</strong> Arts individual programme(s) per student.
+                <div className="text-[11px] text-indigo-700 bg-indigo-50/80 p-2.5 rounded-lg border border-indigo-100 font-medium">
+                  Summary: Stage ({sectionLimits.senior.artsStage.min}–{sectionLimits.senior.artsStage.max}) • Non-Stage ({sectionLimits.senior.artsNonStage.min}–{sectionLimits.senior.artsNonStage.max}) • Sports ({sectionLimits.senior.sports.min}–{sectionLimits.senior.sports.max})
                 </div>
               </div>
 
-              {/* Sports Participation Rules Card */}
-              <div className="p-5 bg-gradient-to-br from-emerald-50/50 to-white border border-emerald-200 rounded-2xl shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-emerald-100 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-lg">
-                      ⚽
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-emerald-950">Sports Programmes</h3>
-                      <p className="text-xs text-emerald-700">Individual rules for sports & athletics</p>
+              {/* Junior Category Card */}
+              <div className="p-5 bg-gradient-to-br from-amber-50/60 to-white border border-amber-200 rounded-2xl shadow-sm space-y-4 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between border-b border-amber-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-lg">
+                        🥈
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-amber-950">Junior Category</h3>
+                        <p className="text-xs text-amber-700">Junior event limits & Song Rule</p>
+                      </div>
                     </div>
                   </div>
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full">
-                    {formData.minCandidateSportsParticipation} Min / {formData.maxCandidateSportsParticipation} Max
-                  </span>
+
+                  <div className="space-y-4 mt-4">
+                    {/* Stage Programmes */}
+                    <div className="bg-white p-3 rounded-xl border border-amber-100">
+                      <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
+                        Stage Programmes
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Min:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={sectionLimits.junior.artsStage.min}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              junior: {
+                                ...prev.junior,
+                                artsStage: { ...prev.junior.artsStage, min: parseInt(e.target.value, 10) || 0 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Max:</span>
+                          <input
+                            type="number"
+                            min={sectionLimits.junior.artsStage.min}
+                            max="50"
+                            value={sectionLimits.junior.artsStage.max}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              junior: {
+                                ...prev.junior,
+                                artsStage: { ...prev.junior.artsStage, max: parseInt(e.target.value, 10) || 1 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Song Special Rule */}
+                      <div className="mt-3 pt-2.5 border-t border-amber-100">
+                        <label className="block text-[11px] font-bold text-amber-900 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                          <span>🎤</span> Song Rule: Max Songs (out of 7)
+                        </label>
+                        <p className="text-[10px] text-amber-700 mb-1.5 leading-snug">
+                          A participant may take part in up to 4 out of the 7 specified Song Programmes. (Poem Recitation & Malappatt are excluded).
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            max="7"
+                            value={sectionLimits.junior.maxSongs ?? 4}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              junior: {
+                                ...prev.junior,
+                                maxSongs: parseInt(e.target.value, 10) || 4
+                              }
+                            }))}
+                            className="w-24 px-3 py-1.5 text-sm font-bold border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white text-gray-800"
+                            required
+                          />
+                          <span className="text-xs text-amber-800 font-medium">max song events</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Non-Stage Programmes */}
+                    <div className="bg-white p-3 rounded-xl border border-amber-100">
+                      <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
+                        Non-Stage Programmes
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Min:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={sectionLimits.junior.artsNonStage.min}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              junior: {
+                                ...prev.junior,
+                                artsNonStage: { ...prev.junior.artsNonStage, min: parseInt(e.target.value, 10) || 0 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Max:</span>
+                          <input
+                            type="number"
+                            min={sectionLimits.junior.artsNonStage.min}
+                            max="50"
+                            value={sectionLimits.junior.artsNonStage.max}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              junior: {
+                                ...prev.junior,
+                                artsNonStage: { ...prev.junior.artsNonStage, max: parseInt(e.target.value, 10) || 1 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sports */}
+                    <div className="bg-white p-3 rounded-xl border border-amber-100">
+                      <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
+                        Sports Events
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Min:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={sectionLimits.junior.sports.min}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              junior: {
+                                ...prev.junior,
+                                sports: { ...prev.junior.sports, min: parseInt(e.target.value, 10) || 0 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Max:</span>
+                          <input
+                            type="number"
+                            min={sectionLimits.junior.sports.min}
+                            max="50"
+                            value={sectionLimits.junior.sports.max}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              junior: {
+                                ...prev.junior,
+                                sports: { ...prev.junior.sports, max: parseInt(e.target.value, 10) || 1 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                      Minimum Sports Programmes *
-                    </label>
-                    <p className="text-xs text-gray-500 mb-2">
-                      Minimum individual sports events required per student (set 0 if sports participation is optional).
-                    </p>
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="number"
-                        min="0"
-                        max="50"
-                        value={formData.minCandidateSportsParticipation}
-                        onChange={(e) => setFormData(prev => ({ ...prev, minCandidateSportsParticipation: parseInt(e.target.value, 10) || 0 }))}
-                        className="w-32 px-3.5 py-2 text-base font-bold border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-800"
-                        required
-                      />
-                      <span className="text-xs font-medium text-gray-600">Sports prog minimum</span>
+                <div className="text-[11px] text-amber-800 bg-amber-50/80 p-2.5 rounded-lg border border-amber-100 font-medium">
+                  Summary: Stage ({sectionLimits.junior.artsStage.min}–{sectionLimits.junior.artsStage.max}) [🎤 {sectionLimits.junior.maxSongs ?? 4} Songs] • Non-Stage ({sectionLimits.junior.artsNonStage.min}–{sectionLimits.junior.artsNonStage.max}) • Sports ({sectionLimits.junior.sports.min}–{sectionLimits.junior.sports.max})
+                </div>
+              </div>
+
+              {/* Sub-Junior Category Card */}
+              <div className="p-5 bg-gradient-to-br from-emerald-50/60 to-white border border-emerald-200 rounded-2xl shadow-sm space-y-4 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between border-b border-emerald-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-lg">
+                        🥉
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-emerald-950">Sub-Junior Category</h3>
+                        <p className="text-xs text-emerald-700">Sub-Junior student event limits</p>
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                      Maximum Sports Programmes *
-                    </label>
-                    <p className="text-xs text-gray-500 mb-2">
-                      Maximum individual sports events allowed per candidate.
-                    </p>
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="number"
-                        min={formData.minCandidateSportsParticipation}
-                        max="100"
-                        value={formData.maxCandidateSportsParticipation}
-                        onChange={(e) => setFormData(prev => ({ ...prev, maxCandidateSportsParticipation: parseInt(e.target.value, 10) || 1 }))}
-                        className="w-32 px-3.5 py-2 text-base font-bold border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-800"
-                        required
-                      />
-                      <span className="text-xs font-medium text-gray-600">Sports prog max limit</span>
+                  <div className="space-y-4 mt-4">
+                    {/* Stage Programmes */}
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100">
+                      <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
+                        Stage Programmes
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Min:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={sectionLimits['sub-junior'].artsStage.min}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              'sub-junior': {
+                                ...prev['sub-junior'],
+                                artsStage: { ...prev['sub-junior'].artsStage, min: parseInt(e.target.value, 10) || 0 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Max:</span>
+                          <input
+                            type="number"
+                            min={sectionLimits['sub-junior'].artsStage.min}
+                            max="50"
+                            value={sectionLimits['sub-junior'].artsStage.max}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              'sub-junior': {
+                                ...prev['sub-junior'],
+                                artsStage: { ...prev['sub-junior'].artsStage, max: parseInt(e.target.value, 10) || 1 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Non-Stage Programmes */}
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100">
+                      <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
+                        Non-Stage Programmes
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Min:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={sectionLimits['sub-junior'].artsNonStage.min}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              'sub-junior': {
+                                ...prev['sub-junior'],
+                                artsNonStage: { ...prev['sub-junior'].artsNonStage, min: parseInt(e.target.value, 10) || 0 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Max:</span>
+                          <input
+                            type="number"
+                            min={sectionLimits['sub-junior'].artsNonStage.min}
+                            max="50"
+                            value={sectionLimits['sub-junior'].artsNonStage.max}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              'sub-junior': {
+                                ...prev['sub-junior'],
+                                artsNonStage: { ...prev['sub-junior'].artsNonStage, max: parseInt(e.target.value, 10) || 1 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sports */}
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100">
+                      <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider mb-1">
+                        Sports Events
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Min:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={sectionLimits['sub-junior'].sports.min}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              'sub-junior': {
+                                ...prev['sub-junior'],
+                                sports: { ...prev['sub-junior'].sports, min: parseInt(e.target.value, 10) || 0 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium">Max:</span>
+                          <input
+                            type="number"
+                            min={sectionLimits['sub-junior'].sports.min}
+                            max="50"
+                            value={sectionLimits['sub-junior'].sports.max}
+                            onChange={(e) => setSectionLimits(prev => ({
+                              ...prev,
+                              'sub-junior': {
+                                ...prev['sub-junior'],
+                                sports: { ...prev['sub-junior'].sports, max: parseInt(e.target.value, 10) || 1 }
+                              }
+                            }))}
+                            className="w-full mt-0.5 px-3 py-1.5 text-sm font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white text-gray-800"
+                            required
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="text-xs text-emerald-700 bg-emerald-50/80 p-2.5 rounded-lg border border-emerald-100">
-                  Current: <strong>{formData.minCandidateSportsParticipation}</strong> to <strong>{formData.maxCandidateSportsParticipation}</strong> Sports individual event(s) per student.
+                <div className="text-[11px] text-emerald-800 bg-emerald-50/80 p-2.5 rounded-lg border border-emerald-100 font-medium">
+                  Summary: Stage ({sectionLimits['sub-junior'].artsStage.min}–{sectionLimits['sub-junior'].artsStage.max}) • Non-Stage ({sectionLimits['sub-junior'].artsNonStage.min}–{sectionLimits['sub-junior'].artsNonStage.max}) • Sports ({sectionLimits['sub-junior'].sports.min}–{sectionLimits['sub-junior'].sports.max})
                 </div>
               </div>
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
               <div className="text-xs text-gray-500">
-                Rules Summary: 🎭 Arts: <strong>{formData.minCandidateArtsParticipation}–{formData.maxCandidateArtsParticipation}</strong> | ⚽ Sports: <strong>{formData.minCandidateSportsParticipation}–{formData.maxCandidateSportsParticipation}</strong>
+                Changes will be saved and immediately applied to all registration validations, team dashboards, and eligibility checking.
               </div>
               <button
                 type="submit"
@@ -278,7 +706,7 @@ export default function SettingsPage() {
                 {savingFestival ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                    <span>Saving...</span>
+                    <span>Saving Rules...</span>
                   </>
                 ) : (
                   <span>Save Participation Rules</span>
