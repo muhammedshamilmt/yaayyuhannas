@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Team, Candidate, ProgrammeParticipant, Programme, Result } from '@/types';
 import { PublicNavbar } from '@/components/Navigation/PublicNavbar';
 import { PublicFooter } from '@/components/Navigation/PublicFooter';
+import { findProgramme, getProgrammeName } from '@/lib/resultsHelper';
 
 interface TeamStats {
   totalPoints: number;
@@ -128,11 +129,12 @@ export default function TeamDetailPage() {
     
     // Points system: 1st = 5 points, 2nd = 3 points, 3rd = 1 point
     teamResults.forEach(result => {
-      const programme = programmes.find(p => p.id === result.programmeId);
-      const programmeName = programme?.name || 'Unknown Programme';
+      const programme = findProgramme(result, programmes);
+      const programmeName = getProgrammeName(result, programme);
+      const statKey = result.programmeId || result.programme || (programme?._id?.toString()) || 'unknown';
       
-      if (!programmeStats[result.programmeId]) {
-        programmeStats[result.programmeId] = {
+      if (!programmeStats[statKey]) {
+        programmeStats[statKey] = {
           name: programmeName,
           participations: 0,
           wins: 0,
@@ -197,8 +199,8 @@ export default function TeamDetailPage() {
     });
     
     teamResults.forEach(result => {
-      const programme = programmes.find(p => p.id === result.programmeId);
-      const programmeName = programme?.name || 'Unknown Programme';
+      const programme = findProgramme(result, programmes);
+      const programmeName = getProgrammeName(result, programme);
       
       // First place
       (result.firstPlace || []).forEach(p => {
@@ -255,8 +257,8 @@ export default function TeamDetailPage() {
     let cumulativePoints = 0;
     
     teamResults.forEach(result => {
-      const programme = programmes.find(p => p.id === result.programmeId);
-      const programmeName = programme?.name || 'Unknown Programme';
+      const programme = findProgramme(result, programmes);
+      const programmeName = getProgrammeName(result, programme);
       
       // Calculate points for this programme
       const firstPlaceCount = (result.firstPlace || []).filter(p => chestNumbers.includes(p.chestNumber)).length;
@@ -576,7 +578,7 @@ export default function TeamDetailPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Competition Results</h2>
             <div className="space-y-4">
               {teamResults.map(result => {
-                const programme = programmes.find(p => p.id === result.programmeId);
+                const programme = findProgramme(result, programmes);
                 const teamCandidates = getTeamCandidates();
                 const chestNumbers = teamCandidates.map(c => c.chestNumber);
                 

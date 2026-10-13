@@ -59,7 +59,11 @@ export default function SchedulePage() {
 
         // Calculate completed programmes
         const completedProgrammes = dayProgrammes.filter((prog: Programme) =>
-          (resultsData || []).some((result: Result) => result.programme.includes(prog.name))
+          (resultsData || []).some((result: Result) =>
+            result.programmeId === prog._id?.toString() ||
+            result.programmeId === prog.id ||
+            result.programme?.includes(prog.name)
+          )
         ).length;
 
         return {

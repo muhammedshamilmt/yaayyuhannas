@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Candidate, Team, Result, Programme } from '@/types';
+import { findProgramme, getProgrammeName } from '@/lib/resultsHelper';
 
 export default function ProfileDetailPage() {
   const params = useParams();
@@ -127,17 +128,15 @@ export default function ProfileDetailPage() {
     let totalPoints = 0;
     
     results.forEach(result => {
-      // Check first place
+      // Always use points stored on the result record
       if (result.firstPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-        totalPoints += result.firstPoints || 5;
+        totalPoints += result.firstPoints ?? 0;
       }
-      // Check second place
       else if (result.secondPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-        totalPoints += result.secondPoints || 3;
+        totalPoints += result.secondPoints ?? 0;
       }
-      // Check third place
       else if (result.thirdPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-        totalPoints += result.thirdPoints || 1;
+        totalPoints += result.thirdPoints ?? 0;
       }
     });
     
@@ -387,8 +386,8 @@ export default function ProfileDetailPage() {
                 {results.length > 0 ? (
                   <div className="space-y-4">
                     {results.slice(0, 5).map((result, index) => {
-                      const programme = programmes.find(p => p._id === result.programmeId || p.id === result.programmeId);
-                      const programmeName = programme?.name || 'Unknown Programme';
+                      const programme = findProgramme(result, programmes);
+                      const programmeName = getProgrammeName(result, programme);
                       
                       // Determine position and points
                       let position = 0;
@@ -396,13 +395,13 @@ export default function ProfileDetailPage() {
                       
                       if (result.firstPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
                         position = 1;
-                        points = result.firstPoints || 5;
+                        points = result.firstPoints ?? 0;
                       } else if (result.secondPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
                         position = 2;
-                        points = result.secondPoints || 3;
+                        points = result.secondPoints ?? 0;
                       } else if (result.thirdPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
                         position = 3;
-                        points = result.thirdPoints || 1;
+                        points = result.thirdPoints ?? 0;
                       }
                       
                       return (
@@ -447,8 +446,8 @@ export default function ProfileDetailPage() {
                 {results.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {results.map((result, index) => {
-                      const programme = programmes.find(p => p._id === result.programmeId || p.id === result.programmeId);
-                      const programmeName = programme?.name || 'Unknown Programme';
+                      const programme = findProgramme(result, programmes);
+                      const programmeName = getProgrammeName(result, programme);
                       const category = programme?.category || 'general';
                       
                       return (
@@ -491,8 +490,8 @@ export default function ProfileDetailPage() {
                 {results.length > 0 ? (
                   <div className="space-y-4">
                     {results.map((result, index) => {
-                      const programme = programmes.find(p => p._id === result.programmeId || p.id === result.programmeId);
-                      const programmeName = programme?.name || 'Unknown Programme';
+                      const programme = findProgramme(result, programmes);
+                      const programmeName = getProgrammeName(result, programme);
                       
                       // Determine position and points
                       let position = 0;
@@ -500,13 +499,13 @@ export default function ProfileDetailPage() {
                       
                       if (result.firstPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
                         position = 1;
-                        points = result.firstPoints || 5;
+                        points = result.firstPoints ?? 0;
                       } else if (result.secondPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
                         position = 2;
-                        points = result.secondPoints || 3;
+                        points = result.secondPoints ?? 0;
                       } else if (result.thirdPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
                         position = 3;
-                        points = result.thirdPoints || 1;
+                        points = result.thirdPoints ?? 0;
                       }
                       
                       const getPositionColor = (position: number) => {

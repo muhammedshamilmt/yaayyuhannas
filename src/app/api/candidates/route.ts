@@ -24,9 +24,13 @@ export async function GET(request: Request) {
       query.team = team;
     }
     
-    // Add festId filter
+    // Add festId filter — fall back to the active fest for public users who have no cookie
     const cookieStore = await cookies();
-    const activeFestId = cookieStore.get('activeFestId')?.value;
+    let activeFestId = cookieStore.get('activeFestId')?.value;
+    if (!activeFestId) {
+      const activeFest = await db.collection('fests').findOne({ status: 'active' });
+      if (activeFest) activeFestId = activeFest._id.toString();
+    }
     if (activeFestId) {
       query.festId = activeFestId;
     }

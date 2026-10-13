@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import { Candidate, Result, Programme, Team } from '@/types';
+import { findProgramme, getProgrammeName, getProgrammeCode } from '@/lib/resultsHelper';
 import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
@@ -97,12 +98,12 @@ export async function GET(request: Request) {
       }
       
       // Match programme
-      const programme = programmes.find(p => p._id?.toString() === result.programmeId || p.code === result.programmeId || p.code === result.programme);
+      const programme = findProgramme(result, programmes);
       
       return {
         _id: result._id?.toString(),
-        programmeName: programme ? programme.name : (result.programme || 'Unknown Programme'),
-        programmeCode: programme ? programme.code : '',
+        programmeName: getProgrammeName(result, programme),
+        programmeCode: getProgrammeCode(result, programme),
         category: programme ? programme.category : '',
         position,
         grade

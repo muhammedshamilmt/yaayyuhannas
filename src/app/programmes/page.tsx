@@ -93,13 +93,17 @@ export default function ProgrammesPage() {
     return participants.filter(p => p.programmeId === programmeId);
   };
 
-  const getProgrammeResults = (programmeName: string) => {
-    return results.filter(r => r.programme.includes(programmeName));
+  const getProgrammeResults = (programme: Programme) => {
+    return results.filter(r =>
+      r.programmeId === programme._id?.toString() ||
+      r.programmeId === programme.id ||
+      r.programme?.includes(programme.name)
+    );
   };
 
   const getProgrammeStatus = (programme: Programme) => {
     if (programme.status === 'completed' || (programme as any).isOver) return 'over';
-    const programmeResults = getProgrammeResults(programme.name);
+    const programmeResults = getProgrammeResults(programme);
     if (programmeResults.length > 0) return 'completed';
     if (programme.status === 'active') return 'active';
     return 'upcoming';

@@ -181,8 +181,8 @@ export default function ResultsPage() {
     setFormData(prev => ({ ...prev, section: section as any }));
 
     if (selectedProgramme && section) {
-      if (selectedProgramme.positionType === 'general') {
-        // For general programmes, show teams that registered
+      if (selectedProgramme.positionType === 'general' || selectedProgramme.positionType === 'group') {
+        // For general AND group programmes, assign position/mark at team level
         const programmeParticipants = participants.filter(p =>
           p.programmeId === selectedProgramme._id?.toString()
         );
@@ -201,7 +201,7 @@ export default function ResultsPage() {
         setFilteredTeams(registeredTeams);
         setFilteredParticipants([]);
       } else {
-        // For individual/group programmes, show participants
+        // For individual programmes only, show per-participant cards
         const programmeParticipants = participants.filter(p =>
           p.programmeId === selectedProgramme._id?.toString()
         );
@@ -318,6 +318,8 @@ export default function ResultsPage() {
     const submitData = {
       ...formData,
       status,
+      // Always store the real programmeId (ObjectId as string) so the public page can match correctly
+      programmeId: selectedProgramme?._id?.toString() || '',
       // Individual/group results
       firstPlace: formData.firstPlace.map(cn => ({ chestNumber: cn })),
       secondPlace: formData.secondPlace.map(cn => ({ chestNumber: cn })),
@@ -629,6 +631,11 @@ export default function ResultsPage() {
     return res?.status === 'draft';
   }).length;
 
+  const selectedPublishedCount = selectedResults.filter(id => {
+    const res = results.find(r => r._id?.toString() === id);
+    return res?.status !== 'draft';
+  }).length;
+
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
       const allFilteredIds = filteredResults
@@ -664,6 +671,45 @@ export default function ResultsPage() {
       alert('Error deleting some results');
     } finally {
       setBulkDeleting(false);
+    }
+  };
+
+  const handleBulkUnpublish = async () => {
+    const ids = selectedResults.filter(id => {
+      const res = results.find(r => r._id?.toString() === id);
+      return res?.status !== 'draft';
+    });
+
+    if (ids.length === 0) {
+      alert('Please select at least one published result to unpublish.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to move ${ids.length} result(s) back to Draft? They will be hidden from public view.`)) {
+      return;
+    }
+
+    try {
+      setBulkPublishing(true);
+      const res = await fetch('/api/results', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, status: 'draft' })
+      });
+
+      if (res.ok) {
+        await fetchData();
+        setSelectedResults(prev => prev.filter(id => !ids.includes(id)));
+        alert(`Successfully moved ${ids.length} result(s) back to Draft.`);
+      } else {
+        const error = await res.json();
+        alert(`Failed to unpublish: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error unpublishing results:', error);
+      alert('Error unpublishing results');
+    } finally {
+      setBulkPublishing(false);
     }
   };
 
@@ -892,12 +938,12 @@ export default function ResultsPage() {
               </div>
             </div>
 
-            {/* Registered Teams Display (for general programmes) */}
-            {showParticipants && selectedProgramme?.positionType === 'general' && filteredTeams.length > 0 && (
+            {/* Registered Teams Display (for group AND general programmes) */}
+            {showParticipants && (selectedProgramme?.positionType === 'general' || selectedProgramme?.positionType === 'group') && filteredTeams.length > 0 && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                   <span className="mr-2">🏆</span>
-                  Registered Teams ({filteredTeams.length})
+                  {selectedProgramme?.positionType === 'group' ? 'Registered Teams — Group Programme' : 'Registered Teams'} ({filteredTeams.length})
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredTeams.map((teamEntry, index) => {
@@ -1010,8 +1056,8 @@ export default function ResultsPage() {
               </div>
             )}
 
-            {/* Registered Participants Display (for individual/group programmes) */}
-            {showParticipants && selectedProgramme?.positionType !== 'general' && filteredParticipants.length > 0 && (
+            {/* Registered Participants Display (for individual programmes ONLY) */}
+            {showParticipants && selectedProgramme?.positionType === 'individual' && filteredParticipants.length > 0 && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                   <span className="mr-2">👥</span>
@@ -1125,7 +1171,7 @@ export default function ResultsPage() {
               </div>
             )}
 
-            {showParticipants && selectedProgramme?.positionType === 'general' && filteredTeams.length === 0 && (
+            {showParticipants && (selectedProgramme?.positionType === 'general' || selectedProgramme?.positionType === 'group') && filteredTeams.length === 0 && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
                 <div className="text-yellow-600 text-4xl mb-2">⚠️</div>
                 <h3 className="text-lg font-semibold text-yellow-800 mb-2">No Teams Found</h3>
@@ -1135,7 +1181,7 @@ export default function ResultsPage() {
               </div>
             )}
 
-            {showParticipants && selectedProgramme?.positionType !== 'general' && filteredParticipants.length === 0 && (
+            {showParticipants && selectedProgramme?.positionType === 'individual' && filteredParticipants.length === 0 && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
                 <div className="text-yellow-600 text-4xl mb-2">⚠️</div>
                 <h3 className="text-lg font-semibold text-yellow-800 mb-2">No Participants Found</h3>
@@ -1143,6 +1189,89 @@ export default function ResultsPage() {
                   No teams have registered for this programme in the selected section.
                 </p>
               </div>
+            )}
+
+            {/* Total Marks Summary */}
+            {showParticipants && (
+              (() => {
+                // Compute totals for team-based (group/general)
+                const isTeamBased = selectedProgramme?.positionType === 'general' || selectedProgramme?.positionType === 'group';
+                if (isTeamBased) {
+                  const allAssigned = [
+                    ...formData.firstPlaceTeams.map(tc => ({ teamCode: tc, label: '🥇 1st', pts: formData.firstPoints })),
+                    ...formData.secondPlaceTeams.map(tc => ({ teamCode: tc, label: '🥈 2nd', pts: formData.secondPoints })),
+                    ...formData.thirdPlaceTeams.map(tc => ({ teamCode: tc, label: '🥉 3rd', pts: formData.thirdPoints })),
+                    ...formData.participationTeamGrades.map(pg => ({ teamCode: pg.teamCode, label: `Grade ${pg.grade}`, pts: pg.points })),
+                  ];
+                  if (allAssigned.length === 0) return null;
+                  const grandTotal = allAssigned.reduce((sum, e) => sum + e.pts, 0);
+                  return (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
+                        <span>📊</span> Marks Summary
+                      </h4>
+                      <div className="space-y-1.5">
+                        {allAssigned.map((entry, i) => {
+                          const team = teams.find(t => t.code === entry.teamCode);
+                          return (
+                            <div key={i} className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-3 h-3 rounded-full inline-block shrink-0"
+                                  style={{ backgroundColor: team?.color || '#6B7280' }}
+                                />
+                                <span className="font-semibold text-gray-800">{team?.name || entry.teamCode}</span>
+                                <span className="text-gray-500">({entry.label})</span>
+                              </div>
+                              <span className="font-bold text-blue-800">+{entry.pts} pts</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-blue-200 flex justify-between items-center">
+                        <span className="text-xs font-bold text-blue-900">Total Marks Awarded</span>
+                        <span className="text-sm font-extrabold text-blue-900">{grandTotal} pts</span>
+                      </div>
+                    </div>
+                  );
+                } else {
+                  // Individual
+                  const allAssigned = [
+                    ...formData.firstPlace.map(cn => ({ chestNumber: cn, label: '🥇 1st', pts: formData.firstPoints })),
+                    ...formData.secondPlace.map(cn => ({ chestNumber: cn, label: '🥈 2nd', pts: formData.secondPoints })),
+                    ...formData.thirdPlace.map(cn => ({ chestNumber: cn, label: '🥉 3rd', pts: formData.thirdPoints })),
+                    ...formData.participationGrades.map(pg => ({ chestNumber: pg.chestNumber, label: `Grade ${pg.grade}`, pts: pg.points })),
+                  ];
+                  if (allAssigned.length === 0) return null;
+                  const grandTotal = allAssigned.reduce((sum, e) => sum + e.pts, 0);
+                  return (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-bold text-blue-900 mb-3 flex items-center gap-2">
+                        <span>📊</span> Marks Summary
+                      </h4>
+                      <div className="space-y-1.5">
+                        {allAssigned.map((entry, i) => {
+                          const candidate = candidates.find(c => c.chestNumber === entry.chestNumber);
+                          return (
+                            <div key={i} className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-gray-700">{entry.chestNumber}</span>
+                                {candidate && <span className="text-gray-600">{candidate.name}</span>}
+                                <span className="text-gray-500">({entry.label})</span>
+                              </div>
+                              <span className="font-bold text-blue-800">+{entry.pts} pts</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-blue-200 flex justify-between items-center">
+                        <span className="text-xs font-bold text-blue-900">Total Marks Awarded</span>
+                        <span className="text-sm font-extrabold text-blue-900">{grandTotal} pts</span>
+                      </div>
+                    </div>
+                  );
+                }
+              })()
             )}
 
             {/* Points Configuration */}
@@ -1319,6 +1448,32 @@ export default function ResultsPage() {
             />
 
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {/* Select All / Deselect All quick links */}
+              <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-3 py-1.5 bg-white">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allIds = filteredResults.map(r => r._id?.toString()).filter(Boolean) as string[];
+                    setSelectedResults(allIds);
+                  }}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+                >
+                  Select All ({filteredResults.length})
+                </button>
+                {selectedResults.length > 0 && (
+                  <>
+                    <span className="text-gray-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedResults([])}
+                      className="text-xs font-semibold text-gray-500 hover:text-gray-700 cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </>
+                )}
+              </div>
+
               {/* Publish Selected Drafts Button */}
               {selectedDraftCount > 0 && (
                 <button
@@ -1329,7 +1484,21 @@ export default function ResultsPage() {
                   title="Publish all selected draft results"
                 >
                   <span>🚀</span>
-                  <span>{bulkPublishing ? 'Publishing...' : `Publish Selected Drafts (${selectedDraftCount})`}</span>
+                  <span>{bulkPublishing ? 'Publishing...' : `Publish Selected (${selectedDraftCount})`}</span>
+                </button>
+              )}
+
+              {/* Unpublish Selected Published Results Button */}
+              {selectedPublishedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBulkUnpublish}
+                  disabled={bulkPublishing}
+                  className="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  title="Move selected published results back to draft"
+                >
+                  <span>📝</span>
+                  <span>{bulkPublishing ? 'Moving...' : `Unpublish Selected (${selectedPublishedCount})`}</span>
                 </button>
               )}
 
@@ -1382,6 +1551,7 @@ export default function ResultsPage() {
                     <th className="text-left py-4 px-4 font-bold text-gray-700">🥈 Second</th>
                     <th className="text-left py-4 px-4 font-bold text-gray-700">🥉 Third</th>
                     <th className="text-left py-4 px-4 font-bold text-gray-700">🎖️ Participation</th>
+                    <th className="text-left py-4 px-4 font-bold text-gray-700">📊 Total</th>
                     <th className="text-left py-4 px-4 font-bold text-gray-700">Actions</th>
                   </tr>
                 </thead>
@@ -1417,8 +1587,8 @@ export default function ResultsPage() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="text-sm">
-                          {/* Individual/Group Results */}
-                          {result.firstPlace && result.firstPlace.length > 0 && (
+                          {/* Individual Results */}
+                          {result.positionType === 'individual' && result.firstPlace && result.firstPlace.length > 0 && (
                             <div className="mb-2">
                               {result.firstPlace.map((winner, index) => (
                                 <div key={index} className="mb-1">
@@ -1428,13 +1598,24 @@ export default function ResultsPage() {
                               <p className="text-gray-500">{result.firstPoints} pts each</p>
                             </div>
                           )}
-                          {/* Team Results */}
-                          {result.firstPlaceTeams && result.firstPlaceTeams.length > 0 && (
+                          {/* Team Results (group + general) */}
+                          {(result.positionType === 'group' || result.positionType === 'general') && result.firstPlaceTeams && result.firstPlaceTeams.length > 0 && (
                             <div>
                               {result.firstPlaceTeams.map((winner, index) => (
                                 <div key={index} className="mb-1 flex items-center">
                                   <span className="inline-block w-4 h-4 rounded-full mr-2" style={{ backgroundColor: teams.find(t => t.code === winner.teamCode)?.color || '#6B7280' }}></span>
                                   <span className="font-medium text-gray-900">{winner.teamCode}</span>
+                                </div>
+                              ))}
+                              <p className="text-gray-500">{result.firstPoints} pts each</p>
+                            </div>
+                          )}
+                          {/* Fallback for legacy data */}
+                          {result.positionType !== 'individual' && (!result.firstPlaceTeams || result.firstPlaceTeams.length === 0) && result.firstPlace && result.firstPlace.length > 0 && (
+                            <div className="mb-2">
+                              {result.firstPlace.map((winner, index) => (
+                                <div key={index} className="mb-1">
+                                  <span className="font-medium text-gray-900">{winner.chestNumber}</span>
                                 </div>
                               ))}
                               <p className="text-gray-500">{result.firstPoints} pts each</p>
@@ -1447,8 +1628,8 @@ export default function ResultsPage() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="text-sm">
-                          {/* Individual/Group Results */}
-                          {result.secondPlace && result.secondPlace.length > 0 && (
+                          {/* Individual Results */}
+                          {result.positionType === 'individual' && result.secondPlace && result.secondPlace.length > 0 && (
                             <div className="mb-2">
                               {result.secondPlace.map((winner, index) => (
                                 <div key={index} className="mb-1">
@@ -1458,13 +1639,24 @@ export default function ResultsPage() {
                               <p className="text-gray-500">{result.secondPoints} pts each</p>
                             </div>
                           )}
-                          {/* Team Results */}
-                          {result.secondPlaceTeams && result.secondPlaceTeams.length > 0 && (
+                          {/* Team Results (group + general) */}
+                          {(result.positionType === 'group' || result.positionType === 'general') && result.secondPlaceTeams && result.secondPlaceTeams.length > 0 && (
                             <div>
                               {result.secondPlaceTeams.map((winner, index) => (
                                 <div key={index} className="mb-1 flex items-center">
                                   <span className="inline-block w-4 h-4 rounded-full mr-2" style={{ backgroundColor: teams.find(t => t.code === winner.teamCode)?.color || '#6B7280' }}></span>
                                   <span className="font-medium text-gray-900">{winner.teamCode}</span>
+                                </div>
+                              ))}
+                              <p className="text-gray-500">{result.secondPoints} pts each</p>
+                            </div>
+                          )}
+                          {/* Fallback for legacy data */}
+                          {result.positionType !== 'individual' && (!result.secondPlaceTeams || result.secondPlaceTeams.length === 0) && result.secondPlace && result.secondPlace.length > 0 && (
+                            <div className="mb-2">
+                              {result.secondPlace.map((winner, index) => (
+                                <div key={index} className="mb-1">
+                                  <span className="font-medium text-gray-900">{winner.chestNumber}</span>
                                 </div>
                               ))}
                               <p className="text-gray-500">{result.secondPoints} pts each</p>
@@ -1477,8 +1669,8 @@ export default function ResultsPage() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="text-sm">
-                          {/* Individual/Group Results */}
-                          {result.thirdPlace && result.thirdPlace.length > 0 && (
+                          {/* Individual Results */}
+                          {result.positionType === 'individual' && result.thirdPlace && result.thirdPlace.length > 0 && (
                             <div className="mb-2">
                               {result.thirdPlace.map((winner, index) => (
                                 <div key={index} className="mb-1">
@@ -1488,13 +1680,24 @@ export default function ResultsPage() {
                               <p className="text-gray-500">{result.thirdPoints} pts each</p>
                             </div>
                           )}
-                          {/* Team Results */}
-                          {result.thirdPlaceTeams && result.thirdPlaceTeams.length > 0 && (
+                          {/* Team Results (group + general) */}
+                          {(result.positionType === 'group' || result.positionType === 'general') && result.thirdPlaceTeams && result.thirdPlaceTeams.length > 0 && (
                             <div>
                               {result.thirdPlaceTeams.map((winner, index) => (
                                 <div key={index} className="mb-1 flex items-center">
                                   <span className="inline-block w-4 h-4 rounded-full mr-2" style={{ backgroundColor: teams.find(t => t.code === winner.teamCode)?.color || '#6B7280' }}></span>
                                   <span className="font-medium text-gray-900">{winner.teamCode}</span>
+                                </div>
+                              ))}
+                              <p className="text-gray-500">{result.thirdPoints} pts each</p>
+                            </div>
+                          )}
+                          {/* Fallback for legacy data */}
+                          {result.positionType !== 'individual' && (!result.thirdPlaceTeams || result.thirdPlaceTeams.length === 0) && result.thirdPlace && result.thirdPlace.length > 0 && (
+                            <div className="mb-2">
+                              {result.thirdPlace.map((winner, index) => (
+                                <div key={index} className="mb-1">
+                                  <span className="font-medium text-gray-900">{winner.chestNumber}</span>
                                 </div>
                               ))}
                               <p className="text-gray-500">{result.thirdPoints} pts each</p>
@@ -1508,8 +1711,7 @@ export default function ResultsPage() {
                       <td className="py-3 px-4">
                         <div className="text-sm">
                           {/* Individual/Group Participation */}
-                          {result.participationGrades && result.participationGrades.length > 0 && (
-                            <div className="mb-2">
+                          {result.participationGrades && result.participationGrades.length > 0 && (                            <div className="mb-2">
                               {result.participationGrades.map((pg, index) => (
                                 <div key={index} className="flex items-center space-x-2 mb-1">
                                   <span className="font-medium text-gray-900">{pg.chestNumber}</span>
@@ -1540,6 +1742,32 @@ export default function ResultsPage() {
                             <p className="text-gray-400">-</p>
                           )}
                         </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        {(() => {
+                          const firstCount = (result.positionType === 'individual'
+                            ? result.firstPlace?.length
+                            : result.firstPlaceTeams?.length) ?? 0;
+                          const secondCount = (result.positionType === 'individual'
+                            ? result.secondPlace?.length
+                            : result.secondPlaceTeams?.length) ?? 0;
+                          const thirdCount = (result.positionType === 'individual'
+                            ? result.thirdPlace?.length
+                            : result.thirdPlaceTeams?.length) ?? 0;
+                          const participationTotal = result.positionType === 'individual'
+                            ? (result.participationGrades || []).reduce((s, p) => s + p.points, 0)
+                            : (result.participationTeamGrades || []).reduce((s, p) => s + p.points, 0);
+                          const total =
+                            firstCount * (result.firstPoints ?? 0) +
+                            secondCount * (result.secondPoints ?? 0) +
+                            thirdCount * (result.thirdPoints ?? 0) +
+                            participationTotal;
+                          return (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-extrabold bg-blue-100 text-blue-800 border border-blue-200">
+                              {total} pts
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-2">

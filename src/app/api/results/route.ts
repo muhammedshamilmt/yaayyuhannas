@@ -16,7 +16,14 @@ export async function GET(request: Request) {
     const collection = db.collection<Result>('results');
     
     const cookieStore = await cookies();
-    const activeFestId = cookieStore.get('activeFestId')?.value;
+    let activeFestId = cookieStore.get('activeFestId')?.value;
+
+    // Public users have no cookie — fall back to the currently active fest
+    // so they always see the right data without cross-fest leakage
+    if (!activeFestId) {
+      const activeFest = await db.collection('fests').findOne({ status: 'active' });
+      if (activeFest) activeFestId = activeFest._id.toString();
+    }
     
     let query: any = {};
     if (activeFestId) {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Team, Result, Candidate, Programme } from '@/types';
+import { findProgramme } from '@/lib/resultsHelper';
 
 interface ProgrammeResult {
   programme: Programme;
@@ -87,7 +88,7 @@ export default function ResultsPage() {
   const processResultsData = (teamsData: Team[], resultsData: Result[], candidatesData: Candidate[], programmesData: Programme[]) => {
     // Process programme results
     const programmeResultsList: ProgrammeResult[] = resultsData.map(result => {
-      const programme = programmesData.find(p => p._id === result.programmeId || p.id === result.programmeId);
+      const programme = findProgramme(result, programmesData);
       if (!programme) return null;
 
       const winners = {

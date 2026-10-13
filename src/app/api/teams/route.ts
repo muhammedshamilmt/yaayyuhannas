@@ -10,7 +10,13 @@ export async function GET() {
     const collection = db.collection<Team>('teams');
     
     const cookieStore = await cookies();
-    const activeFestId = cookieStore.get('activeFestId')?.value;
+    let activeFestId = cookieStore.get('activeFestId')?.value;
+
+    // Public users have no cookie — fall back to the active fest to prevent cross-fest leakage
+    if (!activeFestId) {
+      const activeFest = await db.collection('fests').findOne({ status: 'active' });
+      if (activeFest) activeFestId = activeFest._id.toString();
+    }
     
     let query: any = {};
     if (activeFestId) {

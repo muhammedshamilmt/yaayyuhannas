@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
 import { Team, Result, Candidate, Programme } from '@/types';
+import { findProgramme, getProgrammeName } from '@/lib/resultsHelper';
 
 interface TeamRanking {
   name: string;
@@ -269,10 +270,18 @@ export default function RankingsPage() {
       };
     });
 
-    results.forEach(result => {
-      const programmeId = result.programmeId || result.programme;
-      const programme = programmes.find(p => p._id === programmeId || p.id === programmeId);
-      const programmeName = programme?.name || 'Unknown Programme';
+    const sortedResults = [...results].sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeA - timeB;
+    });
+
+    sortedResults.forEach(result => {
+      const programme = findProgramme(result, programmes);
+      const programmeName = getProgrammeName(result, programme);
+
+      // Only credit individual candidates for individual-type programmes
+      if (result.positionType !== 'individual') return;
 
       // First place
       if (result.firstPlace) {
@@ -785,7 +794,7 @@ export default function RankingsPage() {
                       <div className="border-t pt-3">
                         <p className="text-xs text-gray-500 mb-2">Recent Achievements:</p>
                         <div className="text-xs text-gray-600 max-h-16 overflow-hidden">
-                          {performer.achievements.slice(0, 3).join(', ')}
+                          {[...performer.achievements].reverse().slice(0, 3).join(', ')}
                           {performer.achievements.length > 3 && '...'}
                         </div>
                       </div>

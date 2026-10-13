@@ -275,9 +275,14 @@ export function IndividualProfile({ individual }: IndividualProfileProps) {
                             <h4 className="font-semibold text-gray-800 mb-3">Recent Achievements</h4>
                             <div className="space-y-2 max-h-64 overflow-y-auto">
                                 {individual.achievements.length > 0 ? (
-                                    individual.achievements.map((achievement, idx) => (
-                                        <div key={idx} className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                                            <p className="text-sm font-medium text-purple-800">{achievement}</p>
+                                    [...individual.achievements].reverse().map((achievement, idx) => (
+                                        <div key={idx} className={`p-3 rounded-lg border ${idx === 0 ? 'bg-purple-100 border-purple-300' : 'bg-purple-50 border-purple-200'}`}>
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-medium text-purple-800">{achievement}</p>
+                                                {idx === 0 && (
+                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-600 text-white ml-2 shrink-0">Latest</span>
+                                                )}
+                                            </div>
                                         </div>
                                     ))
                                 ) : (

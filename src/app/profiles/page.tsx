@@ -78,34 +78,30 @@ export default function ProfilesPage() {
 
   const getCandidateResults = (candidate: Candidate) => {
     return results.filter(result => {
-      // Check individual results
+      // Only individual-type programmes can credit a specific candidate
+      if (result.positionType !== 'individual') return false;
       const individualResults = [
         ...(result.firstPlace || []),
         ...(result.secondPlace || []),
         ...(result.thirdPlace || [])
       ];
-      
-      return individualResults.some(winner => 
-        winner.chestNumber === candidate.chestNumber
-      );
+      return individualResults.some(winner => winner.chestNumber === candidate.chestNumber);
     });
   };
 
   const getCandidateTotalPoints = (candidate: Candidate) => {
     let totalPoints = 0;
-    
     results.forEach(result => {
-      // Check first place
+      // Only count individual-type programmes for per-candidate points
+      if (result.positionType !== 'individual') return;
       if (result.firstPlace?.some(winner => winner.chestNumber === candidate.chestNumber)) {
-        totalPoints += result.firstPoints || 5;
+        totalPoints += result.firstPoints ?? 0;
       }
-      // Check second place
       else if (result.secondPlace?.some(winner => winner.chestNumber === candidate.chestNumber)) {
-        totalPoints += result.secondPoints || 3;
+        totalPoints += result.secondPoints ?? 0;
       }
-      // Check third place
       else if (result.thirdPlace?.some(winner => winner.chestNumber === candidate.chestNumber)) {
-        totalPoints += result.thirdPoints || 1;
+        totalPoints += result.thirdPoints ?? 0;
       }
     });
     

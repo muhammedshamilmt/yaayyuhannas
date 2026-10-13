@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Team, Candidate, Programme, Result, FestivalInfo, Schedule } from '@/types';
+import { findProgramme, getProgrammeName } from '@/lib/resultsHelper';
 
 interface DashboardStats {
   totalTeams: number;
@@ -145,7 +146,8 @@ export default function DashboardPage() {
         recentWins += (result.firstPlaceTeams?.length || 0) + (result.secondPlaceTeams?.length || 0) + (result.thirdPlaceTeams?.length || 0);
       }
 
-      // Calculate points for individual results
+      // Calculate points for individual results (individual positionType only)
+      if (result.positionType === 'individual') {
       [
         { place: result.firstPlace, points: result.firstPoints },
         { place: result.secondPlace, points: result.secondPoints },
@@ -160,21 +162,24 @@ export default function DashboardPage() {
           }
         });
       });
+      }
 
-      // Calculate points for team results
-      [
-        { teams: result.firstPlaceTeams, points: result.firstPoints },
-        { teams: result.secondPlaceTeams, points: result.secondPoints },
-        { teams: result.thirdPlaceTeams, points: result.thirdPoints }
-      ].forEach(({ teams, points }) => {
-        (teams || []).forEach(teamResult => {
-          if (teamStats[teamResult.teamCode]) {
-            teamStats[teamResult.teamCode].points += points;
-            teamStats[teamResult.teamCode].wins += 1;
-            totalPoints += points;
-          }
+      // Calculate points for team results (group/general positionType only)
+      if (result.positionType === 'group' || result.positionType === 'general') {
+        [
+          { teams: result.firstPlaceTeams, points: result.firstPoints },
+          { teams: result.secondPlaceTeams, points: result.secondPoints },
+          { teams: result.thirdPlaceTeams, points: result.thirdPoints }
+        ].forEach(({ teams, points }) => {
+          (teams || []).forEach(teamResult => {
+            if (teamStats[teamResult.teamCode]) {
+              teamStats[teamResult.teamCode].points += points;
+              teamStats[teamResult.teamCode].wins += 1;
+              totalPoints += points;
+            }
+          });
         });
-      });
+      } // end isTeamBased
     });
 
     const averagePointsPerTeam = totalTeams > 0 ? totalPoints / totalTeams : 0;
@@ -205,8 +210,8 @@ export default function DashboardPage() {
     
     // Recent results
     resultsData.slice(-10).forEach((result, index) => {
-      const programme = programmesData.find(p => p._id === result.programmeId || p.id === result.programmeId);
-      const programmeName = programme?.name || 'Unknown Programme';
+      const programme = findProgramme(result, programmesData);
+      const programmeName = getProgrammeName(result, programme);
       
       if (result.firstPlace && result.firstPlace.length > 0) {
         const candidate = candidatesData.find(c => c.chestNumber === result.firstPlace![0].chestNumber);

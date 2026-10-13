@@ -263,17 +263,18 @@ function TeamProgrammePdfContent() {
     return allCardItems.filter((item) => selectedProgIds.has(item.programmeId));
   }, [allCardItems, selectedProgIds]);
 
-  // Active items filtered for PDF & Document Preview by docCategoryFilter
+  // Active items filtered for PDF & Document Preview by docCategoryFilter AND selectedSection
   const renderedDocItems = useMemo(() => {
     const selected = allCardItems.filter((item) => selectedProgIds.has(item.programmeId));
-    if (docCategoryFilter === 'arts') {
-      return selected.filter((item) => (item.category || 'arts').toLowerCase() !== 'sports');
-    }
-    if (docCategoryFilter === 'sports') {
-      return selected.filter((item) => (item.category || '').toLowerCase() === 'sports');
-    }
-    return selected;
-  }, [allCardItems, selectedProgIds, docCategoryFilter]);
+    return selected.filter((item) => {
+      // Category filter
+      if (docCategoryFilter === 'arts' && (item.category || '').toLowerCase() === 'sports') return false;
+      if (docCategoryFilter === 'sports' && (item.category || '').toLowerCase() !== 'sports') return false;
+      // Section filter — applies in both the left-panel preview and the dedicated preview mode
+      if (selectedSection !== 'all' && item.section !== selectedSection) return false;
+      return true;
+    });
+  }, [allCardItems, selectedProgIds, docCategoryFilter, selectedSection]);
 
   // Selected counts by category
   const selectedCategoryCounts = useMemo(() => {
@@ -458,41 +459,67 @@ function TeamProgrammePdfContent() {
               </div>
             </div>
 
-            {/* Middle Category Filter in Preview Mode */}
-            <div className="flex items-center gap-1 bg-white/10 p-1 rounded-lg text-xs">
-              <button
-                type="button"
-                onClick={() => setDocCategoryFilter('all')}
-                className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
-                  docCategoryFilter === 'all'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-white/80 hover:text-white'
-                }`}
-              >
-                All ({selectedCategoryCounts.total})
-              </button>
-              <button
-                type="button"
-                onClick={() => setDocCategoryFilter('arts')}
-                className={`px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                  docCategoryFilter === 'arts'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'text-white/80 hover:text-white'
-                }`}
-              >
-                <span>🎨 Arts ({selectedCategoryCounts.arts})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDocCategoryFilter('sports')}
-                className={`px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                  docCategoryFilter === 'sports'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-white/80 hover:text-white'
-                }`}
-              >
-                <span>⚽ Sports ({selectedCategoryCounts.sports})</span>
-              </button>
+            {/* Middle: Category + Section Filters in Preview Mode */}
+            <div className="flex flex-col items-center gap-2">
+              {/* Category pills */}
+              <div className="flex items-center gap-1 bg-white/10 p-1 rounded-lg text-xs">
+                <button
+                  type="button"
+                  onClick={() => setDocCategoryFilter('all')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                    docCategoryFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-white/80 hover:text-white'
+                  }`}
+                >
+                  All ({selectedCategoryCounts.total})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocCategoryFilter('arts')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    docCategoryFilter === 'arts'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-white/80 hover:text-white'
+                  }`}
+                >
+                  <span>🎨 Arts ({selectedCategoryCounts.arts})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocCategoryFilter('sports')}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    docCategoryFilter === 'sports'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-white/80 hover:text-white'
+                  }`}
+                >
+                  <span>⚽ Sports ({selectedCategoryCounts.sports})</span>
+                </button>
+              </div>
+              {/* Section pills */}
+              <div className="flex items-center gap-1 bg-white/10 p-1 rounded-lg text-xs">
+                {[
+                  { value: 'all', label: 'All Sections' },
+                  { value: 'senior', label: 'Senior' },
+                  { value: 'junior', label: 'Junior' },
+                  { value: 'sub-junior', label: 'Sub Jr' },
+                  { value: 'general', label: 'General' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setSelectedSection(opt.value)}
+                    className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                      selectedSection === opt.value
+                        ? 'bg-blue-500 text-white shadow-xs'
+                        : 'text-white/70 hover:text-white'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-xs">

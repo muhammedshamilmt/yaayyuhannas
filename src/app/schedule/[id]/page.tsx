@@ -146,8 +146,12 @@ export default function ScheduleDetailPage({}: ScheduleDetailProps) {
     return participants.filter(p => p.programmeId === programmeId);
   };
 
-  const getProgrammeResults = (programmeName: string) => {
-    return results.filter(r => r.programme.includes(programmeName));
+  const getProgrammeResults = (prog: Programme) => {
+    return results.filter(r =>
+      r.programmeId === prog._id?.toString() ||
+      r.programmeId === prog.id ||
+      r.programme?.includes(prog.name)
+    );
   };
 
   const filteredProgrammes = programmes.filter(programme => {
@@ -161,7 +165,11 @@ export default function ScheduleDetailPage({}: ScheduleDetailProps) {
   );
 
   const completedProgrammes = programmes.filter(prog =>
-    results.some(result => result.programme.includes(prog.name))
+    results.some(result =>
+      result.programmeId === prog._id?.toString() ||
+      result.programmeId === prog.id ||
+      result.programme?.includes(prog.name)
+    )
   );
 
   if (loading) {
@@ -384,9 +392,8 @@ export default function ScheduleDetailPage({}: ScheduleDetailProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProgrammes.map((programme) => {
                   const programmeParticipants = getProgrammeParticipants(programme._id?.toString() || '');
-                  const programmeResults = getProgrammeResults(programme.name);
+                  const programmeResults = getProgrammeResults(programme);
                   const hasResults = programmeResults.length > 0;
-                  
                   return (
                     <Link
                       key={programme._id?.toString()}
@@ -528,7 +535,7 @@ export default function ScheduleDetailPage({}: ScheduleDetailProps) {
               ) : (
                 <div className="space-y-6">
                   {completedProgrammes.map((programme) => {
-                    const programmeResults = getProgrammeResults(programme.name);
+                    const programmeResults = getProgrammeResults(programme);
                     
                     return (
                       <div key={programme._id?.toString()} className="bg-white rounded-xl shadow-sm border">

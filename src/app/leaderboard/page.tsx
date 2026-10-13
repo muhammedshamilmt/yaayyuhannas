@@ -9,6 +9,7 @@ import { PerformanceMetrics } from '@/components/Leaderboard/PerformanceMetrics'
 import { LiveUpdates } from '@/components/Leaderboard/LiveUpdates';
 import { TeamProfile } from '@/components/Leaderboard/TeamProfile';
 import { IndividualProfile } from '@/components/Leaderboard/IndividualProfile';
+import { findProgramme, getProgrammeName } from '@/lib/resultsHelper';
 
 interface TeamStats {
     team: Team;
@@ -165,24 +166,33 @@ export default function DynamicLeaderboardPage() {
             };
         });
 
-        // Calculate detailed statistics from results
-        const recentResults = results.slice(-10); // Last 10 results for momentum
+        // Calculate detailed statistics from results in chronological order
+        const sortedResults = [...results].sort((a, b) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return timeA - timeB;
+        });
+        const recentResults = sortedResults.slice(-10); // Last 10 results for momentum
         let totalParticipations = 0;
 
-        results.forEach((result, index) => {
-            const programme = programmes.find(p => p._id === result.programmeId || p.id === result.programmeId);
-            const programmeName = programme?.name || 'Unknown Programme';
+        sortedResults.forEach((result, index) => {
+            const programme = findProgramme(result, programmes);
+            const programmeName = getProgrammeName(result, programme);
             const category = programme?.category || 'general';
             const resultDate = result.createdAt ? new Date(result.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
             const isRecent = recentResults.includes(result);
 
             totalParticipations++;
 
-            // Process individual results
+            const isIndividual = result.positionType === 'individual';
+            const isTeamBased = result.positionType === 'group' || result.positionType === 'general';
+
+            // Process individual placements — only for individual programmes
+            if (isIndividual) {
             [
-                { place: result.firstPlace, points: programme?.firstPoints ?? result.firstPoints, medal: 'gold' as const, position: 1 },
-                { place: result.secondPlace, points: programme?.secondPoints ?? result.secondPoints, medal: 'silver' as const, position: 2 },
-                { place: result.thirdPlace, points: programme?.thirdPoints ?? result.thirdPoints, medal: 'bronze' as const, position: 3 }
+                { place: result.firstPlace, points: result.firstPoints, medal: 'gold' as const, position: 1 },
+                { place: result.secondPlace, points: result.secondPoints, medal: 'silver' as const, position: 2 },
+                { place: result.thirdPlace, points: result.thirdPoints, medal: 'bronze' as const, position: 3 }
             ].forEach(({ place, points, medal, position }) => {
                 (place || []).forEach(participant => {
                     const candidate = candidates.find(c => c.chestNumber === participant.chestNumber);
@@ -212,13 +222,15 @@ export default function DynamicLeaderboardPage() {
                     }
                 });
             });
+            } // end isIndividual placement loop
 
-            // Process individual participation grades
+            // Process individual participation grades (only for individual programmes)
+            if (isIndividual) {
             (result.participationGrades || []).forEach(participant => {
                 const candidate = candidates.find(c => c.chestNumber === participant.chestNumber);
                 if (candidate && teamStatsMap[candidate.team]) {
                     const teamStat = teamStatsMap[candidate.team];
-                    const points = participant.points || programme?.participationPoints || result.participationPoints || 0;
+                    const points = participant.points || result.participationPoints || 0;
                     if (points > 0) {
                         teamStat.totalPoints += points;
                         
@@ -235,12 +247,14 @@ export default function DynamicLeaderboardPage() {
                     }
                 }
             });
+            } // end individual participation grades
 
-            // Process team results
+            // Process team results (group/general) — always use points stored on the result record
+            if (isTeamBased) {
             [
-                { teams: result.firstPlaceTeams, points: programme?.firstPoints ?? result.firstPoints, medal: 'gold' as const, position: 1 },
-                { teams: result.secondPlaceTeams, points: programme?.secondPoints ?? result.secondPoints, medal: 'silver' as const, position: 2 },
-                { teams: result.thirdPlaceTeams, points: programme?.thirdPoints ?? result.thirdPoints, medal: 'bronze' as const, position: 3 }
+                { teams: result.firstPlaceTeams, points: result.firstPoints, medal: 'gold' as const, position: 1 },
+                { teams: result.secondPlaceTeams, points: result.secondPoints, medal: 'silver' as const, position: 2 },
+                { teams: result.thirdPlaceTeams, points: result.thirdPoints, medal: 'bronze' as const, position: 3 }
             ].forEach(({ teams, points, medal, position }) => {
                 (teams || []).forEach(teamResult => {
                     if (teamStatsMap[teamResult.teamCode]) {
@@ -267,7 +281,7 @@ export default function DynamicLeaderboardPage() {
             (result.participationTeamGrades || []).forEach(teamResult => {
                 if (teamStatsMap[teamResult.teamCode]) {
                     const teamStat = teamStatsMap[teamResult.teamCode];
-                    const points = teamResult.points || programme?.participationPoints || result.participationPoints || 0;
+                    const points = teamResult.points || result.participationPoints || 0;
                     
                     if (points > 0) {
                         teamStat.totalPoints += points;
@@ -285,6 +299,7 @@ export default function DynamicLeaderboardPage() {
                     }
                 }
             });
+            } // end isTeamBased
         });
 
         // Calculate advanced metrics for teams
@@ -343,58 +358,64 @@ export default function DynamicLeaderboardPage() {
             }
         });
 
-        results.forEach(result => {
-            const programme = programmes.find(p => p._id === result.programmeId || p.id === result.programmeId);
-            const programmeName = programme?.name || 'Unknown Programme';
+        sortedResults.forEach(result => {
+            const programme = findProgramme(result, programmes);
+            const programmeName = getProgrammeName(result, programme);
             const category = programme?.category || 'general';
             const isRecent = recentResults.includes(result);
 
-            [
-                { place: result.firstPlace, points: programme?.firstPoints ?? result.firstPoints, medal: 'gold' as const, emoji: '🥇' },
-                { place: result.secondPlace, points: programme?.secondPoints ?? result.secondPoints, medal: 'silver' as const, emoji: '🥈' },
-                { place: result.thirdPlace, points: programme?.thirdPoints ?? result.thirdPoints, medal: 'bronze' as const, emoji: '🥉' }
-            ].forEach(({ place, points, medal, emoji }) => {
-                (place || []).forEach(participant => {
+            const isIndividual = result.positionType === 'individual';
+            const isTeamBased = result.positionType === 'group' || result.positionType === 'general';
+
+            // Only credit individual candidates for individual-type programmes
+            if (isIndividual) {
+                [
+                    { place: result.firstPlace, points: result.firstPoints, medal: 'gold' as const, emoji: '🥇' },
+                    { place: result.secondPlace, points: result.secondPoints, medal: 'silver' as const, emoji: '🥈' },
+                    { place: result.thirdPlace, points: result.thirdPoints, medal: 'bronze' as const, emoji: '🥉' }
+                ].forEach(({ place, points, medal, emoji }) => {
+                    (place || []).forEach(participant => {
+                        if (individualStatsMap[participant.chestNumber]) {
+                            const individualStat = individualStatsMap[participant.chestNumber];
+                            individualStat.totalPoints += points;
+                            individualStat.totalWins += 1;
+                            individualStat.medals[medal] += 1;
+                            individualStat.participationCount += 1;
+                            individualStat.achievements.push(`${emoji} ${programmeName}`);
+                            
+                            if (!individualStat.strongCategories.includes(category)) {
+                                individualStat.strongCategories.push(category);
+                            }
+
+                            if (isRecent) {
+                                individualStat.recentPerformance.push(points);
+                            }
+                        }
+                    });
+                });
+
+                // Participation grades — individual programmes only
+                (result.participationGrades || []).forEach(participant => {
                     if (individualStatsMap[participant.chestNumber]) {
                         const individualStat = individualStatsMap[participant.chestNumber];
-                        individualStat.totalPoints += points;
-                        individualStat.totalWins += 1;
-                        individualStat.medals[medal] += 1;
-                        individualStat.participationCount += 1;
-                        individualStat.achievements.push(`${emoji} ${programmeName}`);
+                        const points = participant.points || result.participationPoints || 0;
                         
-                        if (!individualStat.strongCategories.includes(category)) {
-                            individualStat.strongCategories.push(category);
-                        }
+                        if (points > 0) {
+                            individualStat.totalPoints += points;
+                            individualStat.participationCount += 1;
+                            individualStat.achievements.push(`🎖️ ${programmeName} (Grade ${participant.grade})`);
+                            
+                            if (!individualStat.strongCategories.includes(category)) {
+                                individualStat.strongCategories.push(category);
+                            }
 
-                        if (isRecent) {
-                            individualStat.recentPerformance.push(points);
+                            if (isRecent) {
+                                individualStat.recentPerformance.push(points);
+                            }
                         }
                     }
                 });
-            });
-
-            // Process individual participation grades
-            (result.participationGrades || []).forEach(participant => {
-                if (individualStatsMap[participant.chestNumber]) {
-                    const individualStat = individualStatsMap[participant.chestNumber];
-                    const points = participant.points || programme?.participationPoints || result.participationPoints || 0;
-                    
-                    if (points > 0) {
-                        individualStat.totalPoints += points;
-                        individualStat.participationCount += 1;
-                        individualStat.achievements.push(`🎖️ ${programmeName} (Grade ${participant.grade})`);
-                        
-                        if (!individualStat.strongCategories.includes(category)) {
-                            individualStat.strongCategories.push(category);
-                        }
-
-                        if (isRecent) {
-                            individualStat.recentPerformance.push(points);
-                        }
-                    }
-                }
-            });
+            }
         });
 
         // Calculate advanced metrics for individuals
@@ -1155,7 +1176,7 @@ const getRankBadge = (rank: number) => {
                                             <div className="mb-4">
                                                 <h4 className="text-sm font-semibold text-gray-700 mb-2">Recent Achievements</h4>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {individual.achievements.slice(0, 3).map((achievement, idx) => (
+                                                    {[...individual.achievements].reverse().slice(0, 3).map((achievement, idx) => (
                                                         <span key={idx} className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
                                                             {achievement}
                                                         </span>
