@@ -61,11 +61,11 @@ export function PublicNavbar() {
             Schedule
           </Link>
           <Link
-            href="/programmes"
-            className={`hover:text-gray-900 transition-colors ${isActive('/programmes') ? 'text-gray-900' : ''
+            href="/public-programme"
+            className={`hover:text-gray-900 transition-colors ${isActive('/public-programme') || isActive('/programmes') ? 'text-gray-900 font-semibold' : ''
               }`}
           >
-            Programmes
+            Public Programme
           </Link>
           <Link
             href="/leaderboard"
@@ -151,12 +151,12 @@ export function PublicNavbar() {
               Schedule
             </Link>
             <Link
-              href="/programmes"
+              href="/public-programme"
               onClick={() => setIsOpen(false)}
-              className={`block text-gray-500 hover:text-gray-900 transition-colors ${isActive('/programmes') ? 'text-gray-900' : ''
+              className={`block text-gray-500 hover:text-gray-900 transition-colors ${isActive('/public-programme') || isActive('/programmes') ? 'text-gray-900 font-semibold' : ''
                 }`}
             >
-              Programmes
+              Public Programme
             </Link>
             <Link
               href="/leaderboard"

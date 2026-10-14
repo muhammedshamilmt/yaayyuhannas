@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Programme } from '@/types';
 
 export interface DrawerCandidate {
@@ -34,37 +34,72 @@ export function ProgrammeCandidatesDrawer({
 }: ProgrammeCandidatesDrawerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>('all');
-  const [isVisible, setIsVisible] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
-  // Handle open / close animation timing
+  // Touch drag states for swipe-down to dismiss
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [dragOffset, setDragOffset] = useState<number>(0);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  // Lock body scroll when open
   useEffect(() => {
     if (isOpen) {
-      setIsVisible(true);
+      setIsClosing(false);
       document.body.style.overflow = 'hidden';
     } else {
-      const timer = setTimeout(() => {
-        setIsVisible(false);
-        setSearchQuery('');
-        setSelectedTeamFilter('all');
-      }, 250);
       document.body.style.overflow = '';
-      return () => clearTimeout(timer);
     }
     return () => {
       document.body.style.overflow = '';
     };
   }, [isOpen]);
 
+  // Smooth request close with exit animation
+  const handleRequestClose = useCallback(() => {
+    if (isClosing) return;
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsClosing(false);
+      onClose();
+      setSearchQuery('');
+      setSelectedTeamFilter('all');
+      setDragOffset(0);
+    }, 190);
+  }, [isClosing, onClose]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientY);
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStart === null) return;
+    const currentTouch = e.targetTouches[0].clientY;
+    const diff = currentTouch - touchStart;
+    if (diff > 0) {
+      setDragOffset(diff);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (dragOffset > 75) {
+      handleRequestClose();
+    }
+    setTouchStart(null);
+    setDragOffset(0);
+    setIsDragging(false);
+  };
+
   // Handle Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        onClose();
+        handleRequestClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, handleRequestClose]);
 
   // Unique teams participating in this programme
   const uniqueTeams = useMemo(() => {
@@ -98,7 +133,7 @@ export function ProgrammeCandidatesDrawer({
     });
   }, [candidates, searchQuery, selectedTeamFilter]);
 
-  if (!isOpen && !isVisible) return null;
+  if (!isOpen && !isClosing) return null;
 
   const getPositionBadge = (pos?: number | string) => {
     if (pos === 1 || pos === '1') {
@@ -157,32 +192,88 @@ export function ProgrammeCandidatesDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:pb-6 sm:px-4 overflow-hidden pointer-events-none">
+      <style>{`
+        @keyframes publicDrawerSlideUp {
+          0% {
+            transform: translate3d(0, 100%, 0);
+          }
+          100% {
+            transform: translate3d(0, 0, 0);
+          }
+        }
+        @keyframes publicDrawerSlideDown {
+          0% {
+            transform: translate3d(0, 0, 0);
+          }
+          100% {
+            transform: translate3d(0, 100%, 0);
+          }
+        }
+        @keyframes publicBackdropFadeIn {
+          0% {
+            opacity: 0;
+          }
+          100% {
+            opacity: 1;
+          }
+        }
+        @keyframes publicBackdropFadeOut {
+          0% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+          }
+        }
+      `}</style>
+
       {/* Dimmed Backdrop */}
       <div
-        onClick={onClose}
-        className={`fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300 ease-out ${
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+        onClick={handleRequestClose}
+        style={{
+          animation: isClosing
+            ? 'publicBackdropFadeOut 190ms cubic-bezier(0.4, 0, 1, 1) forwards'
+            : 'publicBackdropFadeIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        }}
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs pointer-events-auto cursor-pointer"
         aria-hidden="true"
       />
 
-      {/* Sheet Content (Slide from bottom on mobile, popup on desktop) */}
+      {/* Sheet Content (Immediate buttery smooth slide from bottom) */}
       <div
-        className={`relative w-full sm:max-w-xl max-h-[88vh] sm:max-h-[85vh] bg-white rounded-t-[32px] sm:rounded-3xl shadow-2xl flex flex-col z-10 transition-transform duration-300 ease-out transform ${
-          isOpen ? 'translate-y-0' : 'translate-y-full sm:translate-y-8 sm:opacity-0'
-        }`}
+        style={{
+          transform: dragOffset > 0 ? `translate3d(0, ${dragOffset}px, 0)` : undefined,
+          animation: isDragging
+            ? 'none'
+            : isClosing
+            ? 'publicDrawerSlideDown 190ms cubic-bezier(0.4, 0, 1, 1) forwards'
+            : 'publicDrawerSlideUp 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        }}
+        className="relative w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[85vh] bg-white rounded-t-[32px] sm:rounded-3xl shadow-2xl flex flex-col z-10 pointer-events-auto will-change-transform"
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawer-title"
       >
-        {/* Mobile Pull Indicator */}
-        <div className="pt-3 pb-1 flex justify-center sm:hidden shrink-0">
-          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+        {/* Pull / Drag Indicator Handle */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onClick={handleRequestClose}
+          className="pt-3 pb-1 flex justify-center cursor-pointer group shrink-0 select-none"
+          title="Drag down or click to dismiss"
+        >
+          <div className="w-12 h-1.5 bg-gray-300 group-hover:bg-gray-400 rounded-full transition-colors" />
         </div>
 
         {/* Header */}
-        <div className="px-6 pt-3 pb-4 border-b border-gray-100 shrink-0">
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className="px-6 pt-2 pb-4 border-b border-gray-100 shrink-0 select-none"
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -256,7 +347,7 @@ export function ProgrammeCandidatesDrawer({
 
             {/* Circular Close Button */}
             <button
-              onClick={onClose}
+              onClick={handleRequestClose}
               aria-label="Close drawer"
               className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-500 hover:text-gray-900 flex items-center justify-center transition-all shrink-0 cursor-pointer"
             >
