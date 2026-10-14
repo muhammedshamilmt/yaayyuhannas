@@ -6,7 +6,6 @@ import Image from "next/image";
 import { useSidebarContext } from "../sidebar/sidebar-context";
 import { MenuIcon } from "./icons";
 import { Notification } from "./notification";
-import { ThemeToggleSwitch } from "./theme-toggle";
 import { UserInfo } from "./user-info";
 
 export function Header() {
@@ -78,7 +77,6 @@ export function Header() {
 
 
 
-          <ThemeToggleSwitch />
           <Notification />
           <UserInfo />
         </div>

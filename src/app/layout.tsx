@@ -23,13 +23,21 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: PropsWithChildren) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="light" suppressHydrationWarning>
       <head>
         <script src="https://cdn.tailwindcss.com"></script>
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              try {
+                if (localStorage.getItem('theme') === 'dark') {
+                  localStorage.setItem('theme', 'light');
+                }
+                document.documentElement.classList.remove('dark');
+                document.documentElement.classList.add('light');
+              } catch (e) {}
               tailwind.config = {
+                darkMode: 'class',
                 theme: {
                   extend: {
                     fontFamily: {
