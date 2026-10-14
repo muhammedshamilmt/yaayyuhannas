@@ -1,17 +1,62 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 export function PublicNavbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [user, setUser] = useState<{ userType?: string; team?: any } | null>(null);
   const pathname = usePathname();
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('currentUser');
+      if (stored) {
+        setUser(JSON.parse(stored));
+      }
+    } catch {}
+  }, []);
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
+  };
+
+  const renderActionButton = (mobile = false) => {
+    if (user?.userType === 'admin') {
+      return (
+        <Link
+          href="/admin"
+          onClick={() => mobile && setIsOpen(false)}
+          className={`bg-indigo-600 text-white font-medium text-sm px-5 py-2 rounded-full hover:bg-indigo-700 transition shadow-sm flex items-center justify-center gap-1.5 ${mobile ? 'block text-center mt-4' : ''}`}
+        >
+          <span>⚙️</span> Admin Panel
+        </Link>
+      );
+    }
+    if (user?.userType === 'team-captain' && user.team?.code) {
+      return (
+        <Link
+          href={`/team-admin?team=${user.team.code}`}
+          onClick={() => mobile && setIsOpen(false)}
+          className={`text-white font-semibold text-sm px-5 py-2 rounded-full transition shadow-sm flex items-center justify-center gap-1.5 ${mobile ? 'block text-center mt-4' : ''}`}
+          style={{ backgroundColor: user.team.color || '#2563EB' }}
+        >
+          <span>🛡️</span> {user.team.name || user.team.code} Portal
+        </Link>
+      );
+    }
+    return (
+      <Link
+        href="/login"
+        onClick={() => mobile && setIsOpen(false)}
+        className={`bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition-colors ${mobile ? 'block text-center mt-4' : ''}`}
+      >
+        Join Festival
+      </Link>
+    );
   };
 
   return (
@@ -99,12 +144,7 @@ export function PublicNavbar() {
 
         {/* Action Button */}
         <div className="hidden md:block">
-          <Link
-            href="/login"
-            className="bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition-colors"
-          >
-            Join Festival
-          </Link>
+          {renderActionButton(false)}
         </div>
 
         {/* Mobile menu button */}
@@ -182,13 +222,7 @@ export function PublicNavbar() {
             >
               Contact
             </Link>
-            <Link
-              href="/login"
-              onClick={() => setIsOpen(false)}
-              className="block bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition-colors text-center mt-4"
-            >
-              Join Festival
-            </Link>
+            {renderActionButton(true)}
           </div>
         </div>
       )}

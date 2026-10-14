@@ -35,46 +35,130 @@ const Login = () => {
   const router = useRouter();
   const { login } = useAuth();
 
+  const processSuccessfulAuth = async (
+    email: string,
+    displayName: string,
+    avatarUrl: string,
+    authProvider: 'email' | 'google'
+  ) => {
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check team membership and user type from backend
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const targetTeamCode = urlParams?.get('team') || localStorage.getItem('selectedTeam');
+
+    const teamCheckResponse = await fetch('/api/auth/check-team', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        email: cleanEmail,
+        teamCode: targetTeamCode || undefined 
+      }),
+    });
+
+    const teamCheckResult = await teamCheckResponse.json();
+
+    if (!teamCheckResult.success) {
+      throw new Error(teamCheckResult.error || 'Failed to verify account permissions');
+    }
+
+    if (teamCheckResult.accessDisabled) {
+      toast({
+        title: 'Team Admin Access Revoked',
+        description: 'Your portal access for this team was suspended by the festival administrator.',
+        variant: 'destructive',
+      });
+    }
+
+    let userData: {
+      name: string;
+      email: string;
+      avatarUrl: string;
+      userType: 'admin' | 'team-captain' | 'user';
+      isAdmin: boolean;
+      authProvider: string;
+      team?: any;
+    };
+    let redirectPath = '/';
+    let welcomeMessage = `Signed in as ${displayName}`;
+
+    if (teamCheckResult.userType === 'admin') {
+      userData = {
+        name: displayName,
+        email: cleanEmail,
+        avatarUrl,
+        userType: 'admin',
+        isAdmin: true,
+        authProvider,
+      };
+      redirectPath = '/admin';
+      welcomeMessage += ' (Admin)';
+    } else if (teamCheckResult.userType === 'team-captain') {
+      const team = teamCheckResult.team;
+      userData = {
+        name: displayName,
+        email: cleanEmail,
+        avatarUrl,
+        userType: 'team-captain',
+        isAdmin: false,
+        team: team,
+        authProvider,
+      };
+      redirectPath = `/team-admin?team=${team.code}`;
+      welcomeMessage += ` (${team.name} Team Admin)`;
+    } else {
+      userData = {
+        name: displayName,
+        email: cleanEmail,
+        avatarUrl,
+        userType: 'user',
+        isAdmin: false,
+        authProvider,
+      };
+      welcomeMessage += ' (User)';
+    }
+
+    // Store user data in localStorage
+    localStorage.setItem('currentUser', JSON.stringify(userData));
+    if (userData.team?.code) {
+      localStorage.setItem('selectedTeam', userData.team.code);
+    } else {
+      localStorage.removeItem('selectedTeam');
+    }
+
+    // Synchronize in-memory auth state
+    try {
+      login(userData);
+    } catch (authErr) {
+      console.error('Error synchronizing auth context:', authErr);
+    }
+
+    toast({
+      title: 'Welcome!',
+      description: welcomeMessage,
+    });
+
+    // Full window navigation ensures all contexts and layouts reload with fresh auth state
+    window.location.href = redirectPath;
+  };
+
   const handleSignIn = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
 
     try {
       const formData = new FormData(event.currentTarget);
-      const data = {
-        email: formData.get('email') as string,
-        password: formData.get('password') as string,
-      };
+      const email = (formData.get('email') as string)?.trim().toLowerCase();
+      const password = formData.get('password') as string;
 
-      // For now, we'll implement a simple email/password check
-      // You can replace this with your actual authentication logic
-      if (data.email && data.password) {
-        const displayName = data.email.split('@')[0];
-        const avatarUrl = `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(displayName)}`;
-        const isAdmin = isAdminEmail(data.email);
-
-        const userData = {
-          name: displayName,
-          email: data.email,
-          avatarUrl,
-          isAdmin,
-          userType: (isAdmin ? 'admin' : 'user') as 'admin' | 'user',
-        };
-
-        try {
-          login(userData);
-        } catch (e) {
-          localStorage.setItem('currentUser', JSON.stringify(userData));
-        }
-
-        toast({
-          title: "Welcome back!",
-          description: `Hello ${displayName}`,
-        });
-
-        // Redirect based on admin status
-        window.location.href = isAdmin ? '/admin' : '/';
+      if (!email || !password) {
+        throw new Error('Please enter both email and password');
       }
+
+      const displayName = email.split('@')[0];
+      const avatarUrl = `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(displayName)}`;
+
+      await processSuccessfulAuth(email, displayName, avatarUrl, 'email');
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
@@ -89,103 +173,22 @@ const Login = () => {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    
+
     try {
       const result = await signInWithGoogle();
       const user = result.user;
-      
+
       if (!user.email) {
         throw new Error('No email found in Google account');
       }
 
       const displayName = user.displayName || user.email.split('@')[0];
       const avatarUrl = user.photoURL || `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(displayName)}`;
-      
-      // Check team membership and user type
-      const teamCheckResponse = await fetch('/api/auth/check-team', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email }),
-      });
-      
-      const teamCheckResult = await teamCheckResponse.json();
-      
-      if (!teamCheckResult.success) {
-        throw new Error('Failed to verify team membership');
-      }
 
-      let userData: {
-        name: string;
-        email: string;
-        avatarUrl: string;
-        userType: 'admin' | 'team-captain' | 'user';
-        isAdmin: boolean;
-        authProvider: string;
-        team?: any;
-      };
-      let redirectPath = '/';
-      let welcomeMessage = `Signed in as ${displayName}`;
-
-      if (teamCheckResult.userType === 'admin') {
-        userData = {
-          name: displayName,
-          email: user.email,
-          avatarUrl,
-          userType: 'admin',
-          isAdmin: true,
-          authProvider: 'google',
-        };
-        redirectPath = '/admin';
-        welcomeMessage += ' (Admin)';
-      } else if (teamCheckResult.userType === 'team-captain') {
-        const team = teamCheckResult.team;
-        userData = {
-          name: displayName,
-          email: user.email,
-          avatarUrl,
-          userType: 'team-captain',
-          isAdmin: false,
-          team: team,
-          authProvider: 'google',
-        };
-        redirectPath = `/team-admin?team=${team.code}`;
-        welcomeMessage += ` (${team.name} Admin)`;
-      } else {
-        userData = {
-          name: displayName,
-          email: user.email,
-          avatarUrl,
-          userType: 'user',
-          isAdmin: false,
-          authProvider: 'google',
-        };
-        welcomeMessage += ' (User)';
-      }
-
-      // Store user data in localStorage
-      localStorage.setItem('currentUser', JSON.stringify(userData));
-      if (userData.team?.code) {
-        localStorage.setItem('selectedTeam', userData.team.code);
-      }
-
-      // Synchronize in-memory auth state
-      try {
-        login(userData);
-      } catch (authErr) {
-        console.error('Error synchronizing auth context:', authErr);
-      }
-
-      toast({
-        title: 'Welcome!',
-        description: welcomeMessage,
-      });
-
-      // Full window navigation ensures all contexts and layouts reload with fresh auth state
-      window.location.href = redirectPath;
-
+      await processSuccessfulAuth(user.email, displayName, avatarUrl, 'google');
     } catch (error: any) {
       console.error('Google sign-in error:', error);
-      
+
       // Sign out from Firebase if there was an error
       try {
         await signOutUser();
@@ -196,7 +199,7 @@ const Login = () => {
       toast({
         title: 'Google Sign-in Failed',
         description: error.message || 'Please try again.',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);

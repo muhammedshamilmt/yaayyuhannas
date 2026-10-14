@@ -20,7 +20,7 @@ export default function PublicProgrammePage() {
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'arts' | 'sports'>('all');
   const [selectedSection, setSelectedSection] = useState<'all' | 'senior' | 'junior' | 'sub-junior' | 'general'>('all');
   const [selectedType, setSelectedType] = useState<'all' | 'individual' | 'group'>('all');
-  const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'completed' | 'upcoming'>('all');
+  const [selectedStatus, setSelectedStatus] = useState<'all' | 'registered' | 'not_registered' | 'completed'>('all');
 
   // Bottom Sheet Drawer State
   const [selectedProgramme, setSelectedProgramme] = useState<Programme | null>(null);
@@ -61,26 +61,6 @@ export default function PublicProgrammePage() {
     }
   };
 
-  // Helper: Determine Programme Status
-  const getProgrammeStatus = useCallback(
-    (programme: Programme) => {
-      if (programme.status === 'completed' || (programme as any).isOver) return 'over';
-      const hasResult = results.some((r) => {
-        const matched = findProgramme(r, programmes);
-        return (
-          (matched && matched._id?.toString() === programme._id?.toString()) ||
-          r.programmeId === programme._id?.toString() ||
-          r.programmeId === programme.id ||
-          (r.programme && programme.code && r.programme.toLowerCase().includes(programme.code.toLowerCase()))
-        );
-      });
-      if (hasResult) return 'completed';
-      if (programme.status === 'active') return 'active';
-      return 'upcoming';
-    },
-    [results, programmes]
-  );
-
   // Helper: Count participants for a programme (strictly matched by programmeId or unique programmeCode)
   const getProgrammeParticipants = useCallback(
     (programme: Programme) => {
@@ -97,26 +77,64 @@ export default function PublicProgrammePage() {
     [participants]
   );
 
-  // Helper: Resolve all Drawer Candidates for a Programme
+  // Helper: Determine Programme Status (accurately handles real registration status)
+  const getProgrammeStatus = useCallback(
+    (programme: Programme) => {
+      const parts = getProgrammeParticipants(programme);
+      const totalCands = parts.reduce((sum, p) => sum + (p.participants?.length || 0), 0);
+
+      // If no candidates registered yet
+      if (totalCands === 0) {
+        return 'not_registered';
+      }
+
+      if (programme.status === 'completed' || (programme as any).isOver) return 'over';
+
+      const progId = programme._id?.toString();
+      const progCode = programme.code?.trim().toLowerCase();
+
+      const hasResult = results.some((r) => {
+        if (progId && (r.programmeId === progId || (r as any).id === progId)) return true;
+        if (r.programme && progCode) {
+          const parts = r.programme.split(' - ');
+          const rCode = parts[0]?.trim().toLowerCase();
+          if (rCode === progCode) return true;
+        }
+        return false;
+      });
+
+      if (hasResult) return 'completed';
+      if (programme.status === 'active') return 'active';
+      return 'upcoming';
+    },
+    [results, getProgrammeParticipants]
+  );
+
+  // Helper: Resolve all Drawer Candidates strictly from REAL registrations
   const getCandidatesForProgramme = useCallback(
     (programme: Programme | null): { candidateList: DrawerCandidate[]; totalTeamsCount: number } => {
       if (!programme) return { candidateList: [], totalTeamsCount: 0 };
 
       const matchedParticipations = getProgrammeParticipants(programme);
 
-      // Find any published results for this programme to attach positions/medals
+      // Strictly match results by exact programmeId or exact code
+      const progId = programme._id?.toString();
+      const progCode = programme.code?.trim().toLowerCase();
+
       const matchingResult = results.find((r) => {
-        const matched = findProgramme(r, programmes);
-        if (matched && matched._id?.toString() === programme._id?.toString()) return true;
-        if (r.programmeId && (r.programmeId === programme._id?.toString() || r.programmeId === programme.id)) return true;
-        if (r.programme && programme.code && new RegExp(`\\b${programme.code}\\b`, 'i').test(r.programme)) return true;
+        if (progId && (r.programmeId === progId || (r as any).id === progId)) return true;
+        if (r.programme && progCode) {
+          const parts = r.programme.split(' - ');
+          const rCode = parts[0]?.trim().toLowerCase();
+          if (rCode === progCode) return true;
+        }
         return false;
       });
 
       const candidateMap = new Map<string, DrawerCandidate>();
       const teamsSet = new Set<string>();
 
-      // 1. Gather from registered programme participants
+      // 1. Gather ONLY from real registered programme participants
       matchedParticipations.forEach((part) => {
         const teamCode = part.teamCode || '';
         if (teamCode) teamsSet.add(teamCode);
@@ -157,37 +175,6 @@ export default function PublicProgrammePage() {
         });
       });
 
-      // 2. Also check if there are winners in results not recorded in participation list
-      if (matchingResult) {
-        const awardSlots: Array<{ place?: Array<{ chestNumber: string }>; pos: number }> = [
-          { place: matchingResult.firstPlace, pos: 1 },
-          { place: matchingResult.secondPlace, pos: 2 },
-          { place: matchingResult.thirdPlace, pos: 3 },
-        ];
-
-        awardSlots.forEach(({ place, pos }) => {
-          (place || []).forEach((winner) => {
-            const chest = winner.chestNumber?.trim();
-            if (chest && !candidateMap.has(chest)) {
-              const cand = candidates.find((c) => c.chestNumber === chest);
-              const team = teams.find((t) => t.code === cand?.team);
-              if (cand?.team) teamsSet.add(cand.team);
-
-              candidateMap.set(chest, {
-                chestNumber: chest,
-                name: cand?.name || `Candidate #${chest}`,
-                teamCode: cand?.team || 'IND',
-                teamName: team?.name || cand?.team || 'Unknown',
-                teamColor: team?.color || '#6366f1',
-                section: cand?.section || programme.section || '',
-                profileImage: cand?.profileImage,
-                position: pos,
-              });
-            }
-          });
-        });
-      }
-
       // Convert to array and sort
       const candidateList = Array.from(candidateMap.values()).sort((a, b) => {
         // Winners first
@@ -217,7 +204,7 @@ export default function PublicProgrammePage() {
         totalTeamsCount: teamsSet.size,
       };
     },
-    [getProgrammeParticipants, results, programmes, candidates, teams]
+    [getProgrammeParticipants, results, candidates, teams]
   );
 
   // Open drawer for a programme
@@ -261,19 +248,34 @@ export default function PublicProgrammePage() {
         if (type.toLowerCase() !== selectedType) return false;
       }
 
-      // Status filter
+      // Registration & Status filter
       if (selectedStatus !== 'all') {
         const status = getProgrammeStatus(programme);
-        if (selectedStatus === 'completed') {
+        if (selectedStatus === 'not_registered') {
+          if (status !== 'not_registered') return false;
+        } else if (selectedStatus === 'registered') {
+          if (status === 'not_registered') return false;
+        } else if (selectedStatus === 'completed') {
           if (status !== 'completed' && status !== 'over') return false;
-        } else if (status !== selectedStatus) {
-          return false;
         }
       }
 
       return true;
     });
   }, [programmes, searchTerm, selectedCategory, selectedSection, selectedType, selectedStatus, getProgrammeStatus]);
+
+  // Total counts for registered vs unregistered programmes
+  const { registeredCount, notRegisteredCount } = useMemo(() => {
+    let reg = 0;
+    let notReg = 0;
+    programmes.forEach((p) => {
+      const parts = getProgrammeParticipants(p);
+      const totalCands = parts.reduce((sum, part) => sum + (part.participants?.length || 0), 0);
+      if (totalCands > 0) reg++;
+      else notReg++;
+    });
+    return { registeredCount: reg, notRegisteredCount: notReg };
+  }, [programmes, getProgrammeParticipants]);
 
   // Resolved drawer data for selected programme
   const drawerData = useMemo(() => {
@@ -307,12 +309,14 @@ export default function PublicProgrammePage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'not_registered':
+        return { label: 'Not Registered', cls: 'bg-slate-100 text-slate-500 border-slate-300' };
       case 'over':
         return { label: 'Concluded', cls: 'bg-rose-100 text-rose-700 border-rose-200' };
       case 'completed':
         return { label: 'Completed', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
       case 'active':
-        return { label: 'Active', cls: 'bg-blue-100 text-blue-700 border-blue-200' };
+        return { label: 'Registered', cls: 'bg-blue-100 text-blue-700 border-blue-200' };
       case 'upcoming':
         return { label: 'Upcoming', cls: 'bg-gray-100 text-gray-600 border-gray-200' };
       default:
@@ -361,15 +365,18 @@ export default function PublicProgrammePage() {
           </p>
 
           {/* Stat Counter Pills */}
-          <div className="flex items-center justify-center gap-2 sm:gap-4 mt-6 flex-wrap text-xs sm:text-sm font-medium">
+          <div className="flex items-center justify-center gap-2 sm:gap-3.5 mt-6 flex-wrap text-xs sm:text-sm font-medium">
             <span className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-200">
-              🎭 <strong className="text-white">{programmes.length}</strong> Total Events
+              🎭 <strong className="text-white">{programmes.length}</strong> Events
+            </span>
+            <span className="px-3.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+              ✅ <strong className="text-white">{registeredCount}</strong> Registered
+            </span>
+            <span className="px-3.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200">
+              ⚪ <strong className="text-white">{notRegisteredCount}</strong> Not Registered
             </span>
             <span className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-200">
               👥 <strong className="text-white">{candidates.length}</strong> Candidates
-            </span>
-            <span className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-slate-200">
-              🛡️ <strong className="text-white">{teams.length}</strong> Teams
             </span>
           </div>
         </div>
@@ -409,6 +416,31 @@ export default function PublicProgrammePage() {
 
           {/* Filter Pills Controls */}
           <div className="space-y-3">
+            {/* Registration Status Filter Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider shrink-0 mr-1 hidden sm:inline">
+                Status:
+              </span>
+              {[
+                { key: 'all', label: `All Events (${programmes.length})` },
+                { key: 'registered', label: `✅ Registered (${registeredCount})` },
+                { key: 'not_registered', label: `⚪ Not Registered (${notRegisteredCount})` },
+                { key: 'completed', label: '🏆 Results Out' },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setSelectedStatus(tab.key as any)}
+                  className={`text-xs sm:text-sm px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all cursor-pointer ${
+                    selectedStatus === tab.key
+                      ? 'bg-gray-900 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
             {/* Category Filter Pills */}
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider shrink-0 mr-1 hidden sm:inline">
@@ -422,10 +454,10 @@ export default function PublicProgrammePage() {
                 <button
                   key={tab.key}
                   onClick={() => setSelectedCategory(tab.key as any)}
-                  className={`text-xs sm:text-sm px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all cursor-pointer ${
+                  className={`text-xs sm:text-sm px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all cursor-pointer border ${
                     selectedCategory === tab.key
-                      ? 'bg-gray-900 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   {tab.label}
@@ -530,6 +562,7 @@ export default function PublicProgrammePage() {
                 (sum, p) => sum + (p.participants?.length || 0),
                 0
               );
+              const isRegistered = totalCandidatesCount > 0;
               const status = getProgrammeStatus(programme);
               const statusBadge = getStatusBadge(status);
               const catBadge = getCategoryBadge(programme.category);
@@ -539,10 +572,18 @@ export default function PublicProgrammePage() {
                 <div
                   key={programme._id?.toString() || programme.code}
                   onClick={() => handleOpenDrawer(programme)}
-                  className="group bg-white rounded-2xl sm:rounded-3xl p-5 border border-slate-200 hover:border-slate-400/80 hover:shadow-lg active:scale-[0.98] transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden"
+                  className={`group rounded-2xl sm:rounded-3xl p-5 border transition-all duration-200 flex flex-col justify-between cursor-pointer relative overflow-hidden active:scale-[0.98] ${
+                    isRegistered
+                      ? 'bg-white border-slate-200 hover:border-slate-400 hover:shadow-lg'
+                      : 'bg-white/70 border-slate-200/80 hover:border-slate-300 hover:shadow-md'
+                  }`}
                 >
                   {/* Subtle hover accent bar */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-transparent group-hover:bg-gradient-to-r group-hover:from-purple-500 group-hover:to-emerald-500 transition-all" />
+                  <div className={`absolute top-0 left-0 right-0 h-1 transition-all ${
+                    isRegistered
+                      ? 'bg-transparent group-hover:bg-gradient-to-r group-hover:from-purple-500 group-hover:to-emerald-500'
+                      : 'bg-transparent group-hover:bg-slate-300'
+                  }`} />
 
                   <div>
                     {/* Top Badges Row */}
@@ -584,22 +625,37 @@ export default function PublicProgrammePage() {
 
                   {/* Bottom Action Footer with Candidate Count & View Button */}
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span className="font-semibold text-slate-700">
-                        {totalCandidatesCount}
-                      </span>
-                      <span className="text-slate-400">
-                        {totalCandidatesCount === 1 ? 'Candidate' : 'Candidates'}
-                      </span>
-                      <span className="text-slate-300">•</span>
-                      <span className="text-slate-400">
-                        {programmeParticipants.length} {programmeParticipants.length === 1 ? 'Team' : 'Teams'}
-                      </span>
-                    </div>
+                    {isRegistered ? (
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="font-semibold text-slate-800">
+                          {totalCandidatesCount}
+                        </span>
+                        <span className="text-slate-500">
+                          {totalCandidatesCount === 1 ? 'Candidate' : 'Candidates'}
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-500">
+                          {programmeParticipants.length} {programmeParticipants.length === 1 ? 'Team' : 'Teams'}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="w-2 h-2 rounded-full bg-slate-300" />
+                        <span className="font-medium text-slate-500">
+                          Not Registered
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-400">0 Candidates</span>
+                      </div>
+                    )}
 
-                    <div className="flex items-center gap-1 text-xs font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                      <span>View Candidates</span>
+                    <div className={`flex items-center gap-1 text-xs font-semibold transition-colors ${
+                      isRegistered
+                        ? 'text-gray-900 group-hover:text-blue-600'
+                        : 'text-slate-500 group-hover:text-slate-800'
+                    }`}>
+                      <span>{isRegistered ? 'View Candidates' : 'Details'}</span>
                       <svg className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                       </svg>

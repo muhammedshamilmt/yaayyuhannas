@@ -294,7 +294,11 @@ export function ProgrammeCandidatesDrawer({
                 >
                   {programme?.section}
                 </span>
-                {status === 'over' ? (
+                {status === 'not_registered' || candidates.length === 0 ? (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-300">
+                    ⚪ Not Registered
+                  </span>
+                ) : status === 'over' ? (
                   <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
                     Concluded
                   </span>
@@ -302,7 +306,11 @@ export function ProgrammeCandidatesDrawer({
                   <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
                     Results Out
                   </span>
-                ) : null}
+                ) : (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
+                    Registered
+                  </span>
+                )}
               </div>
 
               <h2
@@ -429,30 +437,41 @@ export function ProgrammeCandidatesDrawer({
 
         {/* Candidate List Body */}
         <div className="overflow-y-auto overscroll-contain flex-1 px-5 py-3 space-y-2.5 divide-y divide-gray-100">
-          {filteredCandidates.length === 0 ? (
+          {candidates.length === 0 ? (
+            <div className="py-14 px-4 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto mb-3.5 text-3xl shadow-xs">
+                📋
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-1">
+                No Candidate Registrations
+              </h3>
+              <p className="text-xs sm:text-sm text-gray-500 max-w-sm mx-auto leading-relaxed">
+                No teams have registered any candidates for <strong>{programme?.name}</strong> ({programme?.code}) yet.
+              </p>
+              <div className="mt-5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600 font-medium">
+                <span>💡 Teams can register candidates via their Team Admin portal.</span>
+              </div>
+            </div>
+          ) : filteredCandidates.length === 0 ? (
             <div className="py-12 text-center">
               <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl">
-                👥
+                🔍
               </div>
               <h3 className="text-base font-semibold text-gray-900">
-                {searchQuery || selectedTeamFilter !== 'all' ? 'No candidates match filter' : 'No registered candidates yet'}
+                No candidates match filter
               </h3>
               <p className="text-xs text-gray-500 mt-1 max-w-xs mx-auto">
-                {searchQuery || selectedTeamFilter !== 'all'
-                  ? 'Try clearing your search query or team filter.'
-                  : 'Candidates will appear here once teams complete their registrations for this programme.'}
+                Try clearing your search query or team filter.
               </p>
-              {(searchQuery || selectedTeamFilter !== 'all') && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedTeamFilter('all');
-                  }}
-                  className="mt-3 text-xs font-semibold text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                >
-                  Clear search filters
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedTeamFilter('all');
+                }}
+                className="mt-3 text-xs font-semibold text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+              >
+                Clear search filters
+              </button>
             </div>
           ) : (
             filteredCandidates.map((candidate, idx) => {

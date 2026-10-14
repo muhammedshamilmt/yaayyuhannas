@@ -14,24 +14,11 @@ import {
 } from '@/lib/participationRules';
 import TeamBreadcrumb from '@/components/TeamAdmin/TeamBreadcrumb';
 import { Eye, Printer } from 'lucide-react';
+import { getAuthorizedTeamCode } from '@/lib/teamAuth';
 
 export default function TeamProgrammesPage() {
   const searchParams = useSearchParams();
-  const getFallbackTeam = () => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('selectedTeam');
-      if (saved) return saved;
-      try {
-        const stored = localStorage.getItem('currentUser');
-        if (stored) {
-          const u = JSON.parse(stored);
-          if (u.team?.code) return u.team.code;
-        }
-      } catch (e) { }
-    }
-    return 'SMD';
-  };
-  const teamCode = searchParams.get('team') || getFallbackTeam();
+  const teamCode = getAuthorizedTeamCode(searchParams.get('team'));
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [programmes, setProgrammes] = useState<Programme[]>([]);

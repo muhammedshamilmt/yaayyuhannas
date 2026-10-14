@@ -28,6 +28,12 @@ export default function TeamsPage() {
   const [eligibilityFilter, setEligibilityFilter] = useState<'all' | 'under-min' | 'ready'>('all');
   const [eligibilitySearch, setEligibilitySearch] = useState('');
 
+  // Access & Email Grants modal state
+  const [selectedTeamForAccess, setSelectedTeamForAccess] = useState<Team | null>(null);
+  const [newAdminEmailInput, setNewAdminEmailInput] = useState('');
+  const [accessSaving, setAccessSaving] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -224,6 +230,191 @@ export default function TeamsPage() {
       ...prev,
       adminEmails: prev.adminEmails.map((email, i) => i === index ? value : email)
     }));
+  };
+
+  // Open quick access modal for a team
+  const openAccessModal = (team: Team) => {
+    setSelectedTeamForAccess(team);
+    setNewAdminEmailInput('');
+    setCopiedLink(false);
+  };
+
+  // Grant access to a new email for selected team
+  const handleGrantEmail = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!selectedTeamForAccess || !newAdminEmailInput.trim()) return;
+
+    const emailToGrant = newAdminEmailInput.trim().toLowerCase();
+    if (!emailToGrant.includes('@') || !emailToGrant.includes('.')) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+
+    const currentList = Array.isArray(selectedTeamForAccess.adminEmails)
+      ? [...selectedTeamForAccess.adminEmails]
+      : [];
+
+    const currentDisabled = Array.isArray(selectedTeamForAccess.disabledAdminEmails)
+      ? [...selectedTeamForAccess.disabledAdminEmails]
+      : [];
+
+    const isAlreadyInList = currentList.some(em => em.toLowerCase() === emailToGrant) ||
+      selectedTeamForAccess.captainEmail?.toLowerCase() === emailToGrant;
+
+    const isCurrentlyDisabled = currentDisabled.some(e => e.toLowerCase() === emailToGrant);
+
+    if (isAlreadyInList && !isCurrentlyDisabled) {
+      alert('This email already has active access.');
+      return;
+    }
+
+    if (!currentList.some(e => e.toLowerCase() === emailToGrant)) {
+      currentList.push(emailToGrant);
+    }
+
+    // Ensure it is active (remove from disabled list if it was previously revoked)
+    const updatedDisabled = currentDisabled.filter(e => e.toLowerCase() !== emailToGrant);
+
+    setAccessSaving(true);
+    try {
+      const res = await fetch(`/api/teams?id=${selectedTeamForAccess._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          adminEmails: currentList,
+          disabledAdminEmails: updatedDisabled
+        }),
+      });
+
+      if (res.ok) {
+        const updatedTeam = { 
+          ...selectedTeamForAccess, 
+          adminEmails: currentList,
+          disabledAdminEmails: updatedDisabled 
+        };
+        setSelectedTeamForAccess(updatedTeam);
+        setTeams(prev => prev.map(t => t._id === updatedTeam._id ? updatedTeam : t));
+        setNewAdminEmailInput('');
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to grant email access');
+      }
+    } catch (err) {
+      console.error('Error granting access:', err);
+      alert('Network error while granting access');
+    } finally {
+      setAccessSaving(false);
+    }
+  };
+
+  // Toggle access ON / OFF without deleting the email from the list
+  const handleToggleAccess = async (emailToToggle: string) => {
+    if (!selectedTeamForAccess) return;
+
+    const cleanEmail = emailToToggle.trim().toLowerCase();
+    const currentList = Array.isArray(selectedTeamForAccess.adminEmails)
+      ? [...selectedTeamForAccess.adminEmails]
+      : [];
+
+    if (!currentList.some(e => e.toLowerCase() === cleanEmail)) {
+      currentList.push(cleanEmail);
+    }
+
+    const currentDisabled = Array.isArray(selectedTeamForAccess.disabledAdminEmails)
+      ? [...selectedTeamForAccess.disabledAdminEmails]
+      : [];
+
+    const isCurrentlyDisabled = currentDisabled.some(e => e.toLowerCase() === cleanEmail);
+    let updatedDisabled: string[];
+
+    if (isCurrentlyDisabled) {
+      // Re-grant access: remove from disabled list
+      updatedDisabled = currentDisabled.filter(e => e.toLowerCase() !== cleanEmail);
+    } else {
+      // Take access away: add to disabled list without deleting the email!
+      updatedDisabled = Array.from(new Set([...currentDisabled, cleanEmail]));
+    }
+
+    setAccessSaving(true);
+    try {
+      const res = await fetch(`/api/teams?id=${selectedTeamForAccess._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          adminEmails: currentList,
+          disabledAdminEmails: updatedDisabled 
+        }),
+      });
+
+      if (res.ok) {
+        const updatedTeam = { 
+          ...selectedTeamForAccess, 
+          adminEmails: currentList,
+          disabledAdminEmails: updatedDisabled 
+        };
+        setSelectedTeamForAccess(updatedTeam);
+        setTeams(prev => prev.map(t => t._id === updatedTeam._id ? updatedTeam : t));
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to update access status');
+      }
+    } catch (err) {
+      console.error('Error updating access status:', err);
+      alert('Network error while updating access status');
+    } finally {
+      setAccessSaving(false);
+    }
+  };
+
+  // Delete email permanently (only if user explicitly wants to purge it)
+  const handleDeleteEmailPermanently = async (emailToDelete: string) => {
+    if (!selectedTeamForAccess) return;
+    if (!confirm(`Are you sure you want to completely delete "${emailToDelete}" from this team?`)) return;
+
+    const cleanEmail = emailToDelete.trim().toLowerCase();
+    const currentList = Array.isArray(selectedTeamForAccess.adminEmails)
+      ? selectedTeamForAccess.adminEmails.filter(em => em.toLowerCase() !== cleanEmail)
+      : [];
+
+    const updatedDisabled = Array.isArray(selectedTeamForAccess.disabledAdminEmails)
+      ? selectedTeamForAccess.disabledAdminEmails.filter(em => em.toLowerCase() !== cleanEmail)
+      : [];
+
+    const updatedCaptainEmail = selectedTeamForAccess.captainEmail?.toLowerCase() === cleanEmail
+      ? ''
+      : selectedTeamForAccess.captainEmail;
+
+    setAccessSaving(true);
+    try {
+      const res = await fetch(`/api/teams?id=${selectedTeamForAccess._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          adminEmails: currentList,
+          disabledAdminEmails: updatedDisabled,
+          captainEmail: updatedCaptainEmail 
+        }),
+      });
+
+      if (res.ok) {
+        const updatedTeam = { 
+          ...selectedTeamForAccess, 
+          adminEmails: currentList,
+          disabledAdminEmails: updatedDisabled,
+          captainEmail: updatedCaptainEmail 
+        };
+        setSelectedTeamForAccess(updatedTeam);
+        setTeams(prev => prev.map(t => t._id === updatedTeam._id ? updatedTeam : t));
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to delete email');
+      }
+    } catch (err) {
+      console.error('Error deleting email:', err);
+      alert('Network error while deleting email');
+    } finally {
+      setAccessSaving(false);
+    }
   };
 
   const addLeaderField = () => {
@@ -704,26 +895,54 @@ export default function TeamsPage() {
 
                     {/* Admin Access Emails */}
                     <div className="mb-3">
-                      <span className="text-gray-500 font-semibold uppercase text-[10px] block mb-1">
-                        Portal Admins ({((team.adminEmails && team.adminEmails.length > 0) ? team.adminEmails : (team.captainEmail ? [team.captainEmail] : [])).length})
-                      </span>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-gray-500 font-semibold uppercase text-[10px]">
+                          Portal Admins
+                        </span>
+                        {(() => {
+                          const allEmails = Array.from(new Set([
+                            ...(team.adminEmails || []),
+                            ...(team.captainEmail ? [team.captainEmail] : [])
+                          ])).filter(Boolean);
+                          const disabled = (team.disabledAdminEmails || []).map(e => e.toLowerCase());
+                          const activeCount = allEmails.filter(e => !disabled.includes(e.toLowerCase())).length;
+                          return (
+                            <span className="text-[10px] text-gray-500 font-medium">
+                              {activeCount} active / {allEmails.length} total
+                            </span>
+                          );
+                        })()}
+                      </div>
                       <div className="flex flex-wrap gap-1">
-                        {((team.adminEmails && team.adminEmails.length > 0) 
-                          ? team.adminEmails 
-                          : (team.captainEmail ? [team.captainEmail] : [])
-                        ).map((email, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100"
-                            title={email}
-                          >
-                            <span>✉️</span>
-                            <span className="truncate max-w-[140px]">{email}</span>
-                          </span>
-                        ))}
-                        {(!team.adminEmails || team.adminEmails.length === 0) && !team.captainEmail && (
-                          <span className="text-gray-400 italic text-[11px]">No login emails assigned</span>
-                        )}
+                        {(() => {
+                          const allEmails = Array.from(new Set([
+                            ...(team.adminEmails || []),
+                            ...(team.captainEmail ? [team.captainEmail] : [])
+                          ])).filter(Boolean);
+                          const disabled = (team.disabledAdminEmails || []).map(e => e.toLowerCase());
+
+                          if (allEmails.length === 0) {
+                            return <span className="text-gray-400 italic text-[11px]">No login emails assigned</span>;
+                          }
+
+                          return allEmails.map((email, idx) => {
+                            const isTaken = disabled.includes(email.toLowerCase());
+                            return (
+                              <span
+                                key={idx}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${
+                                  isTaken
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200 line-through opacity-80'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                }`}
+                                title={isTaken ? `${email} (Access Revoked / Taken Away)` : `${email} (Access Active)`}
+                              >
+                                <span>{isTaken ? '⛔' : '🟢'}</span>
+                                <span className="truncate max-w-[130px]">{email}</span>
+                              </span>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
 
@@ -749,6 +968,14 @@ export default function TeamsPage() {
                   </div>
 
                   <div>
+                    {/* Quick Access & Email Grants Button */}
+                    <button
+                      onClick={() => openAccessModal(team)}
+                      className="w-full mb-2 py-2 px-3 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 text-blue-900 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs hover:shadow-sm"
+                    >
+                      <span>🔑</span> Grant / Manage Admin Emails ({((team.adminEmails && team.adminEmails.length > 0) ? team.adminEmails : (team.captainEmail ? [team.captainEmail] : [])).length})
+                    </button>
+
                     {/* View Eligibility Details Button */}
                     <button
                       onClick={() => {
@@ -958,6 +1185,246 @@ export default function TeamsPage() {
                 className="bg-gray-800 hover:bg-gray-900 text-white px-5 py-2 rounded-lg text-xs font-bold transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Team Admin Access & Email Grants Modal ── */}
+      {selectedTeamForAccess && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setSelectedTeamForAccess(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div 
+              className="p-6 border-b flex items-center justify-between text-white"
+              style={{
+                backgroundColor: selectedTeamForAccess.color,
+              }}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black text-xl shadow-inner border border-white/30">
+                  {selectedTeamForAccess.code}
+                </div>
+                <div>
+                  <h3 className="text-xl font-black tracking-tight leading-tight">
+                    {selectedTeamForAccess.name} • Admin Access
+                  </h3>
+                  <p className="text-xs text-white/90 font-medium">
+                    Grant and restrict team portal login emails
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedTeamForAccess(null)}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-sm font-bold transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6">
+              {/* Instructions */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5 text-xs text-blue-900 space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  <span>💡</span> How Email Access Works
+                </p>
+                <p className="text-blue-700 leading-relaxed">
+                  Anyone who signs in with one of these email addresses will be recognized as a <strong>Team Admin</strong> and granted full access to the <strong>{selectedTeamForAccess.name}</strong> portal (<code className="bg-blue-100 px-1 py-0.5 rounded font-mono">/team-admin?team={selectedTeamForAccess.code}</code>).
+                </p>
+              </div>
+
+              {/* Add New Email Form */}
+              <form onSubmit={handleGrantEmail} className="space-y-2">
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Grant Access to New Email
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-sm">
+                      ✉️
+                    </span>
+                    <input
+                      type="email"
+                      value={newAdminEmailInput}
+                      onChange={(e) => setNewAdminEmailInput(e.target.value)}
+                      placeholder="e.g. captain@gmail.com"
+                      className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none transition shadow-xs"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={accessSaving || !newAdminEmailInput.trim()}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    {accessSaving ? (
+                      <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <span>+</span>
+                    )}
+                    Grant Access
+                  </button>
+                </div>
+              </form>
+
+              {/* Active Emails List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Authorized Team Admins ({
+                      Array.from(new Set([
+                        ...(selectedTeamForAccess.adminEmails || []),
+                        ...(selectedTeamForAccess.captainEmail ? [selectedTeamForAccess.captainEmail] : [])
+                      ])).length
+                    })
+                  </label>
+                </div>
+
+                <div className="space-y-2">
+                  {(() => {
+                    const allTeamEmails = Array.from(new Set([
+                      ...(selectedTeamForAccess.adminEmails || []),
+                      ...(selectedTeamForAccess.captainEmail ? [selectedTeamForAccess.captainEmail] : [])
+                    ]));
+                    const disabledSet = new Set((selectedTeamForAccess.disabledAdminEmails || []).map(e => e.toLowerCase()));
+
+                    if (allTeamEmails.length === 0) {
+                      return (
+                        <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-gray-400 text-xs">
+                          No emails registered yet. Enter an email above to grant access.
+                        </div>
+                      );
+                    }
+
+                    return allTeamEmails.map((emailVal, idx) => {
+                      const isCaptain = selectedTeamForAccess.captainEmail?.toLowerCase() === emailVal.toLowerCase();
+                      const isAccessTaken = disabledSet.has(emailVal.toLowerCase());
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-center justify-between p-3.5 rounded-xl border transition-all ${
+                            isAccessTaken
+                              ? 'bg-rose-50/40 border-rose-200'
+                              : 'bg-white border-gray-200 hover:border-gray-300 shadow-xs'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-lg">{isAccessTaken ? '⛔' : '✉️'}</span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className={`text-sm font-semibold truncate ${
+                                  isAccessTaken ? 'text-gray-500 line-through' : 'text-gray-900'
+                                }`}>
+                                  {emailVal}
+                                </p>
+                                {isCaptain && (
+                                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                                    Captain
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1">
+                                {isAccessTaken ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700">
+                                    <span>🔴</span> Access Taken Away (Revoked)
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700">
+                                    <span>🟢</span> Access Active (Granted)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 ml-3 flex-shrink-0">
+                            {/* Toggle Access Button (Keeps email intact) */}
+                            {isAccessTaken ? (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleAccess(emailVal)}
+                                disabled={accessSaving}
+                                className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+                                title="Grant team admin access back to this email"
+                              >
+                                <span>▶️</span> Grant Access
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleAccess(emailVal)}
+                                disabled={accessSaving}
+                                className="px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+                                title="Take access away (email stays saved on team)"
+                              >
+                                <span>⏸️</span> Take Access
+                              </button>
+                            )}
+
+                            {/* Optional permanent delete button */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteEmailPermanently(emailVal)}
+                              disabled={accessSaving}
+                              className="p-1.5 text-xs text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                              title="Delete email completely from team"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* Portal Login Link Generator */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 space-y-2">
+                <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider">
+                  Direct Team Portal Link
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/team-admin?team=${selectedTeamForAccess.code}`}
+                    className="flex-1 px-3 py-1.5 text-xs font-mono bg-white border border-gray-300 rounded-lg text-gray-700 select-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        navigator.clipboard.writeText(`${window.location.origin}/team-admin?team=${selectedTeamForAccess.code}`);
+                        setCopiedLink(true);
+                        setTimeout(() => setCopiedLink(false), 2000);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-xs font-medium transition shadow-xs whitespace-nowrap"
+                  >
+                    {copiedLink ? '✓ Copied!' : '📋 Copy Link'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-gray-50 border-t flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedTeamForAccess(null)}
+                className="px-5 py-2 bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold rounded-xl transition shadow-sm"
+              >
+                Done
               </button>
             </div>
           </div>

@@ -3,24 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Team } from '@/types';
+import { getAuthorizedTeamCode } from '@/lib/teamAuth';
 
 export default function TeamDetailsPage() {
   const searchParams = useSearchParams();
-  const getFallbackTeam = () => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('selectedTeam');
-      if (saved) return saved;
-      try {
-        const stored = localStorage.getItem('currentUser');
-        if (stored) {
-          const u = JSON.parse(stored);
-          if (u.team?.code) return u.team.code;
-        }
-      } catch (e) {}
-    }
-    return 'SMD';
-  };
-  const teamCode = searchParams.get('team') || getFallbackTeam();
+  const teamCode = getAuthorizedTeamCode(searchParams.get('team'));
   
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);

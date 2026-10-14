@@ -10,6 +10,7 @@ interface TeamSidebarProps {
   selectedTeam: string;
   teamData?: Team;
   onSwitchTeam?: () => void;
+  isAdmin?: boolean;
 }
 
 const getNavigation = (teamCode: string) => [
@@ -63,7 +64,7 @@ const getNavigation = (teamCode: string) => [
   }
 ];
 
-export default function TeamSidebar({ selectedTeam, teamData, onSwitchTeam }: TeamSidebarProps) {
+export default function TeamSidebar({ selectedTeam, teamData, onSwitchTeam, isAdmin = false }: TeamSidebarProps) {
   const pathname = usePathname();
   const { logout } = useAuth();
   const [showPrankOverlay, setShowPrankOverlay] = useState(false);
@@ -90,13 +91,19 @@ export default function TeamSidebar({ selectedTeam, teamData, onSwitchTeam }: Te
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowPrankOverlay(true)}
-            className="w-full px-3 py-2 text-sm bg-white hover:bg-gray-50 rounded-lg transition-colors border border-gray-200 shadow-sm font-medium text-gray-700 hover:text-gray-900"
-          >
-            Switch Team
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={onSwitchTeam}
+              className="w-full px-3 py-2 text-sm bg-white hover:bg-gray-50 rounded-lg transition-colors border border-gray-200 shadow-sm font-medium text-gray-700 hover:text-gray-900 flex items-center justify-center gap-1.5"
+            >
+              <span>🔄</span> Switch Team
+            </button>
+          ) : (
+            <div className="w-full px-3 py-1.5 text-xs bg-white/90 rounded-lg border border-gray-200 text-center font-medium text-gray-600 flex items-center justify-center gap-1.5 shadow-xs">
+              <span>🔒</span> Assigned Team ({selectedTeam})
+            </div>
+          )}
         </div>
 
       {/* Navigation */}

@@ -10,6 +10,7 @@ export interface Team {
   captain: string;
   captainEmail?: string;
   adminEmails?: string[];
+  disabledAdminEmails?: string[];
   leaders?: string[];
   members: number;
   points: number;

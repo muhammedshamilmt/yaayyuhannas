@@ -11,20 +11,23 @@ export default function TeamAdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [selectedTeam, setSelectedTeam] = useState<string>(() => {
     if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('currentUser');
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          if (user.userType === 'team-captain' && user.team?.code) {
+            return user.team.code;
+          }
+        } catch (e) {}
+      }
       const urlParams = new URLSearchParams(window.location.search);
       const teamFromUrl = urlParams.get('team');
       if (teamFromUrl) return teamFromUrl;
       const savedTeam = localStorage.getItem('selectedTeam');
       if (savedTeam) return savedTeam;
-      const storedUser = localStorage.getItem('currentUser');
-      if (storedUser) {
-        try {
-          const user = JSON.parse(storedUser);
-          if (user.team?.code) return user.team.code;
-        } catch (e) {}
-      }
     }
     return '';
   });
@@ -33,7 +36,6 @@ export default function TeamAdminLayout({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is team captain and get their team immediately
     const storedUser = localStorage.getItem('currentUser');
     const urlParams = new URLSearchParams(window.location.search);
     const teamFromUrl = urlParams.get('team');
@@ -42,17 +44,22 @@ export default function TeamAdminLayout({
     if (storedUser) {
       try {
         const user = JSON.parse(storedUser);
-        if (user.userType === 'team-captain' && user.team) {
-          const teamCode = user.team.code;
-          setSelectedTeam(teamCode);
-          localStorage.setItem('selectedTeam', teamCode);
-          // If URL doesn't have the team parameter, update URL so child pages have it
-          if (!teamFromUrl) {
+        setCurrentUser(user);
+
+        // Strict Team Admin Enforcement
+        if (user.userType === 'team-captain' && user.team?.code) {
+          const authorizedTeamCode = user.team.code;
+          setSelectedTeam(authorizedTeamCode);
+          localStorage.setItem('selectedTeam', authorizedTeamCode);
+
+          // If URL param is missing or points to another team, overwrite URL immediately
+          if (teamFromUrl !== authorizedTeamCode) {
             const newUrl = new URL(window.location.href);
-            newUrl.searchParams.set('team', teamCode);
+            newUrl.searchParams.set('team', authorizedTeamCode);
             window.history.replaceState(null, '', newUrl.toString());
           }
         } else if (user.userType === 'admin') {
+          // Superadmin can browse any team
           if (teamFromUrl) {
             setSelectedTeam(teamFromUrl);
             localStorage.setItem('selectedTeam', teamFromUrl);
@@ -71,7 +78,7 @@ export default function TeamAdminLayout({
     try {
       const response = await fetch('/api/teams');
       const data = await response.json();
-      setTeams(data);
+      setTeams(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching teams:', error);
     } finally {
@@ -80,12 +87,23 @@ export default function TeamAdminLayout({
   };
 
   const handleTeamSelect = (teamCode: string) => {
+    // Team captains are locked to their own team
+    if (currentUser?.userType === 'team-captain') {
+      const authCode = currentUser.team?.code;
+      if (authCode) {
+        setSelectedTeam(authCode);
+        localStorage.setItem('selectedTeam', authCode);
+        window.location.href = `/team-admin?team=${authCode}`;
+      }
+      return;
+    }
+
     setSelectedTeam(teamCode);
     localStorage.setItem('selectedTeam', teamCode);
-    // Redirect to dashboard with team parameter
     window.location.href = `/team-admin?team=${teamCode}`;
   };
 
+  const isMainAdmin = currentUser?.userType === 'admin';
   const selectedTeamData = teams.find(t => t.code === selectedTeam);
 
   return (
@@ -94,23 +112,23 @@ export default function TeamAdminLayout({
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading teams...</p>
+            <p className="text-gray-600 font-medium">Loading team portal...</p>
           </div>
         </div>
-      ) : !selectedTeam ? (
+      ) : !selectedTeam && isMainAdmin ? (
         <div className="min-h-screen bg-gray-50">
           <div className="max-w-7xl mx-auto p-6">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Team Admin Portal</h1>
-              <p className="text-gray-600">Select your team to access the admin dashboard</p>
+              <p className="text-gray-600">Select a team to access the admin dashboard</p>
             </div>
             
             <div className="bg-white rounded-lg shadow-lg p-8">
-              <h2 className="text-xl font-semibold mb-6 text-center">Choose Your Team</h2>
+              <h2 className="text-xl font-semibold mb-6 text-center">Choose Team to Manage</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {teams.map((team) => (
                   <button
-                    key={team._id?.toString()}
+                    key={team._id?.toString() || team.code}
                     onClick={() => handleTeamSelect(team.code)}
                     className="group p-6 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-lg transition-all duration-200 transform hover:scale-105"
                     style={{ borderColor: team.color + '40' }}
@@ -145,9 +163,12 @@ export default function TeamAdminLayout({
           <TeamSidebar 
             selectedTeam={selectedTeam} 
             teamData={selectedTeamData}
+            isAdmin={isMainAdmin}
             onSwitchTeam={() => {
-              setSelectedTeam('');
-              localStorage.removeItem('selectedTeam');
+              if (isMainAdmin) {
+                setSelectedTeam('');
+                localStorage.removeItem('selectedTeam');
+              }
             }}
           />
           <div className="w-full bg-transparent">

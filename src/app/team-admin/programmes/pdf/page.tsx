@@ -30,25 +30,11 @@ import {
   X,
 } from 'lucide-react';
 
+import { getAuthorizedTeamCode } from '@/lib/teamAuth';
+
 function TeamProgrammePdfContent() {
   const searchParams = useSearchParams();
-
-  const getFallbackTeam = () => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('selectedTeam');
-      if (saved) return saved;
-      try {
-        const stored = localStorage.getItem('currentUser');
-        if (stored) {
-          const u = JSON.parse(stored);
-          if (u.team?.code) return u.team.code;
-        }
-      } catch (e) {}
-    }
-    return 'SMD';
-  };
-
-  const teamCode = searchParams.get('team') || getFallbackTeam();
+  const teamCode = getAuthorizedTeamCode(searchParams.get('team'));
 
   const isPreviewMode = searchParams.get('mode') === 'preview';
 
