@@ -10,7 +10,7 @@ export function Hero() {
         backgroundSize: '40px 40px'
       }}>
 
-      {/* Navigation */}
+      {/* Navigation
       <nav className="flex items-center justify-between px-8 py-6 max-w-6xl mx-auto w-full">
         <div className="flex items-center space-x-2">
           <Image
@@ -36,7 +36,7 @@ export function Hero() {
         <Link href="/login" className="bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition-colors">
           Login
         </Link>
-      </nav>
+      </nav> */}
 
       {/* Hero Section - Full Screen Height */}
       <div className="flex-1 flex flex-col justify-center text-center px-8 max-w-6xl mx-auto w-full">

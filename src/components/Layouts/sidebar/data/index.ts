@@ -96,6 +96,12 @@ export const NAV_DATA = [
         items: [],
       },
       {
+        title: "Paper Generator",
+        url: "/admin/paper-generator",
+        icon: Icons.Alphabet,
+        items: [],
+      },
+      {
         title: "Settings",
         url: "/admin/settings",
         icon: Icons.Authentication,

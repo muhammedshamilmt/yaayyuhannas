@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 export function PublicNavbar() {
@@ -14,14 +15,26 @@ export function PublicNavbar() {
   };
 
   return (
-    <nav className="bg-white  border-b sticky top-0 z-50">
-      <div className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full">
+    <nav className="bg-white border-b sticky top-0 z-50">
+      <div className="flex items-center justify-between px-8 py-4 sm:py-5 max-w-7xl mx-auto w-full">
         {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center">
-            <div className="w-4 h-4 bg-white rounded-full"></div>
+        <Link href="/" className="flex items-center space-x-3 group">
+          <Image
+            src="/images/logo/logoayyuhannas.png"
+            alt="AYYU HANNAS"
+            width={44}
+            height={44}
+            className="w-10 h-10 sm:w-11 sm:h-11 object-full overflow-hidden rounded-xl shadow-sm transition-transform duration-200 group-hover:scale-105"
+            priority
+          />
+          <div className="flex flex-col">
+            <span className="font-bold text-lg sm:text-xl text-bold tracking-tight leading-none">
+              AYYU HANNAS
+            </span>
+            <span className="text-[10px] font-semibold text-gray-500 uppercase leading-none mt-1">
+              Arts Fest 2K25
+            </span>
           </div>
-          <span className="font-bold text-xl text-black">Festival 2K25</span>
         </Link>
 
         {/* Desktop Navigation */}
