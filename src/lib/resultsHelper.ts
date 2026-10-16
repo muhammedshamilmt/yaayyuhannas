@@ -134,3 +134,43 @@ export function getProgrammeCode(
 
   return '';
 }
+
+/**
+ * Safely extracts the publication timestamp of a result in milliseconds.
+ * Priority order:
+ * 1. result.publishedAt
+ * 2. result.publishedDate
+ * 3. result.updatedAt (when result was updated/published)
+ * 4. result.createdAt (when result was created)
+ * 5. MongoDB ObjectId timestamp from _id
+ */
+export function getResultPublishedTime(result: (Partial<Result> & { publishedAt?: Date | string; publishedDate?: Date | string }) | null | undefined): number {
+  if (!result) return 0;
+  if (result.publishedAt) {
+    const t = new Date(result.publishedAt).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  if (result.publishedDate) {
+    const t = new Date(result.publishedDate).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  if (result.updatedAt) {
+    const t = new Date(result.updatedAt).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  if (result.createdAt) {
+    const t = new Date(result.createdAt).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  if (result._id) {
+    const idStr = String(result._id);
+    if (/^[0-9a-fA-F]{24}$/.test(idStr)) {
+      const t = parseInt(idStr.substring(0, 8), 16) * 1000;
+      if (!isNaN(t) && t > 0) return t;
+    }
+  }
+  return 0;
+}
+
+// Backward compatibility alias
+export const getResultAddedTime = getResultPublishedTime;

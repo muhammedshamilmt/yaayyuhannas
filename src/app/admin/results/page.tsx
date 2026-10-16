@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
 import { Result, Programme, Candidate, ProgrammeParticipant } from '@/types';
@@ -19,10 +19,13 @@ export default function ResultsPage() {
 
   // Status Filter: 'all' | 'published' | 'draft'
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
+  // Section Filter for Results List: 'all' | 'senior' | 'junior' | 'sub-junior' | 'general'
+  const [resultSectionFilter, setResultSectionFilter] = useState<string>('all');
 
   // Edit Modal State
   const [editingResult, setEditingResult] = useState<Result | null>(null);
   const [editFormData, setEditFormData] = useState({
+    section: 'senior' as 'senior' | 'junior' | 'sub-junior' | 'general',
     firstPlace: [] as string[],
     secondPlace: [] as string[],
     thirdPlace: [] as string[],
@@ -513,6 +516,7 @@ export default function ResultsPage() {
   const startEdit = (result: Result) => {
     setEditingResult(result);
     setEditFormData({
+      section: (result.section || 'senior') as 'senior' | 'junior' | 'sub-junior' | 'general',
       firstPlace: (result.firstPlace || []).map(p => p.chestNumber),
       secondPlace: (result.secondPlace || []).map(p => p.chestNumber),
       thirdPlace: (result.thirdPlace || []).map(p => p.chestNumber),
@@ -534,6 +538,7 @@ export default function ResultsPage() {
 
     const payload = {
       ...editingResult,
+      section: editFormData.section,
       firstPlace: editFormData.firstPlace.map(cn => ({ chestNumber: cn })),
       secondPlace: editFormData.secondPlace.map(cn => ({ chestNumber: cn })),
       thirdPlace: editFormData.thirdPlace.map(cn => ({ chestNumber: cn })),
@@ -548,11 +553,13 @@ export default function ResultsPage() {
       status: finalStatus
     };
 
+    const { _id, ...safePayload } = payload;
+
     try {
       const response = await fetch(`/api/results?id=${editingResult._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(safePayload),
       });
 
       if (response.ok) {
@@ -602,15 +609,37 @@ export default function ResultsPage() {
   const draftCount = draftResults.length;
   const publishedCount = publishedResults.length;
 
+  // Results matching current status tab (used for section counts)
+  const statusFilteredResults = results.filter(r => {
+    if (statusFilter === 'draft' && r.status !== 'draft') return false;
+    if (statusFilter === 'published' && r.status === 'draft') return false;
+    return true;
+  });
+
+  // Available unique sections
+  const availableSections = useMemo(() => {
+    const defaultSections = ['senior', 'junior', 'sub-junior', 'general'];
+    const extraSections = Array.from(
+      new Set(results.map(r => r.section?.toLowerCase()).filter(Boolean))
+    ).filter(s => !defaultSections.includes(s));
+    return [...defaultSections, ...extraSections];
+  }, [results]);
+
   const filteredResults = results.filter(r => {
     // Status filter
     if (statusFilter === 'draft' && r.status !== 'draft') return false;
     if (statusFilter === 'published' && r.status === 'draft') return false;
 
+    // Section filter
+    if (resultSectionFilter !== 'all' && (r.section || '').toLowerCase() !== resultSectionFilter.toLowerCase()) {
+      return false;
+    }
+
     // Search query
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const progMatch = r.programme?.toLowerCase().includes(q);
+      const secMatch = r.section?.toLowerCase().includes(q);
       const chestMatch = [
         ...(r.firstPlace || []).map(p => p.chestNumber),
         ...(r.secondPlace || []).map(p => p.chestNumber),
@@ -621,7 +650,7 @@ export default function ResultsPage() {
         ...(r.secondPlaceTeams || []).map(t => t.teamCode),
         ...(r.thirdPlaceTeams || []).map(t => t.teamCode),
       ].some(tc => tc?.toLowerCase().includes(q));
-      return progMatch || chestMatch || teamMatch;
+      return progMatch || secMatch || chestMatch || teamMatch;
     }
     return true;
   });
@@ -1437,15 +1466,79 @@ export default function ResultsPage() {
             )}
           </div>
 
+          {/* Section Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-4 p-2 bg-gray-50/90 rounded-2xl border border-gray-200/70">
+            <span className="text-xs font-bold text-gray-500 px-2 flex items-center gap-1">
+              <span>🏛️</span>
+              <span>Filter by Section:</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setResultSectionFilter('all')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                resultSectionFilter === 'all'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+              }`}
+            >
+              <span>All Sections</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                resultSectionFilter === 'all' ? 'bg-purple-700 text-purple-100' : 'bg-gray-200 text-gray-600'
+              }`}>
+                {statusFilteredResults.length}
+              </span>
+            </button>
+            {availableSections.map((sec) => {
+              const count = statusFilteredResults.filter(
+                (r) => (r.section || '').toLowerCase() === sec.toLowerCase()
+              ).length;
+              const formatted = sec.charAt(0).toUpperCase() + sec.slice(1).replace('-', ' ');
+              const isSelected = resultSectionFilter.toLowerCase() === sec.toLowerCase();
+              return (
+                <button
+                  key={sec}
+                  type="button"
+                  onClick={() => setResultSectionFilter(sec)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                  }`}
+                >
+                  <span>{formatted}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    isSelected ? 'bg-purple-700 text-purple-100' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
           {/* Search bar & Bulk actions */}
           <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <input
-              type="text"
-              placeholder="Search by programme name or chest number..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full sm:w-72 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-xs sm:text-sm text-gray-700"
-            />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+              <input
+                type="text"
+                placeholder="Search by programme, section, chest number..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full sm:w-72 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-xs sm:text-sm text-gray-700"
+              />
+
+              {resultSectionFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setResultSectionFilter('all')}
+                  className="inline-flex items-center gap-1 text-xs text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 font-semibold px-2.5 py-2 rounded-xl transition-colors cursor-pointer"
+                  title="Clear section filter"
+                >
+                  <span>✕ Section:</span>
+                  <span className="capitalize">{resultSectionFilter.replace('-', ' ')}</span>
+                </button>
+              )}
+            </div>
 
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               {/* Select All / Deselect All quick links */}
@@ -1522,12 +1615,31 @@ export default function ResultsPage() {
               <div className="text-3xl mb-2">📋</div>
               <p className="text-gray-700 font-bold text-sm">
                 {statusFilter === 'draft' 
-                  ? 'No draft results found.'
+                  ? 'No draft results found'
                   : statusFilter === 'published' 
-                    ? 'No published results found.' 
-                    : 'No results found matching your criteria.'}
+                    ? 'No published results found' 
+                    : 'No results found matching your criteria'}
+                {resultSectionFilter !== 'all' && (
+                  <span className="text-purple-700 block mt-1">
+                    for section: {resultSectionFilter.charAt(0).toUpperCase() + resultSectionFilter.slice(1).replace('-', ' ')}
+                  </span>
+                )}
+                .
               </p>
-              <p className="text-gray-400 text-xs mt-1">
+              {(resultSectionFilter !== 'all' || searchQuery || statusFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResultSectionFilter('all');
+                    setSearchQuery('');
+                    setStatusFilter('all');
+                  }}
+                  className="mt-3 px-3.5 py-1.5 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1"
+                >
+                  <span>↺ Clear all filters</span>
+                </button>
+              )}
+              <p className="text-gray-400 text-xs mt-2">
                 {statusFilter === 'draft' ? 'You can save results as draft using the form above.' : 'Add results using the form above.'}
               </p>
             </div>
@@ -1828,7 +1940,7 @@ export default function ResultsPage() {
                   </span>
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {editingResult.programme} • <span className="capitalize font-medium">{editingResult.section}</span>
+                  {editingResult.programme} • <span className="capitalize font-semibold text-purple-700">{editFormData.section || editingResult.section}</span>
                 </p>
               </div>
               <button
@@ -1870,6 +1982,26 @@ export default function ResultsPage() {
                     🚀 Published (Live on site)
                   </button>
                 </div>
+              </div>
+
+              {/* Section Selector */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                  Section *
+                </label>
+                <select
+                  value={editFormData.section}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, section: e.target.value as any }))}
+                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-hidden capitalize bg-white text-gray-800 shadow-xs cursor-pointer"
+                >
+                  <option value="senior">Senior</option>
+                  <option value="junior">Junior</option>
+                  <option value="sub-junior">Sub Junior</option>
+                  <option value="general">General</option>
+                </select>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Change the section category (Senior, Junior, Sub Junior, or General) for this result.
+                </p>
               </div>
 
               {/* Team Programme Winners vs Individual Winners */}

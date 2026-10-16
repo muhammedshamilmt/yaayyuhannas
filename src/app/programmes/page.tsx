@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Programme, ProgrammeParticipant, Team, Candidate, Result } from '@/types';
+import { ProgrammePosterStudio } from '@/components/Programmes/ProgrammePosterStudio';
 
 export default function ProgrammesPage() {
   const [programmes, setProgrammes] = useState<Programme[]>([]);
@@ -12,7 +13,8 @@ export default function ProgrammesPage() {
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [activeTab, setActiveTab] = useState<'overview' | 'programmes' | 'categories' | 'sections'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'programmes' | 'categories' | 'sections' | 'posters'>('overview');
+  const [selectedPosterProgrammeId, setSelectedPosterProgrammeId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'arts' | 'sports'>('all');
   const [selectedSection, setSelectedSection] = useState<'all' | 'senior' | 'junior' | 'sub-junior' | 'general'>('all');
@@ -20,6 +22,18 @@ export default function ProgrammesPage() {
 
   useEffect(() => {
     fetchData();
+
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const tabParam = searchParams.get('tab');
+      const programmeIdParam = searchParams.get('programmeId');
+      if (tabParam === 'posters') {
+        setActiveTab('posters');
+      }
+      if (programmeIdParam) {
+        setSelectedPosterProgrammeId(programmeIdParam);
+      }
+    }
   }, []);
 
   const fetchData = async () => {
@@ -94,11 +108,29 @@ export default function ProgrammesPage() {
   };
 
   const getProgrammeResults = (programme: Programme) => {
-    return results.filter(r =>
-      r.programmeId === programme._id?.toString() ||
-      r.programmeId === programme.id ||
-      r.programme?.includes(programme.name)
-    );
+    const progIdStr = programme._id?.toString() || programme.id;
+    return results.filter((r) => {
+      // Must be published result
+      if (r.status !== 'published') return false;
+
+      // 1. Strict programmeId match
+      if (r.programmeId && progIdStr && String(r.programmeId).trim() === String(progIdStr).trim()) {
+        return true;
+      }
+
+      // 2. Exact CODE - Name and section match
+      if (r.programme && programme.code && programme.name) {
+        const expected = `${programme.code} - ${programme.name}`.trim().toLowerCase();
+        const rProg = r.programme.trim().toLowerCase();
+        if (rProg === expected) {
+          if (!r.section || !programme.section || r.section.trim().toLowerCase() === programme.section.trim().toLowerCase()) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    });
   };
 
   const getProgrammeStatus = (programme: Programme) => {
@@ -151,6 +183,17 @@ export default function ProgrammesPage() {
     );
   }
 
+  const openPoster = (programmeId: string) => {
+    setSelectedPosterProgrammeId(programmeId);
+    setActiveTab('posters');
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', 'posters');
+      url.searchParams.set('programmeId', programmeId);
+      window.history.pushState({}, '', url.toString());
+    }
+  };
+
   const categories = [...new Set(programmes.map(p => p.category))].filter(Boolean);
   const sections = [...new Set(programmes.map(p => p.section))].filter(Boolean);
 
@@ -194,11 +237,19 @@ export default function ProgrammesPage() {
               { key: 'overview', label: '📊 Overview', icon: '📊' },
               { key: 'programmes', label: '🎭 All Programmes', icon: '🎭' },
               { key: 'categories', label: '📂 By Category', icon: '📂' },
-              { key: 'sections', label: '🏛️ By Section', icon: '🏛️' }
+              { key: 'sections', label: '🏛️ By Section', icon: '🏛️' },
+              { key: 'posters', label: '🎨 Posters', icon: '🎨' }
             ].map(tab => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key as any)}
+                onClick={() => {
+                  setActiveTab(tab.key as any);
+                  if (typeof window !== 'undefined' && tab.key === 'posters') {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('tab', 'posters');
+                    window.history.pushState({}, '', url.toString());
+                  }
+                }}
                 className={`px-6 py-4 font-medium text-sm md:text-base transition-colors duration-200 ${
                   activeTab === tab.key
                     ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
@@ -274,6 +325,35 @@ export default function ProgrammesPage() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Poster Studio Quick Banner */}
+            <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-stone-900 text-white rounded-2xl p-6 sm:p-8 shadow-xl border border-zinc-800 flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="space-y-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600/20 text-red-400 text-xs font-semibold uppercase tracking-wider border border-red-500/30">
+                  🎨 Poster Studio
+                </span>
+                <h3 className="text-2xl font-bold">Official Programme Result Posters</h3>
+                <p className="text-zinc-400 text-sm max-w-xl">
+                  Download high-resolution 2400×2400 publication-ready posters for any festival event.
+                  1st, 2nd, and 3rd place winners are loaded dynamically from published results.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('posters');
+                  if (typeof window !== 'undefined') {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('tab', 'posters');
+                    window.history.pushState({}, '', url.toString());
+                  }
+                }}
+                className="shrink-0 px-6 py-3.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold rounded-xl shadow-lg transition text-sm flex items-center gap-2 cursor-pointer"
+              >
+                <span>Open Poster Studio</span>
+                <span>→</span>
+              </button>
             </div>
 
             {/* Featured Programmes */}
@@ -431,6 +511,23 @@ export default function ProgrammesPage() {
                             <div className="text-xs text-gray-500">Required</div>
                           </div>
                         </div>
+
+                        {/* Result Poster Action */}
+                        <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                          <span className="text-xs text-gray-500 font-medium">Result Poster</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openPoster(programme._id?.toString() || programme.id || '');
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-xs rounded-lg transition border border-red-200 cursor-pointer"
+                          >
+                            <span>🎨</span>
+                            <span>View Poster</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </Link>
@@ -552,6 +649,17 @@ export default function ProgrammesPage() {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Posters Tab */}
+        {activeTab === 'posters' && (
+          <ProgrammePosterStudio
+            programmes={programmes}
+            results={results}
+            candidates={candidates}
+            teams={teams}
+            initialProgrammeId={selectedPosterProgrammeId}
+          />
         )}
 
         {/* Empty State */}

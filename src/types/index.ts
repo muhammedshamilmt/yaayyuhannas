@@ -77,6 +77,7 @@ export interface Result {
   thirdPoints: number;
   participationPoints?: number;
   notes?: string;
+  publishedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }

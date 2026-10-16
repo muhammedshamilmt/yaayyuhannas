@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       query.status = { $ne: 'draft' };
     }
     
-    const results = await collection.find(query).toArray();
+    const results = await collection.find(query).sort({ createdAt: 1, _id: 1 }).toArray();
     
     return NextResponse.json(results);
   } catch (error) {
@@ -68,7 +68,8 @@ export async function POST(request: Request) {
       ...bodyWithoutId,
       status,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      ...(status === 'published' ? { publishedAt: new Date() } : {})
     };
     
     if (activeFestId) {
@@ -113,13 +114,18 @@ export async function PUT(request: Request) {
     const db = await getDatabase();
     const collection = db.collection<Result>('results');
     
+    const updateData: any = {
+      ...body,
+      updatedAt: new Date(),
+      ...(body.status === 'published' ? { publishedAt: new Date() } : {})
+    };
+    delete updateData._id;
+    delete updateData.id;
+
     const result = await collection.updateOne(
       { _id: new ObjectId(id) },
       { 
-        $set: { 
-          ...body, 
-          updatedAt: new Date() 
-        } 
+        $set: updateData
       }
     );
 
@@ -155,13 +161,18 @@ export async function PATCH(request: Request) {
     const collection = db.collection<Result>('results');
 
     const objectIds = ids.map(id => new ObjectId(id));
+    const updateFields: any = { 
+      status, 
+      updatedAt: new Date() 
+    };
+    if (status === 'published') {
+      updateFields.publishedAt = new Date();
+    }
+
     const updateResult = await collection.updateMany(
       { _id: { $in: objectIds } },
       { 
-        $set: { 
-          status, 
-          updatedAt: new Date() 
-        } 
+        $set: updateFields 
       }
     );
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Team, Result, Candidate, Programme } from '@/types';
-import { findProgramme } from '@/lib/resultsHelper';
+import { findProgramme, getResultPublishedTime } from '@/lib/resultsHelper';
 
 interface ProgrammeResult {
   programme: Programme;
@@ -51,6 +51,8 @@ export default function ResultsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedSection, setSelectedSection] = useState<string>('all');
+  const [selectedProgrammeSection, setSelectedProgrammeSection] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'recently-added' | 'first-added' | 'name-asc'>('recently-added');
 
   // Fetch data from APIs
   const fetchData = async () => {
@@ -163,6 +165,17 @@ export default function ResultsPage() {
       return { programme, result, winners };
     }).filter(Boolean) as ProgrammeResult[];
 
+    // Sort by publication time: latest published first
+    programmeResultsList.sort((a, b) => {
+      const timeA = getResultPublishedTime(a.result);
+      const timeB = getResultPublishedTime(b.result);
+      if (timeA !== timeB) return timeB - timeA;
+      const idA = String(a.result._id || '');
+      const idB = String(b.result._id || '');
+      if (idA && idB && idA !== idB) return idB.localeCompare(idA);
+      return (a.programme.code || '').localeCompare(b.programme.code || '');
+    });
+
     setProgrammeResults(programmeResultsList);
 
     // Process category results
@@ -244,11 +257,81 @@ export default function ResultsPage() {
   }, []);
 
   const getFilteredResults = () => {
-    return programmeResults.filter(pr => {
-      const matchesSearch = pr.programme.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const filtered = programmeResults.filter(pr => {
+      const progName = pr.programme.name || '';
+      const progCode = pr.programme.code || '';
+      const progSec = (pr.result.section || pr.programme.section || '').toLowerCase();
+
+      const matchesSearch =
+        progName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        progCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        progSec.includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory === 'all' || pr.programme.category === selectedCategory;
-      return matchesSearch && matchesCategory;
+      const matchesSection = selectedProgrammeSection === 'all' || progSec === selectedProgrammeSection.toLowerCase();
+
+      return matchesSearch && matchesCategory && matchesSection;
     });
+
+    return filtered.sort((a, b) => {
+      if (sortOrder === 'recently-added') {
+        const timeA = getResultPublishedTime(a.result);
+        const timeB = getResultPublishedTime(b.result);
+        if (timeA !== timeB) return timeB - timeA; // Latest published first
+        const idA = String(a.result._id || '');
+        const idB = String(b.result._id || '');
+        if (idA && idB && idA !== idB) return idB.localeCompare(idA);
+        return (a.programme.code || '').localeCompare(b.programme.code || '');
+      } else if (sortOrder === 'first-added') {
+        const timeA = getResultPublishedTime(a.result);
+        const timeB = getResultPublishedTime(b.result);
+        if (timeA !== timeB) return timeA - timeB; // Oldest published first
+        const idA = String(a.result._id || '');
+        const idB = String(b.result._id || '');
+        if (idA && idB && idA !== idB) return idA.localeCompare(idB);
+        return (a.programme.code || '').localeCompare(b.programme.code || '');
+      } else if (sortOrder === 'name-asc') {
+        return (a.programme.name || '').localeCompare(b.programme.name || '');
+      }
+      return 0;
+    });
+  };
+
+  const formatResultTime = (timestamp: number) => {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = Math.max(0, now.getTime() - date.getTime());
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+
+    let relative = '';
+    if (diffMins < 1) relative = 'Just now';
+    else if (diffMins < 60) relative = `${diffMins}m ago`;
+    else if (diffHours < 24) relative = `${diffHours}h ago`;
+    else {
+      const diffDays = Math.floor(diffHours / 24);
+      relative = `${diffDays}d ago`;
+    }
+
+    const isToday = date.toDateString() === now.toDateString();
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const formatted = isToday ? `Today, ${timeStr}` : `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+
+    return { formatted, relative };
+  };
+
+  const getSectionBadgeStyle = (sec?: string) => {
+    switch ((sec || '').toLowerCase()) {
+      case 'senior':
+        return 'bg-violet-100 text-violet-800 border-violet-300';
+      case 'junior':
+        return 'bg-amber-100 text-amber-800 border-amber-300';
+      case 'subjunior':
+      case 'sub-junior':
+        return 'bg-pink-100 text-pink-800 border-pink-300';
+      default:
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+    }
   };
 
   const getFilteredSectionResults = () => {
@@ -269,6 +352,15 @@ export default function ResultsPage() {
 
   const categories = [...new Set(programmes.map(p => p.category))].filter(Boolean);
   const sections = [...new Set(candidates.map(c => c.section))].filter(Boolean);
+  const programmeSections = Array.from(
+    new Set([
+      'senior',
+      'junior',
+      'sub-junior',
+      'general',
+      ...programmeResults.map(pr => (pr.result.section || pr.programme.section || '').toLowerCase()).filter(Boolean)
+    ])
+  );
   const filteredResults = getFilteredResults();
   const filteredSectionResults = getFilteredSectionResults();
 
@@ -402,12 +494,15 @@ export default function ResultsPage() {
               <div className="p-6">
                 {programmeResults.length > 0 ? (
                   <div className="space-y-6">
-                    {programmeResults.slice(0, 5).map((pr, index) => (
+                    {[...programmeResults]
+                      .sort((a, b) => getResultPublishedTime(b.result) - getResultPublishedTime(a.result))
+                      .slice(0, 5)
+                      .map((pr, index) => (
                       <div key={index} className="border rounded-lg p-4">
                         <div className="flex justify-between items-start mb-4">
                           <div>
                             <h3 className="text-lg font-bold text-gray-900">{pr.programme.name}</h3>
-                            <p className="text-gray-600">{pr.programme.category} • {pr.programme.section}</p>
+                            <p className="text-gray-600">{pr.programme.category} • <span className="capitalize font-medium">{(pr.result.section || pr.programme.section || '').replace('-', ' ')}</span></p>
                           </div>
                           <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
                             {pr.programme.category}
@@ -488,8 +583,8 @@ export default function ResultsPage() {
           <div className="space-y-6">
             {/* Search and Filter */}
             <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="md:col-span-1">
                   <input
                     type="text"
                     placeholder="Search programmes..."
@@ -498,16 +593,101 @@ export default function ResultsPage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                 </div>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                <div>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white text-gray-700"
+                  >
+                    <option value="all">All Categories</option>
+                    {categories.map((category, idx) => (
+                      <option key={`category-${idx}-${category}`} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <select
+                    value={selectedProgrammeSection}
+                    onChange={(e) => setSelectedProgrammeSection(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent capitalize bg-white text-gray-700 font-medium"
+                  >
+                    <option value="all">All Sections</option>
+                    {programmeSections.map((sec) => (
+                      <option key={sec} value={sec}>
+                        {sec.charAt(0).toUpperCase() + sec.slice(1).replace('-', ' ')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <select
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value as any)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white text-gray-700 font-medium"
+                  >
+                    <option value="recently-added">⚡ Order: Latest Published on Top</option>
+                    <option value="first-added">⏳ Order: Oldest Published First</option>
+                    <option value="name-asc">🔤 Order: Programme Name (A-Z)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Quick Section Filter Pills */}
+              <div className="flex flex-wrap items-center gap-2 pt-4 mt-4 border-t border-gray-100">
+                <span className="text-xs font-bold text-gray-500 mr-1 flex items-center gap-1">
+                  <span>🏛️</span>
+                  <span>Section:</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedProgrammeSection('all')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    selectedProgrammeSection === 'all'
+                      ? 'bg-green-600 text-white shadow-xs'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
                 >
-                  <option value="all">All Categories</option>
-                  {categories.map((category, idx) => (
-                    <option key={`category-${idx}-${category}`} value={category}>{category}</option>
-                  ))}
-                </select>
+                  All ({programmeResults.length})
+                </button>
+                {programmeSections.map((sec) => {
+                  const count = programmeResults.filter(
+                    pr => (pr.result.section || pr.programme.section || '').toLowerCase() === sec.toLowerCase()
+                  ).length;
+                  const isSelected = selectedProgrammeSection.toLowerCase() === sec.toLowerCase();
+                  return (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => setSelectedProgrammeSection(sec)}
+                      className={`px-3 py-1 rounded-full text-xs font-bold capitalize transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-green-600 text-white shadow-xs'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {sec.replace('-', ' ')} ({count})
+                    </button>
+                  );
+                })}
+
+                <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
+                  <span>
+                    Showing <strong className="text-gray-900">{filteredResults.length}</strong> results
+                  </span>
+                  {(selectedProgrammeSection !== 'all' || selectedCategory !== 'all' || searchTerm) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProgrammeSection('all');
+                        setSelectedCategory('all');
+                        setSearchTerm('');
+                      }}
+                      className="ml-2 font-semibold text-rose-600 hover:text-rose-800 cursor-pointer"
+                    >
+                      Clear Filters ✕
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -517,24 +697,85 @@ export default function ResultsPage() {
                 <div className="bg-white rounded-lg shadow-md border border-gray-200 p-12 text-center">
                   <div className="text-6xl mb-4">🎭</div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">No Programme Results Found</h3>
-                  <p className="text-gray-600">
-                    {searchTerm || selectedCategory !== 'all'
+                  <p className="text-gray-600 mb-4">
+                    {searchTerm || selectedCategory !== 'all' || selectedProgrammeSection !== 'all'
                       ? 'Try adjusting your search or filter criteria.'
                       : 'Programme results will appear here once competitions are completed.'}
                   </p>
+                  {(searchTerm || selectedCategory !== 'all' || selectedProgrammeSection !== 'all') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setSelectedCategory('all');
+                        setSelectedProgrammeSection('all');
+                      }}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      ↺ Clear All Filters
+                    </button>
+                  )}
                 </div>
               ) : (
-                filteredResults.map((pr, index) => (
-                  <div key={index} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">{pr.programme.name}</h3>
-                        <p className="text-gray-600">{pr.programme.category} • {pr.programme.section}</p>
+                filteredResults.map((pr, index) => {
+                  const publishedTime = getResultPublishedTime(pr.result);
+                  const timeInfo = formatResultTime(publishedTime);
+                  const isLatest = sortOrder === 'recently-added' && index === 0;
+                  const secName = pr.result.section || pr.programme.section;
+
+                  return (
+                    <div
+                      key={pr.result._id || index}
+                      className={`bg-white rounded-lg shadow-md border p-6 transition-all ${
+                        isLatest ? 'border-emerald-400 ring-2 ring-emerald-500/20 shadow-lg' : 'border-gray-200'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3 mb-4">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                            {pr.programme.code && (
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-mono border border-gray-200">
+                                {pr.programme.code}
+                              </span>
+                            )}
+                            <h3 className="text-xl font-bold text-gray-900">{pr.programme.name}</h3>
+                            {isLatest && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-xs animate-pulse">
+                                ⚡ Latest Published
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                            <span className="font-semibold text-gray-700">{pr.programme.category}</span>
+                            {secName && (
+                              <>
+                                <span>•</span>
+                                <span className={`capitalize px-2.5 py-0.5 rounded-full text-xs font-bold border ${getSectionBadgeStyle(secName)}`}>
+                                  {secName.replace('-', ' ')} Section
+                                </span>
+                              </>
+                            )}
+                            {timeInfo && (
+                              <>
+                                <span>•</span>
+                                <span
+                                  className="inline-flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 px-2.5 py-0.5 rounded-md font-medium"
+                                  title={`Published on ${new Date(publishedTime).toLocaleString()}`}
+                                >
+                                  <span>🕒</span>
+                                  <span>Published: {timeInfo.formatted}</span>
+                                  {timeInfo.relative && (
+                                    <span className="text-emerald-700 font-bold">({timeInfo.relative})</span>
+                                  )}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <span className="self-start bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold border border-green-200 shrink-0">
+                          {pr.programme.category}
+                        </span>
                       </div>
-                      <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
-                        {pr.programme.category}
-                      </span>
-                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {/* First Place */}
@@ -613,7 +854,8 @@ export default function ResultsPage() {
                       )}
                     </div>
                   </div>
-                ))
+                );
+              })
               )}
             </div>
           </div>

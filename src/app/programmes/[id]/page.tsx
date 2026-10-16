@@ -513,9 +513,18 @@ export default function ProgrammeDetailPage() {
                             <h3 className="text-xl font-bold text-gray-900">🏆 Results</h3>
                             <p className="text-sm text-gray-600">Programme: {programme.name}</p>
                           </div>
-                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                            ✅ Completed
-                          </span>
+                          <div className="flex items-center gap-3">
+                            <Link
+                              href={`/programmes?tab=posters&programmeId=${programme._id?.toString() || programme.id}`}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs sm:text-sm font-bold shadow-sm transition"
+                            >
+                              <span>🎨</span>
+                              <span>Download Poster</span>
+                            </Link>
+                            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                              ✅ Completed
+                            </span>
+                          </div>
                         </div>
                       </div>
                       
