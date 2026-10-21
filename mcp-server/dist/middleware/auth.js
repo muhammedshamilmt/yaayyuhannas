@@ -42,7 +42,9 @@ export async function authenticateMcpRequest(req, res, next) {
             console.error('[Auth] Database token check error:', dbErr);
         }
     }
-    // If none matched, deny request
+    // If none matched, deny request with standard RFC 9728 OAuth challenge header
+    const origin = process.env.RENDER_EXTERNAL_URL?.replace(/\/+$/, '') || 'https://yaayyuhannas.onrender.com';
+    res.setHeader('WWW-Authenticate', `Bearer realm="ayyuhannas-fest", resource_metadata="${origin}/.well-known/oauth-protected-resource", authorization_uri="${origin}/oauth/authorize", token_uri="${origin}/oauth/token"`);
     res.status(401).json({
         jsonrpc: '2.0',
         error: {

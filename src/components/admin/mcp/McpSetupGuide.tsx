@@ -269,38 +269,80 @@ export function McpSetupGuide({
                   <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white flex-shrink-0">
                     4
                   </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-bold text-gray-900">Paste your App Link</p>
-                    <p className="text-xs text-gray-600 mt-0.5">
-                      Paste your personalized or master SSE URL in the <strong>&quot;Add a custom app link&quot;</strong> field:
+                  <div className="flex-1 space-y-2">
+                    <p className="text-xs font-bold text-gray-900">Paste Clean App Link</p>
+                    <p className="text-xs text-gray-600">
+                      Paste the clean SSE endpoint into <strong>&quot;Add a custom app link&quot;</strong> (do not add <code className="bg-gray-200 px-1 py-0.5 rounded font-mono text-gray-800">?token=...</code> because Gemini requires standard OAuth):
                     </p>
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <input
                         type="text"
                         readOnly
-                        value={sseWithToken}
+                        value={sseEndpoint}
                         className="flex-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 select-all"
                       />
                       <button
-                        onClick={() => copyText(sseWithToken, 'gemini-link')}
+                        onClick={() => copyText(sseEndpoint, 'gemini-link')}
                         className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition flex-shrink-0 shadow-sm"
                       >
                         {copiedField === 'gemini-link' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        <span>{copiedField === 'gemini-link' ? 'Copied!' : 'Copy'}</span>
+                        <span>{copiedField === 'gemini-link' ? 'Copied!' : 'Copy Link'}</span>
                       </button>
                     </div>
                   </div>
                 </div>
 
                 {/* Step 5 */}
-                <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/50 p-3.5">
+                <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/40 p-3.5">
                   <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white flex-shrink-0">
                     5
                   </div>
+                  <div className="flex-1 space-y-2">
+                    <p className="text-xs font-bold text-blue-950">Fill &quot;Advanced settings&quot; (OAuth Credentials)</p>
+                    <p className="text-xs text-blue-900/80">
+                      Click <strong>Advanced settings</strong> in the Gemini modal and fill in:
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="bg-white p-2.5 rounded-lg border border-blue-200">
+                        <span className="text-[10px] uppercase font-bold text-gray-500 block">Client ID</span>
+                        <div className="flex items-center justify-between mt-1">
+                          <code className="font-mono text-gray-900 font-semibold">{serverName}</code>
+                          <button
+                            onClick={() => copyText(serverName, 'gemini-client-id')}
+                            className="text-blue-600 hover:text-blue-700 text-[11px] font-semibold flex items-center gap-0.5"
+                          >
+                            {copiedField === 'gemini-client-id' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                            <span>{copiedField === 'gemini-client-id' ? 'Copied' : 'Copy'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-2.5 rounded-lg border border-blue-200">
+                        <span className="text-[10px] uppercase font-bold text-gray-500 block">Client Secret</span>
+                        <div className="flex items-center justify-between mt-1">
+                          <code className="font-mono text-gray-900 font-semibold">{masterAuthToken}</code>
+                          <button
+                            onClick={() => copyText(masterAuthToken, 'gemini-client-secret')}
+                            className="text-blue-600 hover:text-blue-700 text-[11px] font-semibold flex items-center gap-0.5"
+                          >
+                            {copiedField === 'gemini-client-secret' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                            <span>{copiedField === 'gemini-client-secret' ? 'Copied' : 'Copy'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 6 */}
+                <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/50 p-3.5">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white flex-shrink-0">
+                    6
+                  </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-900">Click &quot;Next&quot; to Finish</p>
+                    <p className="text-xs font-bold text-gray-900">Click &quot;Next&quot; to Authorize</p>
                     <p className="text-xs text-gray-600 mt-0.5">
-                      You can leave <em>Client ID</em> and <em>Client secret</em> empty because your token is included directly in the URL query parameter. Click <strong>Next</strong> and Google Gemini is ready!
+                      Click <strong>Next</strong>. Gemini will negotiate the standard OAuth handshake, connect to the server, and expose all 9 festival database tools!
                     </p>
                   </div>
                 </div>
@@ -356,22 +398,22 @@ export function McpSetupGuide({
                       <input
                         type="text"
                         readOnly
-                        value={sseWithToken}
-                        className="w-full rounded-xl border border-blue-500/80 bg-black/60 px-3 py-2 text-xs font-mono text-blue-300 focus:outline-none"
+                        value={sseEndpoint}
+                        className="w-full rounded-xl border border-blue-500/80 bg-black/60 px-3 py-2 text-xs font-mono text-blue-300 focus:outline-none select-all"
                       />
                     </div>
                     <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1 font-medium">
-                      <CheckCircle2 className="h-3 w-3" /> Includes verified token for {serverName}
+                      <CheckCircle2 className="h-3 w-3" /> Clean OAuth-ready SSE URL
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-gray-800 bg-gray-800/30 p-2.5">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                      Advanced settings (Optional)
+                  <div className="rounded-xl border border-blue-500/30 bg-blue-950/30 p-2.5">
+                    <p className="text-[10px] font-semibold text-blue-300 uppercase tracking-wider">
+                      Advanced settings (Standard OAuth)
                     </p>
-                    <div className="mt-1.5 text-[10px] text-gray-400 space-y-1">
-                      <p>• Client ID: <span className="text-gray-500 italic">(leave empty)</span></p>
-                      <p>• Client secret: <span className="text-gray-500 italic">(leave empty)</span></p>
+                    <div className="mt-1.5 text-[10px] text-gray-300 space-y-1 font-mono">
+                      <p>Client ID: <span className="text-white font-bold">{serverName}</span></p>
+                      <p>Client secret: <span className="text-white font-bold">{masterAuthToken}</span></p>
                     </div>
                   </div>
 

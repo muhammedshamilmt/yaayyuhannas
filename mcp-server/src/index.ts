@@ -9,6 +9,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { config } from './config.js';
 import { connectToDatabase, closeDatabase, testConnection } from './db.js';
 import { authenticateMcpRequest } from './middleware/auth.js';
+import { oauthRouter } from './oauth.js';
 import { registerMetadataTools } from './tools/metadata.js';
 import { registerQueryTools } from './tools/query.js';
 import { registerFestivalTools } from './tools/festival.js';
@@ -73,6 +74,10 @@ async function bootstrap() {
   }));
 
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  // Mount OAuth 2.0 (RFC 8414 & RFC 9728) metadata & authorization endpoints for Gemini & clients
+  app.use(oauthRouter);
 
   // Serve static assets (logo, favicon)
   app.use('/public', express.static(publicDir));
