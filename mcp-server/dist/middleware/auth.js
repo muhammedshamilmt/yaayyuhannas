@@ -1,29 +1,45 @@
 import { config } from '../config.js';
-export function authenticateMcpRequest(req, res, next) {
-    // If no token is set in config, allow access (development mode)
-    if (!config.authToken || config.authToken.trim() === '') {
-        return next();
-    }
-    // 1. Check Authorization header: Bearer <token>
+import { getDatabase } from '../db.js';
+export async function authenticateMcpRequest(req, res, next) {
+    // Extract token from header or query
+    let clientToken = null;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7).trim();
-        if (token === config.authToken) {
-            return next();
-        }
+        clientToken = authHeader.substring(7).trim();
     }
-    // 2. Check x-api-key header
-    const apiKeyHeader = req.headers['x-api-key'];
-    if (apiKeyHeader && typeof apiKeyHeader === 'string') {
-        if (apiKeyHeader.trim() === config.authToken) {
-            return next();
-        }
+    else if (req.headers['x-api-key'] && typeof req.headers['x-api-key'] === 'string') {
+        clientToken = req.headers['x-api-key'].trim();
     }
-    // 3. Check query parameter: ?token=... (for clients that cannot set custom headers on EventSource)
-    const queryToken = req.query.token;
-    if (queryToken && typeof queryToken === 'string') {
-        if (queryToken.trim() === config.authToken) {
-            return next();
+    else if (req.query.token && typeof req.query.token === 'string') {
+        clientToken = req.query.token.trim();
+    }
+    // If no auth token is required on server and none provided, allow
+    if (!config.authToken && !clientToken) {
+        return next();
+    }
+    // 1. Check against master config token
+    if (clientToken && config.authToken && clientToken === config.authToken) {
+        return next();
+    }
+    // 2. Dynamic DB check: check if token belongs to an active whitelisted user in MongoDB
+    if (clientToken) {
+        try {
+            const db = await getDatabase();
+            const settings = await db.collection('mcp_settings').findOne({
+                serverName: 'ayyuhannas-fest',
+                'authorizedEmails.token': clientToken,
+            });
+            if (settings && Array.isArray(settings.authorizedEmails)) {
+                const user = settings.authorizedEmails.find((u) => u.token === clientToken);
+                if (user && user.status === 'active') {
+                    // Record access timestamp in background
+                    db.collection('mcp_settings').updateOne({ serverName: 'ayyuhannas-fest', 'authorizedEmails.token': clientToken }, { $set: { 'authorizedEmails.$.lastAccessedAt': new Date().toISOString() } }).catch(() => { });
+                    return next();
+                }
+            }
+        }
+        catch (dbErr) {
+            console.error('[Auth] Database token check error:', dbErr);
         }
     }
     // If none matched, deny request
@@ -31,7 +47,7 @@ export function authenticateMcpRequest(req, res, next) {
         jsonrpc: '2.0',
         error: {
             code: -32001,
-            message: 'Unauthorized: Invalid or missing MCP authentication token.',
+            message: 'Unauthorized: Invalid or revoked MCP authentication token. Please check your authorization in the festival admin panel.',
         },
         id: null,
     });

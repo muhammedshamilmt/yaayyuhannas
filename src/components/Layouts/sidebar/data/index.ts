@@ -119,6 +119,12 @@ export const NAV_DATA = [
         icon: Icons.Table,
         items: [],
       },
+      {
+        title: "MCP Connector",
+        url: "/admin/mcp",
+        icon: Icons.PieChart,
+        items: [],
+      },
     ],
   },
 ];

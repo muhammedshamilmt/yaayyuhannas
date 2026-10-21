@@ -44,12 +44,12 @@ In the **Environment** tab on Render, add these variables:
 
 ### Step 3: Verify Your Deployment
 Once deployed, Render gives you a public HTTPS URL, for example:
-`https://ayyuhannas-fest-mcp.onrender.com`
+`https://yaayyuhannas.onrender.com`
 
-- **Visual Dashboard**: Open `https://ayyuhannas-fest-mcp.onrender.com` in your browser to see the festival logo and connection details.
-- **Health Check**: `https://ayyuhannas-fest-mcp.onrender.com/health` -> returns `{"status":"healthy","server":"ayyuhannas-fest","database":"connected"}`
-- **Logo Endpoint**: `https://ayyuhannas-fest-mcp.onrender.com/logo.png`
-- **MCP SSE Endpoint**: `https://ayyuhannas-fest-mcp.onrender.com/sse`
+- **Visual Dashboard**: Open `https://yaayyuhannas.onrender.com` in your browser to see the festival logo and connection details.
+- **Health Check**: `https://yaayyuhannas.onrender.com/health` -> returns `{"status":"healthy","server":"ayyuhannas-fest","database":"connected"}`
+- **Logo Endpoint**: `https://yaayyuhannas.onrender.com/logo.png`
+- **MCP SSE Endpoint**: `https://yaayyuhannas.onrender.com/sse`
 
 ---
 
@@ -59,7 +59,7 @@ Once deployed, Render gives you a public HTTPS URL, for example:
 In Cursor **Settings** > **Features** > **MCP Servers** > **Add New MCP Server**:
 - **Name**: `ayyuhannas-fest`
 - **Type**: `SSE`
-- **URL**: `https://ayyuhannas-fest-mcp.onrender.com/sse?token=YOUR_MCP_AUTH_TOKEN`
+- **URL**: `https://yaayyuhannas.onrender.com/sse?token=YOUR_MCP_AUTH_TOKEN`
 
 ---
 
@@ -69,7 +69,7 @@ Add to `claude_desktop_config.json`:
 {
   "mcpServers": {
     "ayyuhannas-fest": {
-      "url": "https://ayyuhannas-fest-mcp.onrender.com/sse",
+      "url": "https://yaayyuhannas.onrender.com/sse",
       "headers": {
         "Authorization": "Bearer YOUR_MCP_AUTH_TOKEN"
       }
@@ -82,7 +82,7 @@ Add to `claude_desktop_config.json`:
 
 ### 3. Google Gemini / Cloud Agents
 Configure the MCP SSE tool connection with:
-- **URL**: `https://ayyuhannas-fest-mcp.onrender.com/sse`
+- **URL**: `https://yaayyuhannas.onrender.com/sse`
 - **Headers**: `{"Authorization": "Bearer YOUR_MCP_AUTH_TOKEN"}`
 
 ---

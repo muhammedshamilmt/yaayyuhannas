@@ -252,12 +252,35 @@ async function bootstrap() {
     // SSE stream endpoint
     app.get('/sse', authenticateMcpRequest, async (req, res) => {
         console.log(`[SSE] Incoming client connection from ${req.ip}`);
+        // Explicit headers for Render, Cloudflare, Nginx, and proxies
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no'); // Prevents proxy buffering
+        if (typeof res.flushHeaders === 'function') {
+            res.flushHeaders();
+        }
         // Create new SSE transport directing client to POST to /messages
         const transport = new SSEServerTransport('/messages', res);
         const sessionId = transport.sessionId;
         transports.set(sessionId, transport);
+        // CRITICAL: Send periodic SSE heartbeat ping every 15 seconds to prevent Render, Cloudflare, proxies, and browser agents from dropping the connection!
+        const keepaliveTimer = setInterval(() => {
+            try {
+                if (!res.writableEnded) {
+                    res.write(': keepalive\n\n');
+                }
+                else {
+                    clearInterval(keepaliveTimer);
+                }
+            }
+            catch {
+                clearInterval(keepaliveTimer);
+            }
+        }, 15000);
         req.on('close', () => {
             console.log(`[SSE] Client disconnected session: ${sessionId}`);
+            clearInterval(keepaliveTimer);
             transports.delete(sessionId);
         });
         try {
@@ -266,6 +289,7 @@ async function bootstrap() {
             console.log(`[SSE] Session initialized and connected: ${sessionId}`);
         }
         catch (err) {
+            clearInterval(keepaliveTimer);
             console.error(`[SSE] Connection error for session ${sessionId}:`, err);
         }
     });
@@ -299,6 +323,26 @@ async function bootstrap() {
         console.log(`[Ready] Read-only mode: ${config.readOnly}`);
         console.log(`[Ready] Auth configured: ${!!config.authToken}`);
         console.log(`[Ready] Logo endpoint: http://localhost:${serverPort}/logo.png`);
+        // Self-KeepAlive for Render Free Tier (Pings /health every 10 minutes to prevent spindown)
+        const selfUrl = process.env.RENDER_EXTERNAL_URL || 'https://yaayyuhannas.onrender.com';
+        if (selfUrl && !selfUrl.includes('localhost') && !selfUrl.includes('127.0.0.1')) {
+            const pingTarget = `${selfUrl.replace(/\/+$/, '')}/health`;
+            console.log(`[KeepAlive] Scheduled self-ping to prevent Render sleep: ${pingTarget} (every 10m)`);
+            setTimeout(() => {
+                fetch(pingTarget).then(() => {
+                    console.log(`[KeepAlive] Initial self-ping successful`);
+                }).catch(() => { });
+            }, 30000);
+            setInterval(async () => {
+                try {
+                    const res = await fetch(pingTarget);
+                    console.log(`[KeepAlive] Self-ping status: ${res.status} at ${new Date().toISOString()}`);
+                }
+                catch (err) {
+                    console.warn(`[KeepAlive] Self-ping error:`, err.message);
+                }
+            }, 10 * 60 * 1000);
+        }
     });
     // Graceful shutdown
     const shutdown = async () => {
