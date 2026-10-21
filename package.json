@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "mcp": "node mcp-server/dist/index.js --stdio",
+    "mcp:server": "node mcp-server/dist/index.js",
+    "mcp:build": "npm --prefix mcp-server run build",
+    "mcp:test": "npm --prefix mcp-server test"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

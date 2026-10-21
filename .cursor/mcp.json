@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "ayyuhannas-fest": {
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/mcp-server/dist/index.js",
+        "--stdio"
+      ],
+      "env": {
+        "READ_ONLY": "true"
+      },
+      "autoApprove": [
+        "list_collections",
+        "describe_collection_schema",
+        "query_documents",
+        "run_aggregation",
+        "get_festival_overview",
+        "get_live_standings",
+        "search_candidates",
+        "get_programme_details",
+        "diagnose_database_anomalies"
+      ]
+    }
+  }
+}
