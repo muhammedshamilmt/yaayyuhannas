@@ -38,6 +38,7 @@ export function McpSetupGuide({
   const [claudeOs, setClaudeOs] = useState<'mac' | 'windows'>('mac');
 
   const cleanUrl = (cloudServerUrl || 'https://yaayyuhannas.onrender.com').replace(/\/+$/, '');
+  const mcpEndpoint = `${cleanUrl}/mcp`;
   const sseEndpoint = `${cleanUrl}/sse`;
   const sseWithToken = `${cleanUrl}/sse?token=${masterAuthToken || 'YOUR_AUTH_TOKEN'}`;
 
@@ -270,25 +271,28 @@ export function McpSetupGuide({
                     4
                   </div>
                   <div className="flex-1 space-y-2">
-                    <p className="text-xs font-bold text-gray-900">Paste Clean App Link</p>
+                    <p className="text-xs font-bold text-gray-900">Paste Gemini MCP App Link</p>
                     <p className="text-xs text-gray-600">
-                      Paste the clean SSE endpoint into <strong>&quot;Add a custom app link&quot;</strong> (do not add <code className="bg-gray-200 px-1 py-0.5 rounded font-mono text-gray-800">?token=...</code> because Gemini requires standard OAuth):
+                      Paste the standard Gemini Streamable HTTP endpoint <code className="bg-blue-50 text-blue-700 px-1 py-0.5 rounded font-mono font-semibold">/mcp</code> into <strong>&quot;Add a custom app link&quot;</strong>:
                     </p>
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
                         readOnly
-                        value={sseEndpoint}
+                        value={mcpEndpoint}
                         className="flex-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-800 select-all"
                       />
                       <button
-                        onClick={() => copyText(sseEndpoint, 'gemini-link')}
+                        onClick={() => copyText(mcpEndpoint, 'gemini-link')}
                         className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition flex-shrink-0 shadow-sm"
                       >
                         {copiedField === 'gemini-link' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        <span>{copiedField === 'gemini-link' ? 'Copied!' : 'Copy Link'}</span>
+                        <span>{copiedField === 'gemini-link' ? 'Copied!' : 'Copy /mcp Link'}</span>
                       </button>
                     </div>
+                    <p className="text-[11px] text-gray-500">
+                      💡 Tip: Gemini connects via Streamable HTTP at <span className="font-mono text-blue-600 font-semibold">{mcpEndpoint}</span> or SSE at <span className="font-mono text-gray-700">{sseEndpoint}</span>.
+                    </p>
                   </div>
                 </div>
 
@@ -398,12 +402,12 @@ export function McpSetupGuide({
                       <input
                         type="text"
                         readOnly
-                        value={sseEndpoint}
+                        value={mcpEndpoint}
                         className="w-full rounded-xl border border-blue-500/80 bg-black/60 px-3 py-2 text-xs font-mono text-blue-300 focus:outline-none select-all"
                       />
                     </div>
                     <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1 font-medium">
-                      <CheckCircle2 className="h-3 w-3" /> Clean OAuth-ready SSE URL
+                      <CheckCircle2 className="h-3 w-3" /> Streamable HTTP &amp; OAuth Ready
                     </p>
                   </div>
 

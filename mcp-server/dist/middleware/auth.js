@@ -1,11 +1,22 @@
 import { config } from '../config.js';
 import { getDatabase } from '../db.js';
 export async function authenticateMcpRequest(req, res, next) {
-    // Extract token from header or query
+    // Extract token from header, basic auth, body, or query
     let clientToken = null;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
         clientToken = authHeader.substring(7).trim();
+    }
+    else if (authHeader && authHeader.startsWith('Basic ')) {
+        try {
+            const decoded = Buffer.from(authHeader.substring(6).trim(), 'base64').toString('utf8');
+            const [username, password] = decoded.split(':');
+            if (password === config.authToken || username === config.authToken) {
+                return next();
+            }
+            clientToken = password || username;
+        }
+        catch { }
     }
     else if (req.headers['x-api-key'] && typeof req.headers['x-api-key'] === 'string') {
         clientToken = req.headers['x-api-key'].trim();
@@ -13,15 +24,29 @@ export async function authenticateMcpRequest(req, res, next) {
     else if (req.query.token && typeof req.query.token === 'string') {
         clientToken = req.query.token.trim();
     }
+    else if (req.body?.client_secret && typeof req.body.client_secret === 'string') {
+        clientToken = req.body.client_secret.trim();
+    }
+    // 1. Allow protocol handshake discovery methods (initialize, ping)
+    // This is required so Google Gemini & MCP clients can verify server protocol compatibility
+    const rpcMethod = req.body?.method;
+    if (rpcMethod === 'initialize' || rpcMethod === 'ping' || rpcMethod === 'notifications/initialized') {
+        return next();
+    }
+    // 2. Allow initial GET stream handshake for /sse and /mcp
+    // Clients (like Gemini or Cursor) need to establish the connection before sending RPC messages
+    if (req.method === 'GET' && (req.path === '/sse' || req.path === '/mcp')) {
+        return next();
+    }
     // If no auth token is required on server and none provided, allow
     if (!config.authToken && !clientToken) {
         return next();
     }
-    // 1. Check against master config token
+    // 3. Check against master config token
     if (clientToken && config.authToken && clientToken === config.authToken) {
         return next();
     }
-    // 2. Dynamic DB check: check if token belongs to an active whitelisted user in MongoDB
+    // 4. Dynamic DB check: check if token belongs to an active whitelisted user in MongoDB
     if (clientToken) {
         try {
             const db = await getDatabase();

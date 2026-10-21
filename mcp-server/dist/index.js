@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { config } from './config.js';
 import { connectToDatabase, closeDatabase, testConnection } from './db.js';
 import { authenticateMcpRequest } from './middleware/auth.js';
@@ -297,7 +298,7 @@ async function bootstrap() {
             console.error(`[SSE] Connection error for session ${sessionId}:`, err);
         }
     });
-    // JSON-RPC message endpoint
+    // JSON-RPC message endpoint for SSE transport
     app.post('/messages', authenticateMcpRequest, async (req, res) => {
         const sessionId = req.query.sessionId;
         if (!sessionId) {
@@ -319,6 +320,33 @@ async function bootstrap() {
             }
         }
     });
+    // 4. Streamable HTTP Transport (MCP Standard for Google Gemini & Modern Cloud Agents)
+    // Handles both POST JSON-RPC and GET streaming directly on /mcp, /sse, and /
+    const streamableTransport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined, // Stateless mode for cloud environments like Render
+    });
+    const streamableServer = createMcpServer();
+    await streamableServer.connect(streamableTransport);
+    const handleStreamableRequest = async (req, res) => {
+        try {
+            await streamableTransport.handleRequest(req, res, req.body);
+        }
+        catch (err) {
+            console.error('[StreamableHTTP] Error handling request:', err);
+            if (!res.headersSent) {
+                res.status(500).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32603, message: err.message || 'Internal Streamable HTTP error' },
+                    id: null,
+                });
+            }
+        }
+    };
+    // Primary Gemini Cloud MCP endpoint
+    app.all('/mcp', authenticateMcpRequest, handleStreamableRequest);
+    // Allow direct POST on /sse and / for clients that probe without query params
+    app.post('/sse', authenticateMcpRequest, handleStreamableRequest);
+    app.post('/', authenticateMcpRequest, handleStreamableRequest);
     const serverPort = config.port;
     // Explicitly bind to 0.0.0.0 for Render, Docker, and Cloud compatibility
     const httpServer = app.listen(serverPort, '0.0.0.0', () => {
