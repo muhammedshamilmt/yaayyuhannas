@@ -49,20 +49,26 @@ export async function authenticateMcpRequest(req, res, next) {
     if (clientToken && config.authToken && clientToken === config.authToken) {
         return next();
     }
-    // 4. Dynamic DB check: check if token belongs to an active whitelisted user in MongoDB
+    // 4. Dynamic DB check: check masterAuthToken or active whitelisted user in MongoDB
     if (clientToken) {
         try {
             const db = await getDatabase();
             const settings = await db.collection('mcp_settings').findOne({
                 serverName: 'ayyuhannas-fest',
-                'authorizedEmails.token': clientToken,
             });
-            if (settings && Array.isArray(settings.authorizedEmails)) {
-                const user = settings.authorizedEmails.find((u) => u.token === clientToken);
-                if (user && user.status === 'active') {
-                    // Record access timestamp in background
-                    db.collection('mcp_settings').updateOne({ serverName: 'ayyuhannas-fest', 'authorizedEmails.token': clientToken }, { $set: { 'authorizedEmails.$.lastAccessedAt': new Date().toISOString() } }).catch(() => { });
+            if (settings) {
+                // A. Match master token from DB settings
+                if (settings.masterAuthToken && clientToken === settings.masterAuthToken) {
                     return next();
+                }
+                // B. Match user-specific token from authorizedEmails
+                if (Array.isArray(settings.authorizedEmails)) {
+                    const user = settings.authorizedEmails.find((u) => u.token === clientToken);
+                    if (user && user.status === 'active') {
+                        // Record access timestamp in background
+                        db.collection('mcp_settings').updateOne({ serverName: 'ayyuhannas-fest', 'authorizedEmails.token': clientToken }, { $set: { 'authorizedEmails.$.lastAccessedAt': new Date().toISOString() } }).catch(() => { });
+                        return next();
+                    }
                 }
             }
         }
