@@ -47,7 +47,16 @@ export async function PUT(
     
     if (data.name) updateData.name = data.name;
     if (data.year) updateData.year = data.year;
-    if (data.status) updateData.status = data.status;
+    if (data.status) {
+      updateData.status = data.status;
+      if (data.status === 'active') {
+        // Only one fest can be active at a time
+        await db.collection('fests').updateMany(
+          { _id: { $ne: new ObjectId(id) } },
+          { $set: { status: 'archived', updatedAt: new Date() } }
+        );
+      }
+    }
     
     const result = await db.collection('fests').findOneAndUpdate(
       { _id: new ObjectId(id) },

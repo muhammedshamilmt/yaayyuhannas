@@ -4,7 +4,7 @@ import { Result } from '@/types';
 import { ObjectId } from 'mongodb';
 import { syncResultToSheets } from '@/lib/googleSheets';
 import { cookies } from 'next/headers';
-
+import { resolveActiveFestId, getFestIdFilter } from '@/lib/festHelper';
 
 export async function GET(request: Request) {
   try {
@@ -16,19 +16,14 @@ export async function GET(request: Request) {
     const collection = db.collection<Result>('results');
     
     const cookieStore = await cookies();
-    let activeFestId = cookieStore.get('activeFestId')?.value;
-
-    // Public users have no cookie — fall back to the currently active fest
-    // so they always see the right data without cross-fest leakage
-    if (!activeFestId) {
-      const activeFest = await db.collection('fests').findOne({ status: 'active' });
-      if (activeFest) activeFestId = activeFest._id.toString();
-    }
+    const activeFestId = await resolveActiveFestId(db, {
+      requestedFestId: searchParams.get('festId'),
+      cookieFestId: cookieStore.get('activeFestId')?.value
+    });
     
-    let query: any = {};
-    if (activeFestId) {
-      query.festId = activeFestId;
-    }
+    let query: any = {
+      festId: getFestIdFilter(activeFestId)
+    };
 
     if (statusParam === 'draft') {
       query.status = 'draft';
@@ -59,7 +54,9 @@ export async function POST(request: Request) {
     const collection = db.collection<Result>('results');
     
     const cookieStore = await cookies();
-    const activeFestId = cookieStore.get('activeFestId')?.value;
+    const activeFestId = await resolveActiveFestId(db, {
+      cookieFestId: cookieStore.get('activeFestId')?.value
+    });
 
     const { _id, ...bodyWithoutId } = body;
     const status = body.status === 'draft' ? 'draft' : 'published';
@@ -67,14 +64,11 @@ export async function POST(request: Request) {
     const newResult: Result & { festId?: string } = {
       ...bodyWithoutId,
       status,
+      festId: activeFestId,
       createdAt: new Date(),
       updatedAt: new Date(),
       ...(status === 'published' ? { publishedAt: new Date() } : {})
     };
-    
-    if (activeFestId) {
-      newResult.festId = activeFestId;
-    }
     
     const result = await collection.insertOne(newResult);
     

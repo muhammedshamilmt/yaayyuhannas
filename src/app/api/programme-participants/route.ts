@@ -3,18 +3,27 @@ import { ObjectId } from 'mongodb';
 import { getDatabase } from '@/lib/mongodb';
 import { syncProgrammeRegistrationToSheets } from '@/lib/googleSheets';
 import { checkCandidateProgrammeEligibility } from '@/lib/participationRules';
+import { cookies } from 'next/headers';
+import { resolveActiveFestId, getFestIdFilter } from '@/lib/festHelper';
 
 export async function GET(request: NextRequest) {
   try {
     const db = await getDatabase();
     const collection = db.collection('programme_participants');
 
+    const cookieStore = await cookies();
+    const activeFestId = await resolveActiveFestId(db, {
+      cookieFestId: cookieStore.get('activeFestId')?.value
+    });
+
     const { searchParams } = new URL(request.url);
     const team = searchParams.get('team');
     const programme = searchParams.get('programme');
     const programmeId = searchParams.get('programmeId');
 
-    let query: any = {};
+    let query: any = {
+      festId: getFestIdFilter(activeFestId)
+    };
     if (team) query.teamCode = team;
     if (programme) query.programmeId = programme;
     if (programmeId) query.programmeId = programmeId;
@@ -33,6 +42,11 @@ export async function POST(request: NextRequest) {
     const db = await getDatabase();
     const collection = db.collection('programme_participants');
 
+    const cookieStore = await cookies();
+    const activeFestId = await resolveActiveFestId(db, {
+      cookieFestId: cookieStore.get('activeFestId')?.value
+    });
+
     const body = await request.json();
     const { programmeId, programmeCode, programmeName, teamCode, participants, status = 'registered' } = body;
 
@@ -41,22 +55,54 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Check if team already registered, fetch festInfo, and check if programme is over in parallel
     const festInfoCollection = db.collection('festival-info');
     const programmesCollection = db.collection('programmes');
-    const programmeQuery = ObjectId.isValid(programmeId) 
-      ? { $or: [{ _id: new ObjectId(programmeId) }, { id: programmeId }, { code: programmeCode }] }
-      : { $or: [{ id: programmeId }, { code: programmeCode }] };
 
-    const [existing, festInfo, programmeDoc] = await Promise.all([
-      collection.findOne({ programmeId, teamCode }),
-      festInfoCollection.findOne({}),
-      programmesCollection.findOne(programmeQuery)
+    // Look up programme strictly in the active festival
+    let programmeDoc = await programmesCollection.findOne({
+      festId: getFestIdFilter(activeFestId),
+      ...(ObjectId.isValid(programmeId)
+        ? { $or: [{ _id: new ObjectId(programmeId) }, { id: programmeId }, { code: programmeCode }] }
+        : { $or: [{ id: programmeId }, { code: programmeCode }] })
+    });
+
+    // If not found directly in active fest, check if an inactive fest programme was passed and find its active counterpart
+    if (!programmeDoc) {
+      const fallbackQuery = ObjectId.isValid(programmeId)
+        ? { $or: [{ _id: new ObjectId(programmeId) }, { id: programmeId }, { code: programmeCode }] }
+        : { $or: [{ id: programmeId }, { code: programmeCode }] };
+      const staleDoc = await programmesCollection.findOne(fallbackQuery);
+      if (staleDoc) {
+        programmeDoc = await programmesCollection.findOne({
+          code: staleDoc.code,
+          section: staleDoc.section,
+          festId: getFestIdFilter(activeFestId)
+        });
+      }
+    }
+
+    if (!programmeDoc) {
+      return NextResponse.json({ 
+        error: 'This programme does not exist in the active festival. Please choose a programme from the active festival.' 
+      }, { status: 400 });
+    }
+
+    const resolvedProgId = programmeDoc._id.toString();
+    const resolvedProgCode = programmeDoc.code || programmeCode;
+    const resolvedProgName = programmeDoc.name || programmeName;
+
+    const [existing, festInfo] = await Promise.all([
+      collection.findOne({
+        programmeId: resolvedProgId,
+        teamCode,
+        festId: getFestIdFilter(activeFestId)
+      }),
+      festInfoCollection.findOne({})
     ]);
 
     if (programmeDoc && (programmeDoc.status === 'completed' || programmeDoc.isOver === true)) {
       return NextResponse.json({ 
-        error: `Programme "${programmeDoc.name || programmeName}" is over. Registrations and changes are closed.` 
+        error: `Programme "${resolvedProgName}" is over. Registrations and changes are closed.` 
       }, { status: 400 });
     }
 
@@ -123,12 +169,13 @@ export async function POST(request: NextRequest) {
     }
 
     const newParticipant = {
-      programmeId,
-      programmeCode,
-      programmeName,
+      programmeId: resolvedProgId,
+      programmeCode: resolvedProgCode,
+      programmeName: resolvedProgName,
       teamCode,
       participants,
       status,
+      festId: activeFestId,
       createdAt: new Date(),
       updatedAt: new Date()
     };

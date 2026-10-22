@@ -3,6 +3,7 @@ import { getDatabase } from '@/lib/mongodb';
 import { Candidate } from '@/types';
 import { ObjectId } from 'mongodb';
 import { cookies } from 'next/headers';
+import { resolveActiveFestId, getFestIdFilter } from '@/lib/festHelper';
 
 
 export async function GET(request: Request) {
@@ -24,16 +25,12 @@ export async function GET(request: Request) {
       query.team = team;
     }
     
-    // Add festId filter — fall back to the active fest for public users who have no cookie
+    // Add festId filter strictly for the active festival
     const cookieStore = await cookies();
-    let activeFestId = cookieStore.get('activeFestId')?.value;
-    if (!activeFestId) {
-      const activeFest = await db.collection('fests').findOne({ status: 'active' });
-      if (activeFest) activeFestId = activeFest._id.toString();
-    }
-    if (activeFestId) {
-      query.festId = activeFestId;
-    }
+    const activeFestId = await resolveActiveFestId(db, {
+      cookieFestId: cookieStore.get('activeFestId')?.value
+    });
+    query.festId = getFestIdFilter(activeFestId);
     
     const candidates = await collection.find(query).toArray();
     
@@ -51,19 +48,18 @@ export async function POST(request: Request) {
     const collection = db.collection<Candidate>('candidates');
     
     const cookieStore = await cookies();
-    const activeFestId = cookieStore.get('activeFestId')?.value;
+    const activeFestId = await resolveActiveFestId(db, {
+      cookieFestId: cookieStore.get('activeFestId')?.value
+    });
 
     const { _id, ...bodyWithoutId } = body;
     const newCandidate: Candidate & { festId?: string } = {
       ...bodyWithoutId,
+      festId: activeFestId,
       points: 0, // New candidates start with 0 points
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
-    if (activeFestId) {
-      newCandidate.festId = activeFestId;
-    }
     
     const result = await collection.insertOne(newCandidate);
     

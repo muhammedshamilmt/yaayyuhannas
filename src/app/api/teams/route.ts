@@ -3,6 +3,7 @@ import { getDatabase } from '@/lib/mongodb';
 import { Team } from '@/types';
 import { ObjectId } from 'mongodb';
 import { cookies } from 'next/headers';
+import { resolveActiveFestId, getFestIdFilter } from '@/lib/festHelper';
 
 export async function GET() {
   try {
@@ -10,18 +11,13 @@ export async function GET() {
     const collection = db.collection<Team>('teams');
     
     const cookieStore = await cookies();
-    let activeFestId = cookieStore.get('activeFestId')?.value;
-
-    // Public users have no cookie — fall back to the active fest to prevent cross-fest leakage
-    if (!activeFestId) {
-      const activeFest = await db.collection('fests').findOne({ status: 'active' });
-      if (activeFest) activeFestId = activeFest._id.toString();
-    }
+    const activeFestId = await resolveActiveFestId(db, {
+      cookieFestId: cookieStore.get('activeFestId')?.value
+    });
     
-    let query: any = {};
-    if (activeFestId) {
-      query.festId = activeFestId;
-    }
+    let query: any = {
+      festId: getFestIdFilter(activeFestId)
+    };
     
     let teams = await collection.find(query).toArray();
     
@@ -30,10 +26,10 @@ export async function GET() {
     if (teams.length === 0) {
       const defaultTeams: Team[] = [
         {
-          code: 'SMD',
-          name: 'SUMUD',
-          color: '#22C55E',
-          description: 'Team Sumud - Steadfastness and Perseverance',
+          code: 'ADL',
+          name: 'ADĀLAH',
+          color: '#2563EB',
+          description: 'Team Adālah - Justice and Integrity',
           captain: 'To be assigned',
           captainEmail: '',
           adminEmails: [],
@@ -41,13 +37,13 @@ export async function GET() {
           points: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
-          ...(activeFestId && { festId: activeFestId })
+          festId: activeFestId
         },
         {
-          code: 'INT',
-          name: 'INTIFADA',
-          color: '#EF4444',
-          description: 'Team Intifada - Uprising and Resistance',
+          code: 'SHJ',
+          name: 'SHAJĀʿAH',
+          color: '#DC2626',
+          description: 'Team Shajāʿah - Courage and Valour',
           captain: 'To be assigned',
           captainEmail: '',
           adminEmails: [],
@@ -55,13 +51,13 @@ export async function GET() {
           points: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
-          ...(activeFestId && { festId: activeFestId })
+          festId: activeFestId
         },
         {
-          code: 'AQS',
-          name: 'AQSA',
-          color: '#374151',
-          description: 'Team Aqsa - Sacred and Noble',
+          code: 'QYD',
+          name: 'QIYĀDAH',
+          color: '#16A34A',
+          description: 'Team Qiyādah - Leadership and Excellence',
           captain: 'To be assigned',
           captainEmail: '',
           adminEmails: [],
@@ -69,12 +65,12 @@ export async function GET() {
           points: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
-          ...(activeFestId && { festId: activeFestId })
+          festId: activeFestId
         }
       ];
       
       await collection.insertMany(defaultTeams);
-      teams = await collection.find({}).toArray();
+      teams = await collection.find(query).toArray();
     }
     
     return NextResponse.json(teams);
@@ -97,7 +93,9 @@ export async function POST(request: Request) {
     }
     
     const cookieStore = await cookies();
-    const activeFestId = cookieStore.get('activeFestId')?.value;
+    const activeFestId = await resolveActiveFestId(db, {
+      cookieFestId: cookieStore.get('activeFestId')?.value
+    });
 
     const { _id, ...bodyWithoutId } = body;
     const newTeam: Team & { festId?: string } = {
@@ -105,12 +103,9 @@ export async function POST(request: Request) {
       members: 0,
       points: 0,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      festId: activeFestId
     };
-    
-    if (activeFestId) {
-      newTeam.festId = activeFestId;
-    }
     
     const result = await collection.insertOne(newTeam);
     
@@ -193,7 +188,7 @@ export async function DELETE(request: Request) {
     
     // Check if this is one of the main teams
     const team = await collection.findOne({ _id: new ObjectId(id) });
-    if (team && ['SUMUD', 'INTIFADA', 'AQSA'].includes(team.name)) {
+    if (team && ['SUMUD', 'INTIFADA', 'AQSA', 'QIYĀDAH', 'SHAJĀʿAH', 'ADĀLAH', 'QIYADAH', 'SHAJAAH', 'ADALAH'].includes(team.name)) {
       return NextResponse.json({ error: 'Cannot delete main festival teams' }, { status: 403 });
     }
     

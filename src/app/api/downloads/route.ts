@@ -3,6 +3,7 @@ import { getDatabase } from '@/lib/mongodb';
 import { Candidate, Result, Programme, Team } from '@/types';
 import { findProgramme, getProgrammeName, getProgrammeCode } from '@/lib/resultsHelper';
 import { cookies } from 'next/headers';
+import { resolveActiveFestId, getFestIdFilter } from '@/lib/festHelper';
 
 export async function GET(request: Request) {
   try {
@@ -22,9 +23,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Candidate not found' }, { status: 404 });
     }
     
-    // 2. Get active fest ID to filter results (optional, but good for scoping)
+    // 2. Get active fest ID strictly scoped to active festival
     const cookieStore = await cookies();
-    const activeFestId = cookieStore.get('activeFestId')?.value;
+    const activeFestId = await resolveActiveFestId(db, {
+      cookieFestId: cookieStore.get('activeFestId')?.value
+    });
     
     let resultQuery: any = {
       $or: [
@@ -32,12 +35,9 @@ export async function GET(request: Request) {
         { "secondPlace.chestNumber": chestNumber },
         { "thirdPlace.chestNumber": chestNumber },
         { "participationGrades.chestNumber": chestNumber }
-      ]
+      ],
+      festId: getFestIdFilter(activeFestId)
     };
-    
-    if (activeFestId) {
-      resultQuery.festId = activeFestId;
-    }
     
     // 3. Get results where candidate won or participated
     const rawResults = await db.collection<Result>('results').find(resultQuery).toArray();
@@ -51,17 +51,9 @@ export async function GET(request: Request) {
     }
     
     // 4. Get the programme names for these results
-    const programmeIds = rawResults.map(r => r.programmeId);
-    
-    // The programmeId might be stored as an ObjectId string in results. 
-    // Wait, in POST /api/results we saved `programmeId` as a string. Let's just find by code or ID.
-    // Let's get all programmes and match them manually since it's easier and usually a small collection
-    let programmeQuery: any = {};
-    if (activeFestId) {
-      programmeQuery.festId = ObjectId.isValid(activeFestId) 
-        ? { $in: [activeFestId, new ObjectId(activeFestId)] } 
-        : activeFestId;
-    }
+    let programmeQuery: any = {
+      festId: getFestIdFilter(activeFestId)
+    };
     const programmes = await db.collection<Programme>('programmes').find(programmeQuery).toArray();
     
     // Get team info for branding colors (optional)
