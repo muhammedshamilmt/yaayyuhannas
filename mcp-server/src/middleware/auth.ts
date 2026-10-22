@@ -3,6 +3,11 @@ import { config } from '../config.js';
 import { getDatabase } from '../db.js';
 
 export async function authenticateMcpRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+  // Always allow CORS preflight (OPTIONS) and health/info probes (HEAD)
+  if (req.method === 'OPTIONS' || req.method === 'HEAD') {
+    return next();
+  }
+
   // Extract token from header, basic auth, body, or query
   let clientToken: string | null = null;
 
@@ -26,16 +31,15 @@ export async function authenticateMcpRequest(req: Request, res: Response, next: 
     clientToken = req.body.client_secret.trim();
   }
 
-  // 1. Allow protocol handshake discovery methods (initialize, ping)
-  // This is required so Google Gemini & MCP clients can verify server protocol compatibility
-  const rpcMethod = req.body?.method;
+  // 1. Allow protocol handshake discovery methods (initialize, ping, notifications/initialized)
+  // This is required so Claude, Google Gemini & MCP clients can complete protocol negotiation
+  const rpcMethod = Array.isArray(req.body) ? req.body[0]?.method : req.body?.method;
   if (rpcMethod === 'initialize' || rpcMethod === 'ping' || rpcMethod === 'notifications/initialized') {
     return next();
   }
 
-  // 2. Allow initial GET stream handshake for /sse and /mcp
-  // Clients (like Gemini or Cursor) need to establish the connection before sending RPC messages
-  if (req.method === 'GET' && (req.path === '/sse' || req.path === '/mcp')) {
+  // 2. Allow initial GET stream handshake or probe for /sse and /mcp
+  if (req.method === 'GET' && (req.path === '/sse' || req.path === '/mcp' || req.path === '/')) {
     return next();
   }
 

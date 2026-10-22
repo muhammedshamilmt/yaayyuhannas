@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { randomBytes } from 'crypto';
 import { config } from './config.js';
+import { getDatabase } from './db.js';
 export const oauthRouter = Router();
 // In-memory store for authorization codes (code -> { clientId, redirectUri, token, expiresAt })
 const authCodes = new Map();
@@ -63,7 +64,7 @@ oauthRouter.post('/oauth/register', (req, res) => {
         client_secret: clientSecret,
         client_id_issued_at: Math.floor(Date.now() / 1000),
         client_secret_expires_at: 0,
-        client_name: 'Google Gemini Connected App',
+        client_name: 'AI Connected App (Claude / Gemini)',
         redirect_uris: req.body?.redirect_uris || [],
         grant_types: ['authorization_code', 'client_credentials'],
         response_types: ['code'],
@@ -72,22 +73,41 @@ oauthRouter.post('/oauth/register', (req, res) => {
 });
 // 5. Authorization Endpoint (GET /oauth/authorize)
 oauthRouter.get('/oauth/authorize', async (req, res) => {
-    const { client_id, redirect_uri, state, response_type, code_challenge } = req.query;
+    const { client_id, redirect_uri, state, response_type, code_challenge, email } = req.query;
     const origin = getServerOrigin(req);
     if (!redirect_uri) {
         res.status(400).send('Missing redirect_uri parameter');
         return;
     }
+    // Determine user token (either user-specific from DB or master config token)
+    let resolvedToken = config.authToken || 'ayyuhannas-secret-2026';
+    let userEmailLabel = '';
+    if (email) {
+        try {
+            const db = await getDatabase();
+            const settings = await db.collection('mcp_settings').findOne({
+                serverName: 'ayyuhannas-fest',
+                'authorizedEmails.email': email.trim().toLowerCase(),
+            });
+            if (settings && Array.isArray(settings.authorizedEmails)) {
+                const found = settings.authorizedEmails.find((u) => u.email?.toLowerCase() === email.trim().toLowerCase());
+                if (found && found.status === 'active') {
+                    resolvedToken = found.token;
+                    userEmailLabel = found.email;
+                }
+            }
+        }
+        catch { }
+    }
     // Generate an authorization code valid for 10 minutes
     const authCode = `ayyu_code_${randomBytes(16).toString('hex')}`;
     authCodes.set(authCode, {
-        clientId: client_id || 'gemini',
+        clientId: client_id || 'ai-assistant',
         redirectUri: redirect_uri,
-        token: config.authToken || 'ayyuhannas-secret-2026',
+        token: resolvedToken,
         expiresAt: Date.now() + 10 * 60 * 1000,
     });
-    // If auto-approved or already consented, redirect immediately to Google's redirect relay
-    // (Gemini redirect URI is typically under oauth-redirect.googleusercontent.com)
+    // Target redirect with authorization code and state
     const targetRedirect = new URL(redirect_uri);
     targetRedirect.searchParams.set('code', authCode);
     if (state) {
@@ -98,20 +118,20 @@ oauthRouter.get('/oauth/authorize', async (req, res) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Ayyuhannas Fest 2026 - Authorize Gemini AI</title>
+  <title>Ayyuhannas Fest 2026 - Authorize AI Assistant</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: system-ui, sans-serif; background: #f8fafc; color: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-    .card { background: white; border: 1px solid #e2e8f0; border-radius: 1.25rem; padding: 2rem; max-width: 440px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); text-align: center; }
-    .logo { width: 72px; height: 72px; border-radius: 1rem; margin-bottom: 1rem; border: 1px solid #e2e8f0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 16px; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 1.25rem; padding: 2.25rem; max-width: 440px; width: 100%; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06); text-align: center; }
+    .logo { width: 72px; height: 72px; border-radius: 1.25rem; margin-bottom: 1rem; border: 1px solid #e2e8f0; object-fit: cover; }
     h2 { font-size: 1.35rem; margin: 0 0 0.5rem 0; font-weight: 800; color: #0f172a; }
     p { font-size: 0.875rem; color: #64748b; line-height: 1.5; margin-bottom: 1.5rem; }
-    .badge { display: inline-block; background: #eff6ff; color: #1d4ed8; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; border: 1px solid #bfdbfe; margin-bottom: 1rem; }
-    .btn { display: block; width: 100%; box-sizing: border-box; background: #2563eb; color: white; padding: 0.75rem; border-radius: 0.75rem; font-weight: 600; text-decoration: none; transition: 0.2s; border: none; font-size: 0.9rem; cursor: pointer; }
+    .badge { display: inline-block; background: #eff6ff; color: #1d4ed8; padding: 0.3rem 0.85rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; border: 1px solid #bfdbfe; margin-bottom: 1rem; }
+    .btn { display: block; width: 100%; box-sizing: border-box; background: #2563eb; color: white; padding: 0.8rem; border-radius: 0.75rem; font-weight: 600; text-decoration: none; transition: 0.2s; border: none; font-size: 0.9rem; cursor: pointer; }
     .btn:hover { background: #1d4ed8; }
+    .email-chip { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 8px; font-family: monospace; font-size: 12px; color: #334155; margin-bottom: 16px; display: inline-block; }
   </style>
   <script>
-    // Automatically complete authorization after 1.5 seconds
     setTimeout(function() {
       window.location.href = "${targetRedirect.toString()}";
     }, 1200);
@@ -121,8 +141,9 @@ oauthRouter.get('/oauth/authorize', async (req, res) => {
   <div class="card">
     <img src="/logo.png" alt="Festival Logo" class="logo">
     <div class="badge">ayyuhannas-fest MCP Server</div>
-    <h2>Authorize Google Gemini</h2>
-    <p>Granting Gemini access to festival standings, candidate rosters, and programme schedules.</p>
+    <h2>Authorize AI Assistant</h2>
+    <p>Granting your AI assistant (Claude, Google Gemini, etc.) access to live festival standings, candidate rosters, and programme schedules.</p>
+    ${userEmailLabel ? `<div class="email-chip">Authorized: ${userEmailLabel}</div>` : ''}
     <a href="${targetRedirect.toString()}" class="btn">Confirming Connection...</a>
   </div>
 </body>

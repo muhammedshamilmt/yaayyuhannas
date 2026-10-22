@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
@@ -35,6 +36,11 @@ export function createMcpServer() {
     return server;
 }
 async function bootstrap() {
+    const isStdio = process.argv.includes('--stdio');
+    if (isStdio) {
+        // In stdio transport mode, redirect console.log to stderr so stdout is 100% clean for JSON-RPC
+        console.log = (...args) => console.error(...args);
+    }
     console.log('===========================================================');
     console.log('🎪 Ayyuhannas Arts & Sports Fest 2026 - MCP Database Server');
     console.log('   Connector: ayyuhannas-fest');
@@ -61,8 +67,9 @@ async function bootstrap() {
     const app = express();
     app.use(cors({
         origin: '*',
-        methods: ['GET', 'POST', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+        methods: ['GET', 'POST', 'OPTIONS', 'DELETE', 'HEAD'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'mcp-session-id', 'last-event-id', 'accept'],
+        exposedHeaders: ['mcp-session-id', 'Content-Type'],
     }));
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
@@ -76,8 +83,19 @@ async function bootstrap() {
     app.get('/favicon.ico', (_req, res) => {
         res.sendFile(path.join(publicDir, 'logo.png'));
     });
-    // Store active SSE transports by sessionId
-    const transports = new Map();
+    const sessions = new Map();
+    const MAX_SESSIONS = 500;
+    const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+    // Periodic cleanup of inactive sessions
+    setInterval(() => {
+        const cutoff = Date.now() - IDLE_TIMEOUT_MS;
+        for (const [id, session] of sessions.entries()) {
+            if (session.open === 0 && session.lastActive < cutoff) {
+                session.transport.close().catch(() => { });
+                sessions.delete(id);
+            }
+        }
+    }, 60000).unref();
     // Public Health check endpoint (Render uses this to verify deployment)
     app.get('/health', async (_req, res) => {
         const dbStatus = await testConnection();
@@ -254,7 +272,9 @@ async function bootstrap() {
             instructions: 'Connect this endpoint to Claude Desktop, Cursor, Gemini, or ChatGPT via SSE.',
         });
     });
-    // SSE stream endpoint
+    // ===========================================================================
+    // 1. SSE Stream Endpoint (Legacy / Classic MCP clients like Cursor & Desktop)
+    // ===========================================================================
     app.get('/sse', authenticateMcpRequest, async (req, res) => {
         console.log(`[SSE] Incoming client connection from ${req.ip}`);
         // Explicit headers for Render, Cloudflare, Nginx, and proxies
@@ -268,8 +288,9 @@ async function bootstrap() {
         // Create new SSE transport directing client to POST to /messages
         const transport = new SSEServerTransport('/messages', res);
         const sessionId = transport.sessionId;
-        transports.set(sessionId, transport);
-        // CRITICAL: Send periodic SSE heartbeat ping every 15 seconds to prevent Render, Cloudflare, proxies, and browser agents from dropping the connection!
+        const sessionRecord = { transport, open: 1, lastActive: Date.now() };
+        sessions.set(sessionId, sessionRecord);
+        // Periodic SSE heartbeat keepalive ping every 15 seconds
         const keepaliveTimer = setInterval(() => {
             try {
                 if (!res.writableEnded) {
@@ -283,18 +304,24 @@ async function bootstrap() {
                 clearInterval(keepaliveTimer);
             }
         }, 15000);
+        const cleanup = () => {
+            clearInterval(keepaliveTimer);
+            sessions.delete(sessionId);
+        };
         req.on('close', () => {
             console.log(`[SSE] Client disconnected session: ${sessionId}`);
-            clearInterval(keepaliveTimer);
-            transports.delete(sessionId);
+            cleanup();
         });
+        transport.onclose = () => {
+            cleanup();
+        };
         try {
             const serverInstance = createMcpServer();
             await serverInstance.connect(transport);
             console.log(`[SSE] Session initialized and connected: ${sessionId}`);
         }
         catch (err) {
-            clearInterval(keepaliveTimer);
+            cleanup();
             console.error(`[SSE] Connection error for session ${sessionId}:`, err);
         }
     });
@@ -305,13 +332,14 @@ async function bootstrap() {
             res.status(400).send('Missing sessionId query parameter');
             return;
         }
-        const transport = transports.get(sessionId);
-        if (!transport) {
+        const sessionRecord = sessions.get(sessionId);
+        if (!sessionRecord || !(sessionRecord.transport instanceof SSEServerTransport)) {
             res.status(404).send(`Session ${sessionId} not found or expired`);
             return;
         }
+        sessionRecord.lastActive = Date.now();
         try {
-            await transport.handlePostMessage(req, res);
+            await sessionRecord.transport.handlePostMessage(req, res);
         }
         catch (err) {
             console.error(`[Messages] Error handling post message:`, err);
@@ -320,16 +348,91 @@ async function bootstrap() {
             }
         }
     });
-    // 4. Streamable HTTP Transport (MCP Standard for Google Gemini & Modern Cloud Agents)
-    // Handles both POST JSON-RPC and GET streaming directly on /mcp, /sse, and /
-    const streamableTransport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined, // Stateless mode for cloud environments like Render
-    });
-    const streamableServer = createMcpServer();
-    await streamableServer.connect(streamableTransport);
+    // ===========================================================================
+    // 2. Streamable HTTP Transport (MCP Standard for Google Gemini, Claude, Antigravity)
+    // Supports multi-session stateful multiplexing on /mcp, /sse, and /
+    // ===========================================================================
     const handleStreamableRequest = async (req, res) => {
+        // A. Handle GET / HEAD probe requests without text/event-stream (Claude connector validation, health checks, uptime monitors)
+        if ((req.method === 'GET' || req.method === 'HEAD') && !req.headers.accept?.includes('text/event-stream')) {
+            res.status(200).json({
+                name: 'ayyuhannas-fest',
+                protocolVersion: '2024-11-05',
+                status: 'healthy',
+                transport: 'streamable-http',
+                endpoints: { mcp: '/mcp', sse: '/sse', messages: '/messages' },
+            });
+            return;
+        }
+        // B. Ensure Accept header satisfies Streamable HTTP transport requirements (application/json AND text/event-stream)
+        if (!req.headers.accept || !req.headers.accept.includes('text/event-stream')) {
+            req.headers.accept = 'application/json, text/event-stream';
+        }
         try {
-            await streamableTransport.handleRequest(req, res, req.body);
+            const sessionId = req.headers['mcp-session-id'] || req.query.sessionId;
+            const sessionRecord = sessionId ? sessions.get(sessionId) : undefined;
+            let transport;
+            const isInitRequest = req.method === 'POST' && (req.body?.method === 'initialize' ||
+                (Array.isArray(req.body) && req.body[0]?.method === 'initialize'));
+            if (sessionRecord) {
+                if (sessionRecord.transport instanceof StreamableHTTPServerTransport) {
+                    transport = sessionRecord.transport;
+                    sessionRecord.lastActive = Date.now();
+                }
+                else {
+                    res.status(400).json({
+                        jsonrpc: '2.0',
+                        error: { code: -32000, message: 'Session exists but uses a different transport protocol' },
+                        id: null,
+                    });
+                    return;
+                }
+            }
+            else if (isInitRequest) {
+                if (sessions.size >= MAX_SESSIONS) {
+                    res.status(503).json({
+                        jsonrpc: '2.0',
+                        error: { code: -32000, message: 'Too many open sessions on server' },
+                        id: null,
+                    });
+                    return;
+                }
+                transport = new StreamableHTTPServerTransport({
+                    sessionIdGenerator: () => randomUUID(),
+                    enableJsonResponse: true,
+                    onsessioninitialized: (newSid) => {
+                        console.log(`[StreamableHTTP] Session initialized with ID: ${newSid}`);
+                        sessions.set(newSid, { transport, open: 0, lastActive: Date.now() });
+                    },
+                });
+                transport.onclose = () => {
+                    const sid = transport.sessionId;
+                    if (sid && sessions.has(sid)) {
+                        console.log(`[StreamableHTTP] Session closed: ${sid}`);
+                        sessions.delete(sid);
+                    }
+                };
+                const serverInstance = createMcpServer();
+                await serverInstance.connect(transport);
+            }
+            else if (sessionId) {
+                res.status(404).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32001, message: 'Session not found or expired. Please re-initialize.' },
+                    id: null,
+                });
+                return;
+            }
+            else {
+                // Non-session request that is not an initialize request
+                res.status(400).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32000, message: 'Bad Request: No valid MCP session ID provided' },
+                    id: null,
+                });
+                return;
+            }
+            await transport.handleRequest(req, res, req.body);
         }
         catch (err) {
             console.error('[StreamableHTTP] Error handling request:', err);
@@ -342,11 +445,21 @@ async function bootstrap() {
             }
         }
     };
-    // Primary Gemini Cloud MCP endpoint
+    // Primary MCP endpoints (Streamable HTTP + JSON-RPC)
     app.all('/mcp', authenticateMcpRequest, handleStreamableRequest);
-    // Allow direct POST on /sse and / for clients that probe without query params
     app.post('/sse', authenticateMcpRequest, handleStreamableRequest);
     app.post('/', authenticateMcpRequest, handleStreamableRequest);
+    // Well-known MCP metadata endpoint
+    app.get('/.well-known/mcp.json', (_req, res) => {
+        res.json({
+            name: 'ayyuhannas-fest',
+            protocolVersion: '2024-11-05',
+            endpoints: {
+                mcp: '/mcp',
+                sse: '/sse',
+            },
+        });
+    });
     const serverPort = config.port;
     // Explicitly bind to 0.0.0.0 for Render, Docker, and Cloud compatibility
     const httpServer = app.listen(serverPort, '0.0.0.0', () => {
