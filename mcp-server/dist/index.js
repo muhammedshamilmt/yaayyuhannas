@@ -424,13 +424,13 @@ async function bootstrap() {
                 return;
             }
             else {
-                // Non-session request that is not an initialize request
-                res.status(400).json({
-                    jsonrpc: '2.0',
-                    error: { code: -32000, message: 'Bad Request: No valid MCP session ID provided' },
-                    id: null,
+                // C. Stateless fallback (Google Gemini Cloud, AI Studio, and agents calling tools without session binding)
+                transport = new StreamableHTTPServerTransport({
+                    sessionIdGenerator: undefined,
+                    enableJsonResponse: true,
                 });
-                return;
+                const serverInstance = createMcpServer();
+                await serverInstance.connect(transport);
             }
             await transport.handleRequest(req, res, req.body);
         }
