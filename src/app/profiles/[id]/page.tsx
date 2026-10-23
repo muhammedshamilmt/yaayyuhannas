@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Candidate, Team, Result, Programme } from '@/types';
-import { findProgramme, getProgrammeName } from '@/lib/resultsHelper';
+import { Candidate, Team, Result, Programme, ProgrammeParticipant } from '@/types';
+import { getTeamTheme, getSectionTheme, getCandidateStats, CandidateStats } from '@/lib/profileHelper';
 
 export default function ProfileDetailPage() {
   const params = useParams();
@@ -13,9 +13,10 @@ export default function ProfileDetailPage() {
 
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
-
+  const [teams, setTeams] = useState<Team[]>([]);
   const [results, setResults] = useState<Result[]>([]);
   const [programmes, setProgrammes] = useState<Programme[]>([]);
+  const [programmeParticipants, setProgrammeParticipants] = useState<ProgrammeParticipant[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'participations' | 'results' | 'achievements'>('overview');
 
@@ -28,165 +29,65 @@ export default function ProfileDetailPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [candidatesRes, teamsRes, resultsRes, programmesRes] = await Promise.all([
+      const [candidatesRes, teamsRes, resultsRes, programmesRes, participantsRes] = await Promise.all([
         fetch('/api/candidates'),
         fetch('/api/teams'),
         fetch('/api/results'),
-        fetch('/api/programmes')
+        fetch('/api/programmes'),
+        fetch('/api/programme-participants')
       ]);
 
-      const [candidatesData, teamsData, resultsData, programmesData] = await Promise.all([
-        candidatesRes.json(),
-        teamsRes.json(),
-        resultsRes.json(),
-        programmesRes.json()
+      const [candidatesData, teamsData, resultsData, programmesData, participantsData] = await Promise.all([
+        candidatesRes.ok ? candidatesRes.json() : [],
+        teamsRes.ok ? teamsRes.json() : [],
+        resultsRes.ok ? resultsRes.json() : [],
+        programmesRes.ok ? programmesRes.json() : [],
+        participantsRes.ok ? participantsRes.json() : []
       ]);
 
-      const foundCandidate = candidatesData.find((c: Candidate) => 
-        c._id?.toString() === candidateId || c.chestNumber === candidateId
+      const candidateList: Candidate[] = Array.isArray(candidatesData) ? candidatesData : [];
+      const teamList: Team[] = Array.isArray(teamsData) ? teamsData : [];
+
+      const cleanCandidateId = decodeURIComponent(candidateId).trim();
+      const foundCandidate = candidateList.find((c: Candidate) => 
+        String(c._id) === cleanCandidateId || 
+        String(c.chestNumber) === cleanCandidateId
       );
       
       if (!foundCandidate) {
-        router.push('/profiles');
+        setCandidate(null);
         return;
       }
 
       setCandidate(foundCandidate);
-      
-      const candidateTeam = teamsData.find((t: Team) => t.code === foundCandidate.team);
-      setTeam(candidateTeam);
+      setTeams(teamList);
 
-      // Filter results where this candidate participated
-      const candidateResults = resultsData.filter((result: Result) => {
-        const individualResults = [
-          ...(result.firstPlace || []),
-          ...(result.secondPlace || []),
-          ...(result.thirdPlace || [])
-        ];
-        
-        return individualResults.some(winner => 
-          winner.chestNumber === foundCandidate.chestNumber
-        );
-      });
-      
-      setResults(candidateResults);
-      setProgrammes(programmesData || []);
+      const candidateTeam = teamList.find((t: Team) => 
+        t.code?.toUpperCase() === foundCandidate.team?.toUpperCase() ||
+        t._id?.toString() === foundCandidate.team
+      );
+      setTeam(candidateTeam || null);
+
+      setResults(Array.isArray(resultsData) ? resultsData : []);
+      setProgrammes(Array.isArray(programmesData) ? programmesData : []);
+      setProgrammeParticipants(Array.isArray(participantsData) ? participantsData : []);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching profile data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const getTeamColor = (teamName?: string) => {
-    switch (teamName?.toLowerCase()) {
-      case 'team sumud': return 'from-green-500 to-emerald-600';
-      case 'team aqsa': return 'from-gray-500 to-gray-600';
-      case 'team inthifada': return 'from-red-500 to-rose-600';
-      default: return 'from-blue-500 to-indigo-600';
-    }
-  };
-
-  const getTeamBadgeColor = (teamName?: string) => {
-    switch (teamName?.toLowerCase()) {
-      case 'team sumud': return 'bg-green-100 text-green-800 border-green-200';
-      case 'team aqsa': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'team inthifada': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-blue-100 text-blue-800 border-blue-200';
-    }
-  };
-
-  const getSectionColor = (section: string) => {
-    switch (section?.toLowerCase()) {
-      case 'senior': return 'bg-purple-100 text-purple-800';
-      case 'junior': return 'bg-yellow-100 text-yellow-800';
-      case 'sub-junior': return 'bg-pink-100 text-pink-800';
-      case 'general': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getProgrammeName = (programmeId: string) => {
-    const programme = programmes.find(p => p._id?.toString() === programmeId);
-    return programme?.name || 'Unknown Programme';
-  };
-
-  const getProgrammeCategory = (programmeId: string) => {
-    const programme = programmes.find(p => p._id?.toString() === programmeId);
-    return programme?.category || 'general';
-  };
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'arts': return '🎭';
-      case 'sports': return '⚽';
-      default: return '🏆';
-    }
-  };
-
-  const getTotalPoints = () => {
-    let totalPoints = 0;
-    
-    results.forEach(result => {
-      // Always use points stored on the result record
-      if (result.firstPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-        totalPoints += result.firstPoints ?? 0;
-      }
-      else if (result.secondPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-        totalPoints += result.secondPoints ?? 0;
-      }
-      else if (result.thirdPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-        totalPoints += result.thirdPoints ?? 0;
-      }
-    });
-    
-    return totalPoints;
-  };
-
-  const getPositionStats = () => {
-    let first = 0, second = 0, third = 0;
-    
-    results.forEach(result => {
-      if (result.firstPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-        first++;
-      } else if (result.secondPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-        second++;
-      } else if (result.thirdPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-        third++;
-      }
-    });
-
-    return { first, second, third, total: first + second + third };
-  };
-
-  const getPerformanceRating = () => {
-    const totalPoints = getTotalPoints();
-    const totalResults = results.length;
-    if (totalResults === 0) return 'No Data';
-    
-    const avgPoints = totalPoints / totalResults;
-    if (avgPoints >= 4) return 'Excellent';
-    if (avgPoints >= 3) return 'Good';
-    if (avgPoints >= 2) return 'Average';
-    return 'Needs Improvement';
-  };
-
-  const getRatingColor = (rating: string) => {
-    switch (rating) {
-      case 'Excellent': return 'text-green-600 bg-green-100';
-      case 'Good': return 'text-blue-600 bg-blue-100';
-      case 'Average': return 'text-yellow-600 bg-yellow-100';
-      case 'Needs Improvement': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-xl">Loading profile...</p>
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin"></div>
+          </div>
+          <h2 className="text-xl font-bold text-white mb-1">Loading Participant Profile...</h2>
+          <p className="text-slate-400 text-sm">Retrieving event registrations and achievements</p>
         </div>
       </div>
     );
@@ -194,283 +95,388 @@ export default function ProfileDetailPage() {
 
   if (!candidate) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-gray-400 text-2xl">👤</span>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+          <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-700">
+            <span className="text-3xl">👤</span>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Profile Not Found</h2>
-          <p className="text-gray-600 mb-6">The requested profile could not be found.</p>
-          <Link href="/profiles" className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
-            Back to Profiles
+          <h2 className="text-2xl font-bold text-white mb-2">Profile Not Found</h2>
+          <p className="text-slate-400 text-sm mb-6">
+            The requested participant (#{candidateId}) could not be located in Wattaqa Arts Fest 2k25.
+          </p>
+          <Link
+            href="/profiles"
+            className="inline-flex items-center justify-center px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition-colors"
+          >
+            ← Back to Profiles
           </Link>
         </div>
       </div>
     );
   }
 
-  const positionStats = getPositionStats();
-  const totalPoints = getTotalPoints();
-  const performanceRating = getPerformanceRating();
+  const teamTheme = getTeamTheme(candidate.team, teams);
+  const sectionTheme = getSectionTheme(candidate.section);
+  const stats: CandidateStats = getCandidateStats(candidate, results, programmeParticipants, programmes);
 
   return (
-    <div className="min-h-screen bg-gray-50"
-      style={{
-        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
-                            linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px)`,
-        backgroundSize: '40px 40px'
-      }}>
+    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
       
-      {/* Profile Header */}
-      <div className={`bg-gradient-to-r ${getTeamColor(team?.name)} shadow-lg`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center justify-between mb-6">
-            <Link href="/profiles" className="text-white hover:text-gray-200 transition-colors">
-              ← Back to Profiles
-            </Link>
-          </div>
+      {/* Dynamic Team Header */}
+      <div className={`relative overflow-hidden bg-gradient-to-r ${teamTheme.gradient} border-b border-white/10 shadow-2xl`}>
+        {/* Subtle patterned overlay */}
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
           
-          <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
-            <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white border-opacity-30">
-              {candidate.profileImage ? (
-                <img
-                  src={candidate.profileImage}
-                  alt={candidate.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full bg-white bg-opacity-20 flex items-center justify-center">
-                  <span className="text-white text-2xl font-bold">
+          {/* Top navigation row */}
+          <div className="flex items-center justify-between mb-8">
+            <Link
+              href="/profiles"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-black/30 hover:bg-black/50 text-white/90 hover:text-white text-xs sm:text-sm font-medium backdrop-blur-md border border-white/10 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              All Participants
+            </Link>
+
+            <span className="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-white/20 text-white border border-white/30 backdrop-blur-md">
+              Ayyuhannas 2K25
+            </span>
+          </div>
+
+          {/* Participant Profile Banner */}
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
+            
+            {/* Avatar */}
+            <div className="relative shrink-0">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden bg-white/10 border-4 border-white/40 shadow-2xl flex items-center justify-center backdrop-blur-md">
+                {candidate.profileImage ? (
+                  <img
+                    src={candidate.profileImage}
+                    alt={candidate.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-4xl font-black text-white">
                     {candidate.name.charAt(0).toUpperCase()}
                   </span>
-                </div>
-              )}
+                )}
+              </div>
+              <div className="absolute -bottom-2 -right-2 px-2 py-0.5 rounded-lg bg-slate-950 text-white border border-white/20 text-xs font-black shadow-lg">
+                #{candidate.chestNumber}
+              </div>
             </div>
-            
+
+            {/* Profile Info */}
             <div className="flex-1">
-              <h1 className="text-4xl font-bold text-white mb-2">{candidate.name}</h1>
-              <div className="flex flex-wrap gap-3 mb-4">
-                <span className={`px-3 py-1 rounded-full text-sm font-medium border bg-white ${getTeamBadgeColor(team?.name).replace('bg-', 'text-').replace('text-', 'text-')}`}>
-                  {team?.name || 'Unknown Team'}
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
+                <span className="px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-white/90 text-slate-900 shadow-md">
+                  {teamTheme.name}
                 </span>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getSectionColor(candidate.section)}`}>
-                  {candidate.section}
+                <span className="px-3 py-1 rounded-lg text-xs font-medium bg-black/40 text-white border border-white/20 capitalize">
+                  {sectionTheme.label} Section
                 </span>
-                <span className="px-3 py-1 rounded-full text-sm font-medium bg-white bg-opacity-20 text-white">
-                  #{candidate.chestNumber}
+                <span className="px-3 py-1 rounded-lg text-xs font-medium bg-black/40 text-white border border-white/20">
+                  Chest #{candidate.chestNumber}
                 </span>
               </div>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{results.length}</div>
-                  <div className="text-sm opacity-90">Events</div>
+
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight mb-4">
+                {candidate.name}
+              </h1>
+
+              {/* Header Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-xl">
+                <div className="bg-black/30 backdrop-blur-md rounded-xl p-3 border border-white/15 text-center">
+                  <div className="text-xl sm:text-2xl font-black text-white">
+                    {stats.totalPoints}
+                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/80 mt-0.5">
+                    Total Points
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totalPoints}</div>
-                  <div className="text-sm opacity-90">Total Points</div>
+
+                <div className="bg-black/30 backdrop-blur-md rounded-xl p-3 border border-white/15 text-center">
+                  <div className="text-xl sm:text-2xl font-black text-amber-300 flex items-center justify-center gap-1">
+                    <span>🥇</span> {stats.medals.gold}
+                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/80 mt-0.5">
+                    Gold Medals
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{positionStats.first}</div>
-                  <div className="text-sm opacity-90">Gold Medals</div>
+
+                <div className="bg-black/30 backdrop-blur-md rounded-xl p-3 border border-white/15 text-center">
+                  <div className="text-xl sm:text-2xl font-black text-white">
+                    {stats.medals.total}
+                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/80 mt-0.5">
+                    Podium Wins
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{results.length}</div>
-                  <div className="text-sm opacity-90">Results</div>
+
+                <div className="bg-black/30 backdrop-blur-md rounded-xl p-3 border border-white/15 text-center">
+                  <div className="text-xl sm:text-2xl font-black text-white">
+                    {stats.registeredProgrammes.length}
+                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/80 mt-0.5">
+                    Events
+                  </div>
                 </div>
               </div>
             </div>
+
           </div>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-          <div className="flex flex-wrap border-b">
+      {/* Tabs Navigation */}
+      <div className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-1 sm:space-x-3 overflow-x-auto py-2.5 no-scrollbar">
             {[
-              { key: 'overview', label: '📊 Overview', icon: '📊' },
-              { key: 'participations', label: '🎭 Participations', icon: '🎭' },
-              { key: 'results', label: '🏆 Results', icon: '🏆' },
-              { key: 'achievements', label: '🌟 Achievements', icon: '🌟' }
+              { key: 'overview', label: 'Overview', icon: '📊' },
+              { key: 'participations', label: `Participations (${stats.registeredProgrammes.length})`, icon: '🎭' },
+              { key: 'results', label: `Results & Scores (${stats.resultDetails.length})`, icon: '🏆' },
+              { key: 'achievements', label: 'Achievements', icon: '🌟' }
             ].map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key as any)}
-                className={`px-6 py-4 font-medium text-sm md:text-base transition-colors duration-200 ${
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 flex items-center gap-2 ${
                   activeTab === tab.key
-                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
                 }`}
               >
-                <span className="hidden md:inline">{tab.label}</span>
-                <span className="md:hidden">{tab.icon}</span>
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Tab Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* Overview Tab */}
+        {/* OVERVIEW TAB */}
         {activeTab === 'overview' && (
-          <div className="space-y-8">
-            {/* Performance Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Performance Rating</h3>
-                  <span className="text-2xl">📈</span>
+          <div className="space-y-6">
+            
+            {/* Top 3 KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              
+              {/* Performance Rating */}
+              <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 shadow-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
+                    Performance Standing
+                  </h3>
+                  <span className="text-xl">📈</span>
                 </div>
-                <div className={`text-2xl font-bold px-3 py-1 rounded-lg ${getRatingColor(performanceRating)}`}>
-                  {performanceRating}
+                <div className={`inline-block px-3.5 py-1.5 rounded-xl text-sm font-black border ${stats.ratingColor} mb-2`}>
+                  {stats.performanceRating}
                 </div>
-                <p className="text-sm text-gray-600 mt-2">
-                  Based on average points per event
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Based on registered programmes, podium placements, and grade points accumulated.
                 </p>
               </div>
 
-              <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Medal Count</h3>
-                  <span className="text-2xl">🏅</span>
+              {/* Medals Breakdown */}
+              <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 shadow-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
+                    Podiums & Medals
+                  </h3>
+                  <span className="text-xl">🏅</span>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-yellow-600">🥇 Gold:</span>
-                    <span className="font-bold">{positionStats.first}</span>
+                  <div className="flex items-center justify-between text-xs sm:text-sm bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800">
+                    <span className="text-amber-400 font-semibold flex items-center gap-1.5">🥇 1st Place (Gold)</span>
+                    <span className="font-black text-white">{stats.medals.gold}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">🥈 Silver:</span>
-                    <span className="font-bold">{positionStats.second}</span>
+                  <div className="flex items-center justify-between text-xs sm:text-sm bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800">
+                    <span className="text-slate-300 font-semibold flex items-center gap-1.5">🥈 2nd Place (Silver)</span>
+                    <span className="font-black text-white">{stats.medals.silver}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-orange-600">🥉 Bronze:</span>
-                    <span className="font-bold">{positionStats.third}</span>
+                  <div className="flex items-center justify-between text-xs sm:text-sm bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800">
+                    <span className="text-amber-600 font-semibold flex items-center gap-1.5">🥉 3rd Place (Bronze)</span>
+                    <span className="font-black text-white">{stats.medals.bronze}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Activity Summary</h3>
-                  <span className="text-2xl">📋</span>
+              {/* Team Association */}
+              <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 shadow-lg flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
+                      Team Affiliation
+                    </h3>
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: teamTheme.color }} />
+                  </div>
+                  <div className="text-xl font-black text-white mb-1">
+                    {teamTheme.name}
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    Code: <span className="font-bold text-slate-200">{teamTheme.code}</span>
+                    {team?.captain && <span> • Captain: {team.captain}</span>}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Events Participated:</span>
-                    <span className="font-bold">{results.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Results Recorded:</span>
-                    <span className="font-bold">{results.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Avg Points:</span>
-                    <span className="font-bold">
-                      {results.length > 0 ? (totalPoints / results.length).toFixed(1) : '0'}
-                    </span>
-                  </div>
+                <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                  <span>Candidate Points Contributed</span>
+                  <span className="font-black text-emerald-400">{stats.totalPoints} pts</span>
                 </div>
               </div>
+
             </div>
 
-            {/* Recent Activity */}
-            <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
-                <h2 className="text-2xl font-bold text-white">Recent Activity</h2>
+            {/* Recent Activity Table */}
+            <div className="bg-slate-900/90 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-white">Recent Event Results</h3>
+                  <p className="text-xs text-slate-400">Official result announcements credited to this participant</p>
+                </div>
+                <span className="px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-semibold">
+                  {stats.resultDetails.length} recorded
+                </span>
               </div>
+
               <div className="p-6">
-                {results.length > 0 ? (
-                  <div className="space-y-4">
-                    {results.slice(0, 5).map((result, index) => {
-                      const programme = findProgramme(result, programmes);
-                      const programmeName = getProgrammeName(result, programme);
-                      
-                      // Determine position and points
-                      let position = 0;
-                      let points = 0;
-                      
-                      if (result.firstPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-                        position = 1;
-                        points = result.firstPoints ?? 0;
-                      } else if (result.secondPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-                        position = 2;
-                        points = result.secondPoints ?? 0;
-                      } else if (result.thirdPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-                        position = 3;
-                        points = result.thirdPoints ?? 0;
-                      }
-                      
-                      return (
-                        <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <span className="text-2xl">🏆</span>
-                            <div>
-                              <h4 className="font-semibold text-gray-900">{programmeName}</h4>
-                              <p className="text-sm text-gray-600">Position: #{position}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-bold text-indigo-600">{points} pts</div>
-                            <div className="text-sm text-gray-500">
-                              {new Date(result.createdAt || '').toLocaleDateString()}
+                {stats.resultDetails.length > 0 ? (
+                  <div className="divide-y divide-slate-800/80">
+                    {stats.resultDetails.map((item, idx) => (
+                      <div key={idx} className="py-3.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-lg shrink-0">
+                            {item.position === 1 ? '🥇' : item.position === 2 ? '🥈' : item.position === 3 ? '🥉' : '🎖️'}
+                          </span>
+                          <div>
+                            <h4 className="font-bold text-white text-sm sm:text-base">
+                              {item.programmeName}
+                            </h4>
+                            <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-slate-400">
+                              <span className="capitalize">{item.category}</span>
+                              {item.position > 0 && (
+                                <span className="text-indigo-400 font-semibold">
+                                  Position #{item.position}
+                                </span>
+                              )}
+                              {item.grade && (
+                                <span className="text-emerald-400 font-semibold">
+                                  Grade {item.grade}
+                                </span>
+                              )}
+                              {item.date && <span>• {item.date}</span>}
                             </div>
                           </div>
                         </div>
-                      );
-                    })}
+
+                        <div className="sm:text-right shrink-0">
+                          <span className="inline-block px-3 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-sm font-black">
+                            +{item.totalPoints} pts
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <span className="text-4xl mb-4 block">📊</span>
-                    <p className="text-gray-600">No recent activity recorded</p>
+                  <div className="text-center py-10">
+                    <span className="text-3xl block mb-2">⏳</span>
+                    <h4 className="text-base font-bold text-white mb-1">No Results Announced Yet</h4>
+                    <p className="text-slate-400 text-xs max-w-sm mx-auto">
+                      Results for this participant will be updated automatically as soon as the judges publish the scores.
+                    </p>
                   </div>
                 )}
               </div>
             </div>
+
           </div>
         )}
 
-        {/* Participations Tab */}
+        {/* PARTICIPATIONS TAB */}
         {activeTab === 'participations' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
-                <h2 className="text-2xl font-bold text-white">Event Participations</h2>
-                <p className="text-blue-100">All events this participant has competed in</p>
+            <div className="bg-slate-900/90 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-white">Registered Programmes</h3>
+                  <p className="text-xs text-slate-400">
+                    Live schedule & registrations for this candidate across arts and sports
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20 text-xs font-semibold">
+                  {stats.registeredProgrammes.length} total events
+                </span>
               </div>
+
               <div className="p-6">
-                {results.length > 0 ? (
+                {stats.registeredProgrammes.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {results.map((result, index) => {
-                      const programme = findProgramme(result, programmes);
-                      const programmeName = getProgrammeName(result, programme);
-                      const category = programme?.category || 'general';
-                      
-                      return (
-                        <div key={index} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-2xl">{getCategoryIcon(category)}</span>
-                            <span className="text-xs text-gray-500">
-                              {new Date(result.createdAt || '').toLocaleDateString()}
+                    {stats.registeredProgrammes.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-slate-950/70 rounded-2xl border border-slate-800 p-4.5 hover:border-slate-700 transition-all flex flex-col justify-between"
+                      >
+                        <div>
+                          {/* Header badges */}
+                          <div className="flex items-center justify-between gap-2 mb-2.5">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-mono text-[11px] font-bold">
+                              {item.programmeCode || 'EVENT'}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                              item.category === 'sports' 
+                                ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' 
+                                : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                            }`}>
+                              {item.category}
                             </span>
                           </div>
-                          <h4 className="font-semibold text-gray-900 mb-2">{programmeName}</h4>
-                          <div className="text-sm text-gray-600">
-                            <p>Team: {team?.name}</p>
-                            <p>Category: {category}</p>
+
+                          <h4 className="font-bold text-white text-sm mb-1.5 line-clamp-2">
+                            {item.programmeName}
+                          </h4>
+
+                          <div className="text-xs text-slate-400 flex items-center gap-2 mb-3">
+                            <span className="capitalize">{item.section}</span>
+                            <span>•</span>
+                            <span>{item.isStage ? 'Stage' : 'Non-Stage'}</span>
                           </div>
                         </div>
-                      );
-                    })}
+
+                        {/* Result or Pending status */}
+                        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                          {item.hasResult && item.resultDetail ? (
+                            <>
+                              <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                                {item.resultDetail.position === 1 ? '🥇 1st' : item.resultDetail.position === 2 ? '🥈 2nd' : item.resultDetail.position === 3 ? '🥉 3rd' : '✓ Completed'}
+                                {item.resultDetail.grade && ` (Grade ${item.resultDetail.grade})`}
+                              </span>
+                              <span className="font-black text-white bg-slate-900 px-2 py-0.5 rounded-md border border-slate-800">
+                                +{item.resultDetail.totalPoints} pts
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-slate-500 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                              Scheduled / In Progress
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <span className="text-4xl mb-4 block">🎭</span>
-                    <p className="text-gray-600">No participations recorded</p>
+                  <div className="text-center py-10">
+                    <span className="text-3xl block mb-2">📋</span>
+                    <h4 className="text-base font-bold text-white mb-1">No Registrations Recorded</h4>
+                    <p className="text-slate-400 text-xs max-w-sm mx-auto">
+                      This participant is not currently registered in any active festival programmes.
+                    </p>
                   </div>
                 )}
               </div>
@@ -478,92 +484,84 @@ export default function ProfileDetailPage() {
           </div>
         )}
 
-        {/* Results Tab */}
+        {/* RESULTS TAB */}
         {activeTab === 'results' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
-                <h2 className="text-2xl font-bold text-white">Competition Results</h2>
-                <p className="text-green-100">Detailed performance in each event</p>
+            <div className="bg-slate-900/90 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-white">Full Competition Results</h3>
+                  <p className="text-xs text-slate-400">Detailed breakdown of podium positions and grades</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-base font-black text-emerald-400">
+                    {stats.totalPoints} Points
+                  </div>
+                </div>
               </div>
+
               <div className="p-6">
-                {results.length > 0 ? (
-                  <div className="space-y-4">
-                    {results.map((result, index) => {
-                      const programme = findProgramme(result, programmes);
-                      const programmeName = getProgrammeName(result, programme);
-                      
-                      // Determine position and points
-                      let position = 0;
-                      let points = 0;
-                      
-                      if (result.firstPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-                        position = 1;
-                        points = result.firstPoints ?? 0;
-                      } else if (result.secondPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-                        position = 2;
-                        points = result.secondPoints ?? 0;
-                      } else if (result.thirdPlace?.some(winner => winner.chestNumber === candidate?.chestNumber)) {
-                        position = 3;
-                        points = result.thirdPoints ?? 0;
-                      }
-                      
-                      const getPositionColor = (position: number) => {
-                        if (position === 1) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-                        if (position === 2) return 'bg-gray-100 text-gray-800 border-gray-200';
-                        if (position === 3) return 'bg-orange-100 text-orange-800 border-orange-200';
-                        return 'bg-blue-100 text-blue-800 border-blue-200';
-                      };
-
-                      const getPositionIcon = (position: number) => {
-                        if (position === 1) return '🥇';
-                        if (position === 2) return '🥈';
-                        if (position === 3) return '🥉';
-                        return '🏅';
-                      };
-
-                      return (
-                        <div key={index} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-xl font-semibold text-gray-900">{programmeName}</h4>
-                            <div className="flex items-center space-x-2">
-                              <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getPositionColor(position)}`}>
-                                {getPositionIcon(position)} Position #{position}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="text-center p-4 bg-gray-50 rounded-lg">
-                              <div className="text-2xl font-bold text-indigo-600">{points}</div>
-                              <div className="text-sm text-gray-600">Points Earned</div>
-                            </div>
-                            <div className="text-center p-4 bg-gray-50 rounded-lg">
-                              <div className="text-2xl font-bold text-green-600">#{position}</div>
-                              <div className="text-sm text-gray-600">Final Position</div>
-                            </div>
-                            <div className="text-center p-4 bg-gray-50 rounded-lg">
-                              <div className="text-2xl font-bold text-purple-600">
-                                {(result.firstPlace?.length || 0) + (result.secondPlace?.length || 0) + (result.thirdPlace?.length || 0)}
-                              </div>
-                              <div className="text-sm text-gray-600">Total Winners</div>
-                            </div>
+                {stats.resultDetails.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {stats.resultDetails.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-slate-950/80 rounded-2xl border border-slate-800 p-5 hover:border-slate-700 transition-all shadow-md"
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div>
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                              {item.category}
+                            </span>
+                            <h4 className="font-bold text-white text-base">
+                              {item.programmeName}
+                            </h4>
                           </div>
 
-                          <div className="mt-4 pt-4 border-t border-gray-100">
-                            <div className="flex justify-between text-sm text-gray-600">
-                              <span>Date:</span>
-                              <span>{new Date(result.createdAt || '').toLocaleDateString()}</span>
-                            </div>
+                          {item.position > 0 ? (
+                            <span className={`px-2.5 py-1 rounded-xl text-xs font-black uppercase tracking-wider ${
+                              item.position === 1
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : item.position === 2
+                                ? 'bg-slate-300/20 text-slate-200 border border-slate-300/30'
+                                : 'bg-amber-700/20 text-amber-400 border border-amber-700/30'
+                            }`}>
+                              {item.position === 1 ? '🥇 1st Place' : item.position === 2 ? '🥈 2nd Place' : '🥉 3rd Place'}
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              Grade {item.grade || 'A'}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Metric stats */}
+                        <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-800/80 text-xs">
+                          <div className="bg-slate-900 rounded-lg p-2 text-center">
+                            <span className="text-slate-400 block text-[10px] uppercase">Position Points</span>
+                            <span className="text-white font-bold text-sm">+{item.positionPoints}</span>
+                          </div>
+                          <div className="bg-slate-900 rounded-lg p-2 text-center">
+                            <span className="text-slate-400 block text-[10px] uppercase">Grade Points</span>
+                            <span className="text-white font-bold text-sm">+{item.gradePoints}</span>
                           </div>
                         </div>
-                      );
-                    })}
+
+                        {item.date && (
+                          <div className="mt-3 text-[11px] text-slate-500 text-right">
+                            Announced on {item.date}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <span className="text-4xl mb-4 block">🏆</span>
-                    <p className="text-gray-600">No results recorded yet</p>
+                  <div className="text-center py-10">
+                    <span className="text-3xl block mb-2">🏆</span>
+                    <h4 className="text-base font-bold text-white mb-1">No Results Published Yet</h4>
+                    <p className="text-slate-400 text-xs max-w-sm mx-auto">
+                      Competition results and official standings for this participant will appear here when published.
+                    </p>
                   </div>
                 )}
               </div>
@@ -571,89 +569,134 @@ export default function ProfileDetailPage() {
           </div>
         )}
 
-        {/* Achievements Tab */}
+        {/* ACHIEVEMENTS TAB */}
         {activeTab === 'achievements' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Medals & Awards */}
-              <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">🏅 Medals & Awards</h3>
-                <div className="space-y-4">
-                  {positionStats.first > 0 && (
-                    <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
+              
+              {/* Medals & Honors */}
+              <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-6 shadow-xl">
+                <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                  <span>🏅</span> Official Medals & Honors
+                </h3>
+
+                <div className="space-y-3">
+                  {stats.medals.gold > 0 && (
+                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                      <div className="flex items-center gap-3">
                         <span className="text-2xl">🥇</span>
-                        <span className="font-medium">Gold Medals</span>
+                        <div>
+                          <div className="font-bold text-white text-sm">Gold Medals</div>
+                          <div className="text-xs text-amber-400/80">First place champion</div>
+                        </div>
                       </div>
-                      <span className="text-xl font-bold text-yellow-600">{positionStats.first}</span>
+                      <span className="text-xl font-black text-amber-400">{stats.medals.gold}</span>
                     </div>
                   )}
-                  {positionStats.second > 0 && (
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
+
+                  {stats.medals.silver > 0 && (
+                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-300/10 border border-slate-300/20">
+                      <div className="flex items-center gap-3">
                         <span className="text-2xl">🥈</span>
-                        <span className="font-medium">Silver Medals</span>
+                        <div>
+                          <div className="font-bold text-white text-sm">Silver Medals</div>
+                          <div className="text-xs text-slate-300/80">Second place runner-up</div>
+                        </div>
                       </div>
-                      <span className="text-xl font-bold text-gray-600">{positionStats.second}</span>
+                      <span className="text-xl font-black text-slate-200">{stats.medals.silver}</span>
                     </div>
                   )}
-                  {positionStats.third > 0 && (
-                    <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
+
+                  {stats.medals.bronze > 0 && (
+                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-700/10 border border-amber-700/20">
+                      <div className="flex items-center gap-3">
                         <span className="text-2xl">🥉</span>
-                        <span className="font-medium">Bronze Medals</span>
+                        <div>
+                          <div className="font-bold text-white text-sm">Bronze Medals</div>
+                          <div className="text-xs text-amber-500/80">Third place podium</div>
+                        </div>
                       </div>
-                      <span className="text-xl font-bold text-orange-600">{positionStats.third}</span>
+                      <span className="text-xl font-black text-amber-500">{stats.medals.bronze}</span>
                     </div>
                   )}
-                  {positionStats.total === 0 && (
-                    <div className="text-center py-4 text-gray-500">
-                      No medals earned yet
+
+                  {stats.medals.total === 0 && (
+                    <div className="text-center py-6 text-slate-500 text-xs">
+                      No medals earned yet. Check back as results are published!
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Performance Milestones */}
-              <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">🌟 Milestones</h3>
+              {/* Milestones & Badges */}
+              <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-6 shadow-xl">
+                <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                  <span>🌟</span> Festival Milestones
+                </h3>
+
                 <div className="space-y-3">
-                  <div className={`p-3 rounded-lg ${results.length >= 5 ? 'bg-green-50 text-green-800' : 'bg-gray-50 text-gray-600'}`}>
-                    <div className="flex items-center justify-between">
-                      <span>Active Participant</span>
-                      <span>{results.length >= 5 ? '✅' : '⏳'}</span>
+                  <div className={`p-3.5 rounded-xl border ${
+                    stats.registeredProgrammes.length >= 1
+                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-500'
+                  }`}>
+                    <div className="flex items-center justify-between text-sm font-bold">
+                      <span>Official Festival Competitor</span>
+                      <span>{stats.registeredProgrammes.length >= 1 ? '✅' : '🔒'}</span>
                     </div>
-                    <div className="text-sm opacity-75">Participate in 5+ events ({results.length}/5)</div>
+                    <div className="text-xs opacity-80 mt-0.5">
+                      Registered in active festival events ({stats.registeredProgrammes.length} events)
+                    </div>
                   </div>
-                  
-                  <div className={`p-3 rounded-lg ${positionStats.first >= 1 ? 'bg-green-50 text-green-800' : 'bg-gray-50 text-gray-600'}`}>
-                    <div className="flex items-center justify-between">
-                      <span>Champion</span>
-                      <span>{positionStats.first >= 1 ? '✅' : '⏳'}</span>
+
+                  <div className={`p-3.5 rounded-xl border ${
+                    stats.medals.gold >= 1
+                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-500'
+                  }`}>
+                    <div className="flex items-center justify-between text-sm font-bold">
+                      <span>Gold Champion</span>
+                      <span>{stats.medals.gold >= 1 ? '✅' : '🔒'}</span>
                     </div>
-                    <div className="text-sm opacity-75">Win 1st place ({positionStats.first}/1)</div>
+                    <div className="text-xs opacity-80 mt-0.5">
+                      Secure 1st place in any competition ({stats.medals.gold}/1)
+                    </div>
                   </div>
-                  
-                  <div className={`p-3 rounded-lg ${totalPoints >= 50 ? 'bg-green-50 text-green-800' : 'bg-gray-50 text-gray-600'}`}>
-                    <div className="flex items-center justify-between">
-                      <span>Point Collector</span>
-                      <span>{totalPoints >= 50 ? '✅' : '⏳'}</span>
+
+                  <div className={`p-3.5 rounded-xl border ${
+                    stats.totalPoints >= 20
+                      ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-500'
+                  }`}>
+                    <div className="flex items-center justify-between text-sm font-bold">
+                      <span>Top Scorer Badge</span>
+                      <span>{stats.totalPoints >= 20 ? '✅' : '🔒'}</span>
                     </div>
-                    <div className="text-sm opacity-75">Earn 50+ points ({totalPoints}/50)</div>
+                    <div className="text-xs opacity-80 mt-0.5">
+                      Accumulate 20+ total points ({stats.totalPoints}/20)
+                    </div>
                   </div>
-                  
-                  <div className={`p-3 rounded-lg ${positionStats.total >= 3 ? 'bg-green-50 text-green-800' : 'bg-gray-50 text-gray-600'}`}>
-                    <div className="flex items-center justify-between">
-                      <span>Podium Finisher</span>
-                      <span>{positionStats.total >= 3 ? '✅' : '⏳'}</span>
+
+                  <div className={`p-3.5 rounded-xl border ${
+                    stats.medals.total >= 3
+                      ? 'bg-sky-500/10 border-sky-500/20 text-sky-300'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-500'
+                  }`}>
+                    <div className="flex items-center justify-between text-sm font-bold">
+                      <span>Multi-Podium Finisher</span>
+                      <span>{stats.medals.total >= 3 ? '✅' : '🔒'}</span>
                     </div>
-                    <div className="text-sm opacity-75">3+ podium finishes ({positionStats.total}/3)</div>
+                    <div className="text-xs opacity-80 mt-0.5">
+                      Achieve 3 or more podium finishes ({stats.medals.total}/3)
+                    </div>
                   </div>
                 </div>
               </div>
+
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
