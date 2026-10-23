@@ -93,13 +93,17 @@ export default function CompetitionPaperGeneratorPage() {
   const registeredCandidates = useMemo(() => {
     if (!selectedProgramme) return [];
 
-    const progId = selectedProgramme._id?.toString();
-    const progCode = selectedProgramme.code?.trim().toLowerCase();
+    const progId = selectedProgramme._id?.toString() || (selectedProgramme as any).id?.toString();
 
     const programmeParticipants = participants.filter((p) => {
       if (p.status === 'withdrawn') return false;
-      if (progId && (p.programmeId === progId || (p as any).id === progId)) return true;
-      if (progCode && p.programmeCode && p.programmeCode.trim().toLowerCase() === progCode) return true;
+      if (progId && p.programmeId && p.programmeId.toString() === progId) return true;
+      if (!p.programmeId && p.programmeCode && p.programmeName) {
+        return (
+          p.programmeCode.trim().toUpperCase() === selectedProgramme.code?.trim().toUpperCase() &&
+          p.programmeName.trim().toLowerCase() === selectedProgramme.name?.trim().toLowerCase()
+        );
+      }
       return false;
     });
 

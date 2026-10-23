@@ -61,23 +61,30 @@ export default function PublicProgrammePage() {
     }
   };
 
-  // Helper: Count participants for a programme (strictly matched by programmeId or unique programmeCode)
+  // Helper: Count participants for a programme (strictly matched by unique programmeId)
   const getProgrammeParticipants = useCallback(
     (programme: Programme) => {
-      const progId = programme._id?.toString();
-      const progCode = programme.code?.trim().toLowerCase();
+      const progId = programme._id?.toString() || (programme as any).id?.toString();
+      if (!progId) return [];
 
       return participants.filter((p) => {
         if (p.status === 'withdrawn') return false;
-        if (progId && (p.programmeId === progId || (p as any).id === progId)) return true;
-        if (progCode && p.programmeCode && p.programmeCode.trim().toLowerCase() === progCode) return true;
+        // 1. Strict match by exact programmeId
+        if (p.programmeId && p.programmeId.toString() === progId) return true;
+        // 2. Safe fallback only if programmeId is missing on record: must match BOTH code AND name
+        if (!p.programmeId && p.programmeCode && p.programmeName) {
+          return (
+            p.programmeCode.trim().toUpperCase() === programme.code?.trim().toUpperCase() &&
+            p.programmeName.trim().toLowerCase() === programme.name?.trim().toLowerCase()
+          );
+        }
         return false;
       });
     },
     [participants]
   );
 
-  // Helper: Determine Programme Status (accurately handles real registration status)
+  // Helper: Determine Programme Status (accurately handles real registration status and result)
   const getProgrammeStatus = useCallback(
     (programme: Programme) => {
       const parts = getProgrammeParticipants(programme);
@@ -90,15 +97,27 @@ export default function PublicProgrammePage() {
 
       if (programme.status === 'completed' || (programme as any).isOver) return 'over';
 
-      const progId = programme._id?.toString();
-      const progCode = programme.code?.trim().toLowerCase();
+      const progId = programme._id?.toString() || (programme as any).id?.toString();
 
       const hasResult = results.some((r) => {
-        if (progId && (r.programmeId === progId || (r as any).id === progId)) return true;
-        if (r.programme && progCode) {
-          const parts = r.programme.split(' - ');
-          const rCode = parts[0]?.trim().toLowerCase();
-          if (rCode === progCode) return true;
+        // 1. Strict match by exact programmeId
+        if (progId && r.programmeId && r.programmeId.toString() === progId) return true;
+        // 2. Fallback: must match both code AND name (never code alone)
+        if (r.programme && programme.code && programme.name) {
+          const progStr = r.programme.trim().toLowerCase();
+          const targetExact = `${programme.code} - ${programme.name}`.trim().toLowerCase();
+          if (progStr === targetExact) return true;
+
+          if (r.programme.includes(' - ')) {
+            const [rCode, ...rest] = r.programme.split(' - ');
+            const rName = rest.join(' - ').trim().toLowerCase();
+            if (
+              rCode.trim().toUpperCase() === programme.code.trim().toUpperCase() &&
+              rName === programme.name.trim().toLowerCase()
+            ) {
+              return true;
+            }
+          }
         }
         return false;
       });
@@ -117,16 +136,28 @@ export default function PublicProgrammePage() {
 
       const matchedParticipations = getProgrammeParticipants(programme);
 
-      // Strictly match results by exact programmeId or exact code
-      const progId = programme._id?.toString();
-      const progCode = programme.code?.trim().toLowerCase();
+      // Strictly match results by exact programmeId (or both code and name)
+      const progId = programme._id?.toString() || (programme as any).id?.toString();
 
       const matchingResult = results.find((r) => {
-        if (progId && (r.programmeId === progId || (r as any).id === progId)) return true;
-        if (r.programme && progCode) {
-          const parts = r.programme.split(' - ');
-          const rCode = parts[0]?.trim().toLowerCase();
-          if (rCode === progCode) return true;
+        // 1. Strict match by exact programmeId
+        if (progId && r.programmeId && r.programmeId.toString() === progId) return true;
+        // 2. Fallback: must match both code AND name
+        if (r.programme && programme.code && programme.name) {
+          const progStr = r.programme.trim().toLowerCase();
+          const targetExact = `${programme.code} - ${programme.name}`.trim().toLowerCase();
+          if (progStr === targetExact) return true;
+
+          if (r.programme.includes(' - ')) {
+            const [rCode, ...rest] = r.programme.split(' - ');
+            const rName = rest.join(' - ').trim().toLowerCase();
+            if (
+              rCode.trim().toUpperCase() === programme.code.trim().toUpperCase() &&
+              rName === programme.name.trim().toLowerCase()
+            ) {
+              return true;
+            }
+          }
         }
         return false;
       });
