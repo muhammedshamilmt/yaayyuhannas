@@ -1,5 +1,5 @@
 import { Candidate, Team, Result, Programme, ProgrammeParticipant } from '@/types';
-import { findProgramme, getProgrammeName } from '@/lib/resultsHelper';
+import { findProgramme, getProgrammeName, getProgrammeCode } from '@/lib/resultsHelper';
 
 export interface TeamTheme {
   code: string;
@@ -134,6 +134,7 @@ export function getSectionTheme(section?: string) {
 export interface CandidateResultDetail {
   result: Result;
   programmeName: string;
+  programmeCode: string;
   category: string;
   position: 1 | 2 | 3 | 0; // 0 = participation grade only
   positionPoints: number;
@@ -144,7 +145,7 @@ export interface CandidateResultDetail {
 }
 
 export interface CandidateRegisteredProgramme {
-  participantRecord: ProgrammeParticipant;
+  participantRecord?: ProgrammeParticipant;
   programme?: Programme;
   programmeName: string;
   programmeCode: string;
@@ -188,11 +189,12 @@ export function getCandidateStats(
   let positionPoints = 0;
   let gradePoints = 0;
 
+  // Process all results for this candidate
   results.forEach(result => {
-    const isFirst = result.firstPlace?.some(p => String(p.chestNumber).trim() === chest);
-    const isSecond = result.secondPlace?.some(p => String(p.chestNumber).trim() === chest);
-    const isThird = result.thirdPlace?.some(p => String(p.chestNumber).trim() === chest);
-    const gradeItem = result.participationGrades?.find(p => String(p.chestNumber).trim() === chest);
+    const isFirst = result.firstPlace?.some(p => String(p.chestNumber || '').trim() === chest);
+    const isSecond = result.secondPlace?.some(p => String(p.chestNumber || '').trim() === chest);
+    const isThird = result.thirdPlace?.some(p => String(p.chestNumber || '').trim() === chest);
+    const gradeItem = result.participationGrades?.find(p => String(p.chestNumber || '').trim() === chest);
 
     if (!isFirst && !isSecond && !isThird && !gradeItem) {
       return;
@@ -204,25 +206,27 @@ export function getCandidateStats(
 
     if (isFirst) {
       pos = 1;
-      posPts = result.firstPoints ?? 0;
+      posPts = Number(result.firstPoints) || 0;
       gold++;
-      earnedGrade = result.firstPlace?.find(p => String(p.chestNumber).trim() === chest)?.grade;
+      earnedGrade = result.firstPlace?.find(p => String(p.chestNumber || '').trim() === chest)?.grade;
     } else if (isSecond) {
       pos = 2;
-      posPts = result.secondPoints ?? 0;
+      posPts = Number(result.secondPoints) || 0;
       silver++;
-      earnedGrade = result.secondPlace?.find(p => String(p.chestNumber).trim() === chest)?.grade;
+      earnedGrade = result.secondPlace?.find(p => String(p.chestNumber || '').trim() === chest)?.grade;
     } else if (isThird) {
       pos = 3;
-      posPts = result.thirdPoints ?? 0;
+      posPts = Number(result.thirdPoints) || 0;
       bronze++;
-      earnedGrade = result.thirdPlace?.find(p => String(p.chestNumber).trim() === chest)?.grade;
+      earnedGrade = result.thirdPlace?.find(p => String(p.chestNumber || '').trim() === chest)?.grade;
     }
 
     let gPts = 0;
     if (gradeItem) {
       earnedGrade = gradeItem.grade || earnedGrade;
-      gPts = Number(gradeItem.points ?? result.participationPoints ?? 0);
+      gPts = Number(gradeItem.points ?? result.participationPoints ?? (
+        gradeItem.grade === 'A' ? 5 : gradeItem.grade === 'B' ? 3 : gradeItem.grade === 'C' ? 1 : 0
+      ));
     }
 
     const eventPoints = posPts + gPts;
@@ -231,8 +235,21 @@ export function getCandidateStats(
     totalPoints += eventPoints;
 
     const matchedProg = findProgramme(result, programmes);
-    const pName = getProgrammeName(result, matchedProg);
-    const cat = matchedProg?.category || 'general';
+    let pName = getProgrammeName(result, matchedProg);
+    let pCode = getProgrammeCode(result, matchedProg);
+
+    // Fallback if name is still 'Unknown Programme' or empty
+    if (!pName || pName === 'Unknown Programme') {
+      if (result.programme) {
+        pName = result.programme.includes(' - ') ? result.programme.split(' - ').slice(1).join(' - ').trim() : result.programme.trim();
+      } else if (pCode) {
+        pName = `Event ${pCode}`;
+      } else {
+        pName = 'Festival Event';
+      }
+    }
+
+    const cat = matchedProg?.category || (pCode?.toLowerCase().includes('gs') || pCode?.toLowerCase().includes('spd') ? 'sports' : 'arts');
 
     const dateVal = result.publishedAt || result.createdAt;
     const dateStr = dateVal ? new Date(dateVal).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
@@ -240,6 +257,7 @@ export function getCandidateStats(
     resultDetails.push({
       result,
       programmeName: pName,
+      programmeCode: pCode,
       category: cat,
       position: pos,
       positionPoints: posPts,
@@ -257,30 +275,51 @@ export function getCandidateStats(
     return timeB - timeA;
   });
 
-  // Find all registered programmes for this candidate
+  // Find all registered programmes for this candidate from programme_participants
   const registeredProgrammes: CandidateRegisteredProgramme[] = [];
+  const registeredProgCodes = new Set<string>();
+
   programmeParticipants.forEach(pp => {
-    const hasCandidate = (pp.participants || []).some(pChest => String(pChest).trim() === chest);
+    const hasCandidate = (pp.participants || []).some(pChest => String(pChest || '').trim() === chest);
     if (!hasCandidate) return;
 
-    // Find full programme info
-    const matchedProg = programmes.find(p => 
-      (pp.programmeId && (String(p._id) === String(pp.programmeId) || String(p.id) === String(pp.programmeId))) ||
-      (pp.programmeCode && p.code?.trim().toLowerCase() === pp.programmeCode?.trim().toLowerCase())
-    );
+    const cleanPpCode = (pp.programmeCode || '').trim();
+    const cleanPpName = (pp.programmeName || '').trim();
+    const cleanPpId = (pp.programmeId || '').trim();
 
-    const progName = matchedProg?.name || pp.programmeName || 'Programme';
-    const progCode = matchedProg?.code || pp.programmeCode || '';
-    const category = matchedProg?.category || 'arts';
+    // Find full programme info from programmes collection
+    const matchedProg = programmes.find(p => {
+      const pId = String(p._id || p.id || '').trim();
+      if (cleanPpId && pId === cleanPpId) return true;
+      const pCode = (p.code || '').trim().toLowerCase();
+      if (cleanPpCode && pCode === cleanPpCode.toLowerCase()) return true;
+      const pName = (p.name || '').trim().toLowerCase();
+      if (cleanPpName && pName === cleanPpName.toLowerCase()) return true;
+      return false;
+    });
+
+    let progName = (matchedProg?.name || cleanPpName).trim();
+    if (!progName || progName.toLowerCase() === 'programme' || progName.toLowerCase() === 'unknown') {
+      progName = cleanPpCode ? `Event ${cleanPpCode}` : 'Festival Programme';
+    }
+
+    const progCode = (matchedProg?.code || cleanPpCode).trim();
+    const category = matchedProg?.category || (progCode.toLowerCase().startsWith('gs') || cleanPpName.toLowerCase().includes('ball') || cleanPpName.toLowerCase().includes('jump') ? 'sports' : 'arts');
     const section = matchedProg?.section || candidate.section || 'general';
     const isStage = matchedProg?.isStage ?? true;
 
-    // Check if this registered programme already has a result
+    // Check if this registered programme already has an announced result
     const matchedResult = resultDetails.find(rd => {
-      if (pp.programmeId && String(rd.result.programmeId) === String(pp.programmeId)) return true;
-      if (progCode && rd.result.programme?.toLowerCase().includes(progCode.toLowerCase())) return true;
+      if (cleanPpId && String(rd.result.programmeId || '').trim() === cleanPpId) return true;
+      if (progCode && rd.programmeCode && rd.programmeCode.toLowerCase() === progCode.toLowerCase()) return true;
+      if (progCode && rd.result.programme && rd.result.programme.toLowerCase().includes(progCode.toLowerCase())) return true;
+      if (cleanPpName && rd.programmeName && rd.programmeName.toLowerCase() === cleanPpName.toLowerCase()) return true;
       return false;
     });
+
+    if (progCode) {
+      registeredProgCodes.add(progCode.toLowerCase());
+    }
 
     registeredProgrammes.push({
       participantRecord: pp,
@@ -295,23 +334,46 @@ export function getCandidateStats(
     });
   });
 
+  // Also include any result event where candidate scored points that might not be in programme_participants
+  resultDetails.forEach(rd => {
+    const codeMatch = rd.programmeCode ? registeredProgCodes.has(rd.programmeCode.toLowerCase()) : false;
+    const nameMatch = registeredProgrammes.some(rp => rp.programmeName.toLowerCase() === rd.programmeName.toLowerCase());
+
+    if (!codeMatch && !nameMatch) {
+      const matchedProg = findProgramme(rd.result, programmes);
+      registeredProgrammes.push({
+        programme: matchedProg,
+        programmeName: rd.programmeName,
+        programmeCode: rd.programmeCode || (matchedProg?.code || '').trim(),
+        category: rd.category,
+        section: candidate.section || 'general',
+        isStage: matchedProg?.isStage ?? true,
+        hasResult: true,
+        resultDetail: rd
+      });
+      if (rd.programmeCode) {
+        registeredProgCodes.add(rd.programmeCode.toLowerCase());
+      }
+    }
+  });
+
   const totalWins = gold + silver + bronze;
 
   let performanceRating: 'Champion' | 'Excellent' | 'Good' | 'Active' | 'Participant' = 'Participant';
-  let ratingColor = 'text-gray-600 bg-gray-100 border-gray-200';
+  let ratingColor = 'text-gray-700 bg-gray-100 border-gray-200';
 
   if (gold >= 2 || totalPoints >= 25) {
     performanceRating = 'Champion';
-    ratingColor = 'text-amber-700 bg-amber-50 border-amber-300';
+    ratingColor = 'text-amber-800 bg-amber-50 border-amber-300';
   } else if (gold >= 1 || totalPoints >= 15) {
     performanceRating = 'Excellent';
-    ratingColor = 'text-emerald-700 bg-emerald-50 border-emerald-300';
+    ratingColor = 'text-emerald-800 bg-emerald-50 border-emerald-300';
   } else if (totalWins >= 1 || totalPoints >= 8) {
     performanceRating = 'Good';
-    ratingColor = 'text-blue-700 bg-blue-50 border-blue-300';
+    ratingColor = 'text-blue-800 bg-blue-50 border-blue-300';
   } else if (registeredProgrammes.length >= 2 || totalPoints > 0) {
     performanceRating = 'Active';
-    ratingColor = 'text-indigo-700 bg-indigo-50 border-indigo-300';
+    ratingColor = 'text-indigo-800 bg-indigo-50 border-indigo-300';
   }
 
   return {

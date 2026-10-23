@@ -143,29 +143,13 @@ export default function ProfilesPage() {
     });
   }, [filteredCandidates, sortBy, candidateStatsMap]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto mb-4">
-            <div className="absolute inset-0 rounded-full border-4 border-indigo-200"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-indigo-600 border-t-transparent animate-spin"></div>
-          </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-1">Loading Profiles...</h2>
-          <p className="text-slate-500 text-sm">Gathering live participant statistics</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-slate-900 selection:text-white">
       {/* Public Navbar */}
       <PublicNavbar />
 
-      {/* Hero Header (White Theme with soft gradient) */}
+      {/* Hero Header */}
       <header className="relative bg-gradient-to-b from-indigo-50/70 via-white to-slate-50 border-b border-slate-200/80 pt-10 pb-12 sm:pt-14 sm:pb-16 px-4 sm:px-6 overflow-hidden">
-        {/* Subtle decorative background blur shapes */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-200/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl pointer-events-none" />
 
@@ -307,8 +291,8 @@ export default function ProfilesPage() {
           </div>
         </div>
 
-        {/* Profiles Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        {/* Profiles Grid: WIDE CARD LAYOUT (2 columns with more width and less height) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {sortedCandidates.map((candidate) => {
             const stats = candidateStatsMap.get(String(candidate._id || candidate.chestNumber));
             const teamTheme = getTeamTheme(candidate.team, teams);
@@ -316,125 +300,137 @@ export default function ProfilesPage() {
 
             const totalPoints = stats?.totalPoints ?? 0;
             const totalWins = stats?.medals.total ?? 0;
-            const goldMedals = stats?.medals.gold ?? 0;
             const registeredCount = stats?.registeredProgrammes.length ?? 0;
-            const resultsCount = stats?.resultDetails.length ?? 0;
+
+            // Color palette for exp bars
+            const expColors = [
+              'bg-violet-500', 'bg-indigo-500', 'bg-blue-500', 'bg-cyan-500', 
+              'bg-teal-500', 'bg-emerald-500', 'bg-amber-400', 'bg-orange-500', 'bg-rose-500'
+            ];
+            const activeTicks = Math.min(24, Math.max(2, Math.round((totalPoints / 25) * 24)));
 
             return (
               <Link
                 key={String(candidate._id || candidate.chestNumber)}
                 href={`/profiles/${candidate.chestNumber || candidate._id}`}
-                className="group flex flex-col bg-white rounded-2xl border border-slate-200/90 hover:border-indigo-300 transition-all duration-300 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1"
+                className="group flex flex-col bg-white rounded-[26px] border border-slate-200/90 hover:border-indigo-300 transition-all duration-300 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-0.5"
               >
-                {/* Team Top Accent Strip */}
-                <div 
-                  className="h-1.5 w-full transition-all duration-300 group-hover:h-2"
-                  style={{ backgroundColor: teamTheme.color }}
-                />
-
-                {/* Card Header */}
-                <div className="p-4 sm:p-5 flex items-start gap-3.5 border-b border-slate-100">
-                  {/* Avatar */}
-                  <div className="relative shrink-0">
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 group-hover:border-indigo-400 transition-colors shadow-inner flex items-center justify-center">
-                      {candidate.profileImage ? (
-                        <img
-                          src={candidate.profileImage}
-                          alt={candidate.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-xl font-black text-indigo-600">
-                          {candidate.name.charAt(0).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    {/* Chest number badge */}
-                    <span className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-md bg-slate-900 text-white text-[10px] font-bold tracking-tight shadow">
-                      #{candidate.chestNumber}
+                {/* 1. Atmospheric Cover Header (Soft Sky / Clouds Aesthetic as in reference image) */}
+                <div className="relative h-28 sm:h-32 bg-gradient-to-r from-sky-100 via-blue-50 to-indigo-100 overflow-hidden">
+                  {/* Subtle cloud and sun glow illustration */}
+                  <div className="absolute -top-10 left-10 w-48 h-32 bg-white/70 rounded-full blur-xl pointer-events-none" />
+                  <div className="absolute top-2 right-16 w-32 h-24 bg-sky-200/40 rounded-full blur-lg pointer-events-none" />
+                  
+                  {/* Top-Right "Follow +" Style Pill Button */}
+                  <div className="absolute top-3.5 right-4 z-10">
+                    <span className="px-3.5 py-1.5 rounded-full bg-white/95 text-slate-800 text-xs font-bold shadow-sm border border-slate-200/60 backdrop-blur-md flex items-center gap-1.5 group-hover:bg-slate-900 group-hover:text-white transition-colors">
+                      <span>View</span>
+                      <span className="text-slate-400 group-hover:text-slate-300">#{candidate.chestNumber}</span>
                     </span>
                   </div>
+                </div>
 
-                  {/* Name and Badges */}
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-slate-900 text-base leading-snug truncate group-hover:text-indigo-600 transition-colors">
-                      {candidate.name}
-                    </h3>
-                    
-                    {/* Team & Section Tags */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                      <span 
-                        className="px-2 py-0.5 rounded-md text-[11px] font-bold tracking-wide uppercase shadow-2xs"
-                        style={{
-                          backgroundColor: `${teamTheme.color}15`,
-                          color: teamTheme.color,
-                          border: `1px solid ${teamTheme.color}35`
-                        }}
-                      >
-                        {teamTheme.name}
+                {/* 2. Avatar & Experience Segmented Bar (Overlapping Cover Header) */}
+                <div className="px-5 sm:px-6 flex items-end justify-between -mt-11 sm:-mt-12 relative z-10">
+                  {/* Circular Avatar with thick white border */}
+                  <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-full overflow-hidden bg-white border-4 border-white shadow-md flex items-center justify-center shrink-0">
+                    {candidate.profileImage ? (
+                      <img
+                        src={candidate.profileImage}
+                        alt={candidate.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl sm:text-3xl font-black text-indigo-600">
+                        {candidate.name.charAt(0).toUpperCase()}
                       </span>
-                      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 capitalize">
-                        {sectionTheme.label}
-                      </span>
+                    )}
+                  </div>
+
+                  {/* Experience / Status Segmented Bar (Exact UI from the photo: exp. ||||||||||||) */}
+                  <div className="pb-2 flex items-center gap-1.5 text-xs">
+                    <span className="text-[11px] font-mono tracking-tight text-slate-400 font-semibold lowercase">
+                      pts.
+                    </span>
+                    <div className="flex items-center gap-[2.5px]">
+                      {Array.from({ length: 22 }).map((_, i) => {
+                        const isActive = i < activeTicks;
+                        const tickColor = expColors[i % expColors.length];
+                        return (
+                          <span
+                            key={i}
+                            className={`w-[2.5px] h-3.5 rounded-full transition-all ${
+                              isActive ? tickColor : 'bg-slate-200'
+                            }`}
+                          />
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
 
-                {/* Card Metrics Grid */}
-                <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
-                  <div className="grid grid-cols-3 gap-2 py-1 text-center">
-                    
-                    {/* Points Metric */}
-                    <div className="bg-emerald-50/70 rounded-xl p-2.5 border border-emerald-100">
-                      <div className="text-xl sm:text-2xl font-black text-emerald-700">
-                        {totalPoints}
-                      </div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600/80 mt-0.5">
-                        Points
-                      </div>
-                    </div>
+                {/* 3. Candidate Name & Bio/Subtitle */}
+                <div className="px-5 sm:px-6 pt-2 pb-4">
+                  <h3 className="text-xl sm:text-2xl font-bold text-slate-900 group-hover:text-indigo-600 transition-colors tracking-tight">
+                    {candidate.name}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 line-clamp-1">
+                    {teamTheme.name} • {sectionTheme.label} Section • Competitor
+                  </p>
+                </div>
 
-                    {/* Medals / Wins Metric */}
-                    <div className="bg-amber-50/70 rounded-xl p-2.5 border border-amber-100">
-                      <div className="text-xl sm:text-2xl font-black text-amber-700 flex items-center justify-center gap-0.5">
-                        {goldMedals > 0 && <span className="text-xs">🥇</span>}
-                        {totalWins}
-                      </div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-amber-600/80 mt-0.5">
-                        {totalWins === 1 ? 'Podium' : 'Podiums'}
-                      </div>
+                {/* 4. 3-Column Stats Grid (Exact UI with dividing lines from the photo) */}
+                <div className="border-t border-slate-100 grid grid-cols-3 divide-x divide-slate-100 py-3 text-center bg-white">
+                  <div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                      {totalPoints}
                     </div>
-
-                    {/* Events / Participations */}
-                    <div className="bg-sky-50/70 rounded-xl p-2.5 border border-sky-100">
-                      <div className="text-xl sm:text-2xl font-black text-sky-700">
-                        {registeredCount}
-                      </div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-sky-600/80 mt-0.5">
-                        Events
-                      </div>
+                    <div className="text-xs text-slate-400 font-medium mt-0.5">
+                      Points
                     </div>
+                  </div>
+                  <div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                      {totalWins}
+                    </div>
+                    <div className="text-xs text-slate-400 font-medium mt-0.5">
+                      Podiums
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                      {registeredCount}
+                    </div>
+                    <div className="text-xs text-slate-400 font-medium mt-0.5">
+                      Events
+                    </div>
+                  </div>
+                </div>
 
+                {/* 5. Bottom Badges / Action Row */}
+                <div className="border-t border-slate-100 px-5 sm:px-6 py-2.5 bg-slate-50/60 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span 
+                      className="px-2 py-0.5 rounded-md text-[11px] font-bold tracking-wide uppercase"
+                      style={{
+                        backgroundColor: `${teamTheme.color}15`,
+                        color: teamTheme.color,
+                        border: `1px solid ${teamTheme.color}35`
+                      }}
+                    >
+                      {teamTheme.name}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-200/80 text-slate-700 capitalize">
+                      {sectionTheme.label}
+                    </span>
                   </div>
 
-                  {/* Footer status row */}
-                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-500">
-                      {resultsCount > 0 ? (
-                        <span className="text-indigo-600 font-semibold">
-                          {resultsCount} {resultsCount === 1 ? 'Result Published' : 'Results Published'}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">Awaiting Results</span>
-                      )}
-                    </span>
-                    <span className="inline-flex items-center text-indigo-600 font-semibold transition-colors">
-                      View Profile
-                      <svg className="w-3.5 h-3.5 ml-1 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </span>
-                  </div>
+                  <span className="inline-flex items-center text-indigo-600 font-semibold group-hover:translate-x-0.5 transition-transform">
+                    Profile
+                    <svg className="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
                 </div>
               </Link>
             );

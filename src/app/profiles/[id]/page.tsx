@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Candidate, Team, Result, Programme, ProgrammeParticipant } from '@/types';
 import { getTeamTheme, getSectionTheme, getCandidateStats, CandidateStats } from '@/lib/profileHelper';
@@ -10,7 +10,6 @@ import { PublicFooter } from '@/components/Navigation/PublicFooter';
 
 export default function ProfileDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const candidateId = params.id as string;
 
   const [candidate, setCandidate] = useState<Candidate | null>(null);
@@ -92,7 +91,6 @@ export default function ProfileDetailPage() {
   const candidateRank = useMemo(() => {
     if (!candidate || !stats || candidates.length === 0) return null;
 
-    // Rank candidates by totalPoints desc, then gold medals desc
     const rankList = candidates.map(c => {
       const cStats = getCandidateStats(c, results, programmeParticipants, programmes);
       return {
@@ -153,144 +151,148 @@ export default function ProfileDetailPage() {
   const teamTheme = getTeamTheme(candidate.team, teams);
   const sectionTheme = getSectionTheme(candidate.section);
 
+  const expColors = [
+    'bg-violet-500', 'bg-indigo-500', 'bg-blue-500', 'bg-cyan-500', 
+    'bg-teal-500', 'bg-emerald-500', 'bg-amber-400', 'bg-orange-500', 'bg-rose-500'
+  ];
+  const activeTicks = Math.min(24, Math.max(2, Math.round((stats.totalPoints / 25) * 24)));
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-slate-900 selection:text-white">
       {/* Public Navbar */}
       <PublicNavbar />
 
-      {/* Top Banner (White theme with Team Color accents) */}
-      <div className="relative bg-white border-b border-slate-200/90 shadow-xs overflow-hidden">
-        {/* Team Top Accent Strip */}
-        <div 
-          className="h-2 w-full"
-          style={{ backgroundColor: teamTheme.color }}
-        />
+      {/* Main Container */}
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">
+        
+        {/* Top Breadcrumb row */}
+        <div className="flex items-center justify-between mb-4">
+          <Link
+            href="/profiles"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs sm:text-sm font-semibold border border-slate-200/90 shadow-2xs transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            All Participants
+          </Link>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+          <div className="flex items-center gap-2">
+            {candidateRank && candidateRank <= 10 && (
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                🏆 Rank #{candidateRank}
+              </span>
+            )}
+            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white text-slate-700 border border-slate-200">
+              Ayyuhannas 2K25
+            </span>
+          </div>
+        </div>
+
+        {/* HERO CARD: Styled after the user's reference image (wide aspect, atmospheric sky cover, overlapping avatar, exp bar) */}
+        <div className="bg-white rounded-[28px] border border-slate-200/90 shadow-lg overflow-hidden mb-8">
           
-          {/* Top navigation row */}
-          <div className="flex items-center justify-between mb-6">
-            <Link
-              href="/profiles"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 text-xs sm:text-sm font-semibold transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              All Participants
-            </Link>
+          {/* Atmospheric Cover Header */}
+          <div className="relative h-36 sm:h-44 bg-gradient-to-r from-sky-100 via-blue-50 to-indigo-100 overflow-hidden">
+            <div className="absolute -top-12 left-16 w-64 h-36 bg-white/70 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute top-4 right-20 w-44 h-28 bg-sky-200/40 rounded-full blur-xl pointer-events-none" />
 
-            <div className="flex items-center gap-2">
-              {candidateRank && candidateRank <= 10 && (
-                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
-                  🏆 Rank #{candidateRank}
-                </span>
-              )}
-              <span className="text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                Ayyuhannas 2K25
+            {/* Top-Right "Follow +" Style Pill Button */}
+            <div className="absolute top-4 right-5 z-10 flex items-center gap-2">
+              <span className="px-4 py-1.5 rounded-full bg-white/95 text-slate-900 text-xs font-bold shadow-sm border border-slate-200/80 backdrop-blur-md flex items-center gap-1.5">
+                <span>#{candidate.chestNumber}</span>
+                <span className="text-slate-300">•</span>
+                <span style={{ color: teamTheme.color }}>{teamTheme.code}</span>
               </span>
             </div>
           </div>
 
-          {/* Participant Profile Banner */}
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
-            
+          {/* Avatar & Experience Meter Row */}
+          <div className="px-6 sm:px-8 flex items-end justify-between -mt-14 sm:-mt-16 relative z-10">
             {/* Avatar */}
-            <div className="relative shrink-0">
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden bg-slate-100 border-2 border-slate-200 shadow-md flex items-center justify-center">
-                {candidate.profileImage ? (
-                  <img
-                    src={candidate.profileImage}
-                    alt={candidate.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-4xl font-black text-indigo-600">
-                    {candidate.name.charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <div className="absolute -bottom-2 -right-2 px-2.5 py-0.5 rounded-lg bg-slate-900 text-white text-xs font-black shadow-md">
-                #{candidate.chestNumber}
-              </div>
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-white border-4 border-white shadow-md flex items-center justify-center shrink-0">
+              {candidate.profileImage ? (
+                <img
+                  src={candidate.profileImage}
+                  alt={candidate.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-3xl sm:text-4xl font-black text-indigo-600">
+                  {candidate.name.charAt(0).toUpperCase()}
+                </span>
+              )}
             </div>
 
-            {/* Profile Info */}
-            <div className="flex-1">
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
-                <span 
-                  className="px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider shadow-2xs"
-                  style={{
-                    backgroundColor: `${teamTheme.color}15`,
-                    color: teamTheme.color,
-                    border: `1px solid ${teamTheme.color}35`
-                  }}
-                >
-                  {teamTheme.name} ({teamTheme.code})
-                </span>
-                <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 capitalize">
-                  {sectionTheme.label} Section
-                </span>
-                <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                  Chest #{candidate.chestNumber}
-                </span>
-              </div>
-
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">
-                {candidate.name}
-              </h1>
-
-              {/* Header Stats Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-xl">
-                <div className="bg-emerald-50/80 rounded-xl p-3 border border-emerald-100 text-center shadow-2xs">
-                  <div className="text-xl sm:text-2xl font-black text-emerald-700">
-                    {stats.totalPoints}
-                  </div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 mt-0.5">
-                    Total Points
-                  </div>
-                </div>
-
-                <div className="bg-amber-50/80 rounded-xl p-3 border border-amber-100 text-center shadow-2xs">
-                  <div className="text-xl sm:text-2xl font-black text-amber-700 flex items-center justify-center gap-1">
-                    <span>🥇</span> {stats.medals.gold}
-                  </div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mt-0.5">
-                    Gold Medals
-                  </div>
-                </div>
-
-                <div className="bg-slate-100/80 rounded-xl p-3 border border-slate-200 text-center shadow-2xs">
-                  <div className="text-xl sm:text-2xl font-black text-slate-800">
-                    {stats.medals.total}
-                  </div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600 mt-0.5">
-                    Podium Wins
-                  </div>
-                </div>
-
-                <div className="bg-sky-50/80 rounded-xl p-3 border border-sky-100 text-center shadow-2xs">
-                  <div className="text-xl sm:text-2xl font-black text-sky-700">
-                    {stats.registeredProgrammes.length}
-                  </div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-sky-600 mt-0.5">
-                    Events
-                  </div>
-                </div>
+            {/* Experience / Status Segmented Bar (exp. ||||||||||||) */}
+            <div className="pb-3 flex items-center gap-1.5 text-xs">
+              <span className="text-[11px] font-mono tracking-tight text-slate-400 font-semibold lowercase">
+                pts.
+              </span>
+              <div className="flex items-center gap-[2.5px]">
+                {Array.from({ length: 24 }).map((_, i) => {
+                  const isActive = i < activeTicks;
+                  const tickColor = expColors[i % expColors.length];
+                  return (
+                    <span
+                      key={i}
+                      className={`w-[2.5px] h-4 rounded-full transition-all ${
+                        isActive ? tickColor : 'bg-slate-200'
+                      }`}
+                    />
+                  );
+                })}
               </div>
             </div>
-
           </div>
-        </div>
-      </div>
 
-      {/* Tabs Navigation (White Theme sticky) */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-1 sm:space-x-2 overflow-x-auto py-2.5 no-scrollbar">
+          {/* Name & Subtitle / Bio */}
+          <div className="px-6 sm:px-8 pt-2.5 pb-5">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              {candidate.name}
+            </h1>
+            <p className="text-sm text-slate-500 font-medium mt-1">
+              {teamTheme.name} Team • {sectionTheme.label} Section • Chest #{candidate.chestNumber}
+            </p>
+          </div>
+
+          {/* 3-Column Stats Grid (with vertical dividers) */}
+          <div className="border-t border-slate-100 grid grid-cols-3 divide-x divide-slate-100 py-4 text-center bg-white">
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                {stats.totalPoints}
+              </div>
+              <div className="text-xs text-slate-400 font-medium mt-0.5">
+                Total Points
+              </div>
+            </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center justify-center gap-1">
+                {stats.medals.gold > 0 && <span className="text-lg">🥇</span>}
+                {stats.medals.total}
+              </div>
+              <div className="text-xs text-slate-400 font-medium mt-0.5">
+                Podium Wins
+              </div>
+            </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                {stats.registeredProgrammes.length}
+              </div>
+              <div className="text-xs text-slate-400 font-medium mt-0.5">
+                Registered Events
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Sticky Tabs Navigation */}
+        <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-md pb-4 pt-1 border-b border-slate-200/80 mb-6">
+          <div className="flex space-x-1 sm:space-x-2 overflow-x-auto no-scrollbar">
             {[
               { key: 'overview', label: 'Overview', icon: '📊' },
-              { key: 'participations', label: `Participations (${stats.registeredProgrammes.length})`, icon: '🎭' },
+              { key: 'participations', label: `Registered Programmes (${stats.registeredProgrammes.length})`, icon: '🎭' },
               { key: 'results', label: `Results & Scores (${stats.resultDetails.length})`, icon: '🏆' },
               { key: 'achievements', label: 'Achievements', icon: '🌟' }
             ].map(tab => (
@@ -299,8 +301,8 @@ export default function ProfileDetailPage() {
                 onClick={() => setActiveTab(tab.key as any)}
                 className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 flex items-center gap-2 ${
                   activeTab === tab.key
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white bg-slate-100/70 border border-slate-200/60'
                 }`}
               >
                 <span>{tab.icon}</span>
@@ -309,16 +311,10 @@ export default function ProfileDetailPage() {
             ))}
           </div>
         </div>
-      </div>
 
-      {/* Main Tab Content */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* OVERVIEW TAB */}
+        {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            
-            {/* Top 3 KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               
               {/* Performance Rating */}
@@ -333,11 +329,11 @@ export default function ProfileDetailPage() {
                   {stats.performanceRating}
                 </div>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Calculated from competition placements, grade honors, and live registered events.
+                  Based on registered events, podiums earned, and participation grade honors.
                 </p>
                 {candidateRank && (
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Overall Festival Rank</span>
+                    <span className="text-slate-500">Festival Overall Rank</span>
                     <span className="font-extrabold text-indigo-600">#{candidateRank} of {candidates.length}</span>
                   </div>
                 )}
@@ -367,7 +363,7 @@ export default function ProfileDetailPage() {
                 </div>
               </div>
 
-              {/* Team Association */}
+              {/* Team Card */}
               <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-sm flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -418,6 +414,11 @@ export default function ProfileDetailPage() {
                               {item.programmeName}
                             </h4>
                             <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-slate-500">
+                              {item.programmeCode && (
+                                <span className="font-mono font-semibold text-slate-600">
+                                  {item.programmeCode}
+                                </span>
+                              )}
                               <span className="capitalize">{item.category}</span>
                               {item.position > 0 && (
                                 <span className="text-indigo-600 font-semibold">
@@ -447,7 +448,7 @@ export default function ProfileDetailPage() {
                     <span className="text-3xl block mb-2">⏳</span>
                     <h4 className="text-base font-bold text-slate-900 mb-1">No Results Announced Yet</h4>
                     <p className="text-slate-500 text-xs max-w-sm mx-auto">
-                      Results for this participant will be updated automatically as soon as the judges publish the scores.
+                      Results for this participant will be updated automatically as soon as published by the judges.
                     </p>
                   </div>
                 )}
@@ -457,7 +458,7 @@ export default function ProfileDetailPage() {
           </div>
         )}
 
-        {/* PARTICIPATIONS TAB */}
+        {/* TAB 2: REGISTERED PROGRAMMES (REAL NAMES, NO UNKNOWNS) */}
         {activeTab === 'participations' && (
           <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-sm">
@@ -465,26 +466,26 @@ export default function ProfileDetailPage() {
                 <div>
                   <h3 className="text-base font-bold text-slate-900">Registered Programmes</h3>
                   <p className="text-xs text-slate-500">
-                    Live schedule & registrations for this candidate across arts and sports
+                    Live schedule & registrations for this candidate with official programme names
                   </p>
                 </div>
-                <span className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-xs font-semibold">
+                <span className="px-3 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-xs font-bold">
                   {stats.registeredProgrammes.length} total events
                 </span>
               </div>
 
               <div className="p-6">
                 {stats.registeredProgrammes.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {stats.registeredProgrammes.map((item, idx) => (
                       <div
                         key={idx}
                         className="bg-white rounded-2xl border border-slate-200 p-4.5 hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between"
                       >
                         <div>
-                          {/* Header badges */}
-                          <div className="flex items-center justify-between gap-2 mb-2.5">
-                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-[11px] font-bold">
+                          {/* Code and Category tags */}
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-bold">
                               {item.programmeCode || 'EVENT'}
                             </span>
                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
@@ -492,11 +493,12 @@ export default function ProfileDetailPage() {
                                 ? 'bg-orange-50 text-orange-700 border border-orange-200' 
                                 : 'bg-purple-50 text-purple-700 border border-purple-200'
                             }`}>
-                              {item.category}
+                              {item.category === 'sports' ? '⚽ Sports' : '🎭 Arts'}
                             </span>
                           </div>
 
-                          <h4 className="font-bold text-slate-900 text-sm mb-1.5 line-clamp-2">
+                          {/* Real Programme Name */}
+                          <h4 className="font-bold text-slate-900 text-base mb-1.5">
                             {item.programmeName}
                           </h4>
 
@@ -507,13 +509,13 @@ export default function ProfileDetailPage() {
                           </div>
                         </div>
 
-                        {/* Result or Pending status */}
+                        {/* Status Footer */}
                         <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                           {item.hasResult && item.resultDetail ? (
                             <>
                               <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                                {item.resultDetail.position === 1 ? '🥇 1st' : item.resultDetail.position === 2 ? '🥈 2nd' : item.resultDetail.position === 3 ? '🥉 3rd' : '✓ Completed'}
-                                {item.resultDetail.grade && ` (Grade ${item.resultDetail.grade})`}
+                                {item.resultDetail.position === 1 ? '🥇 1st Place' : item.resultDetail.position === 2 ? '🥈 2nd Place' : item.resultDetail.position === 3 ? '🥉 3rd Place' : '✓ Completed'}
+                                {item.resultDetail.grade && ` • Grade ${item.resultDetail.grade}`}
                               </span>
                               <span className="font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
                                 +{item.resultDetail.totalPoints} pts
@@ -543,7 +545,7 @@ export default function ProfileDetailPage() {
           </div>
         )}
 
-        {/* RESULTS TAB */}
+        {/* TAB 3: RESULTS & SCORES */}
         {activeTab === 'results' && (
           <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-sm">
@@ -570,7 +572,7 @@ export default function ProfileDetailPage() {
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div>
                             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                              {item.category}
+                              {item.programmeCode ? `${item.programmeCode} • ` : ''}{item.category}
                             </span>
                             <h4 className="font-bold text-slate-900 text-base">
                               {item.programmeName}
@@ -628,7 +630,7 @@ export default function ProfileDetailPage() {
           </div>
         )}
 
-        {/* ACHIEVEMENTS TAB */}
+        {/* TAB 4: ACHIEVEMENTS */}
         {activeTab === 'achievements' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
