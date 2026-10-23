@@ -133,34 +133,22 @@ export function getSectionTheme(section?: string) {
 
 export type ProgrammeGroupType = 'sports' | 'arts-stage' | 'arts-non-stage';
 
+/**
+ * Accurately classifies a programme into 'sports', 'arts-stage', or 'arts-non-stage'
+ */
 export function classifyProgramme(
   programme?: Programme | null,
   code?: string,
   name?: string,
   category?: string
 ): { category: 'arts' | 'sports'; subcategory: 'stage' | 'non-stage'; programmeType: ProgrammeGroupType; isStage: boolean } {
+  const officialCategory = (programme?.category || category || '').trim().toLowerCase();
+  const officialSubcategory = (programme?.subcategory || '').trim().toLowerCase();
   const cleanCode = (code || programme?.code || '').trim().toUpperCase();
   const cleanName = (name || programme?.name || '').trim().toLowerCase();
-  const rawCat = (category || programme?.category || '').trim().toLowerCase();
-  const rawSub = (programme?.subcategory || '').trim().toLowerCase();
 
-  // 1. Check if Sports
-  const isSports = 
-    rawCat === 'sports' || 
-    cleanCode.startsWith('GS') || 
-    cleanCode.startsWith('GSS') || 
-    cleanCode.startsWith('BS') || 
-    cleanCode.startsWith('SPD') ||
-    cleanName.includes('cricket') ||
-    cleanName.includes('volly') ||
-    cleanName.includes('volleyball') ||
-    cleanName.includes('football') ||
-    cleanName.includes('tug of war') ||
-    cleanName.includes('race') ||
-    cleanName.includes('jump') ||
-    cleanName.includes('water balloon');
-
-  if (isSports) {
+  // 1. If officialCategory is explicitly provided by the programme document:
+  if (officialCategory === 'sports') {
     return {
       category: 'sports',
       subcategory: 'non-stage',
@@ -169,20 +157,83 @@ export function classifyProgramme(
     };
   }
 
-  // 2. Check if Arts Non-Stage
-  const isNonStage = 
-    rawSub === 'non-stage' ||
+  if (officialCategory === 'arts') {
+    const isNonStage = 
+      officialSubcategory === 'non-stage' ||
+      cleanCode.startsWith('ANS') ||
+      cleanCode.startsWith('BNS') ||
+      cleanCode.startsWith('JNS') ||
+      cleanCode.startsWith('SNS');
+
+    if (isNonStage) {
+      return {
+        category: 'arts',
+        subcategory: 'non-stage',
+        programmeType: 'arts-non-stage',
+        isStage: false
+      };
+    }
+
+    return {
+      category: 'arts',
+      subcategory: 'stage',
+      programmeType: 'arts-stage',
+      isStage: true
+    };
+  }
+
+  // 2. Fallback when officialCategory is not available (e.g., ad-hoc registration)
+  const isSportsKeyword = 
+    cleanCode.startsWith('TNS') || // TNS250 Glass Blowing
+    cleanName.includes('cricket') ||
+    cleanName.includes('football') ||
+    cleanName.includes('volly') ||
+    cleanName.includes('volleyball') ||
+    cleanName.includes('tug of war') ||
+    cleanName.includes('badminton') ||
+    cleanName.includes('pot breaking') ||
+    cleanName.includes('plate spinner') ||
+    cleanName.includes('water balloon') ||
+    cleanName.includes('leg chain') ||
+    cleanName.includes('frog jump') ||
+    cleanName.includes('chess') ||
+    cleanName.includes('freestyle') ||
+    cleanName.includes('penalty') ||
+    cleanName.includes('shootout') ||
+    cleanName.includes('glass blowing') ||
+    cleanName.includes('glass balance') ||
+    cleanName.includes('pull ups') ||
+    cleanName.includes('arm wrestling') ||
+    cleanName.includes('race') ||
+    cleanName.includes('running');
+
+  if (isSportsKeyword) {
+    return {
+      category: 'sports',
+      subcategory: 'non-stage',
+      programmeType: 'sports',
+      isStage: false
+    };
+  }
+
+  const isNonStageArts = 
     cleanCode.startsWith('ANS') ||
-    cleanCode.includes('NS') ||
+    cleanCode.startsWith('BNS') ||
+    cleanCode.startsWith('JNS') ||
+    cleanCode.startsWith('SNS') ||
+    cleanName.includes('essay') ||
     cleanName.includes('writing') ||
     cleanName.includes('drawing') ||
-    cleanName.includes('story') ||
-    cleanName.includes('typing') ||
     cleanName.includes('painting') ||
+    cleanName.includes('typing') ||
     cleanName.includes('calligraphy') ||
-    cleanName.includes('essay');
+    cleanName.includes('story') ||
+    cleanName.includes('reporting') ||
+    cleanName.includes('poster') ||
+    cleanName.includes('translation') ||
+    cleanName.includes('heading');
 
-  if (isNonStage) {
+  if (isNonStageArts) {
     return {
       category: 'arts',
       subcategory: 'non-stage',
@@ -191,7 +242,7 @@ export function classifyProgramme(
     };
   }
 
-  // 3. Otherwise Arts Stage
+  // 3. Default fallback: Arts Stage
   return {
     category: 'arts',
     subcategory: 'stage',
@@ -357,16 +408,33 @@ export function getCandidateStats(
     const cleanPpName = (pp.programmeName || '').trim();
     const cleanPpId = (pp.programmeId || '').trim();
 
-    // Find full programme info from programmes collection
-    const matchedProg = programmes.find(p => {
-      const pId = String(p._id || p.id || '').trim();
-      if (cleanPpId && pId === cleanPpId) return true;
-      const pCode = (p.code || '').trim().toLowerCase();
-      if (cleanPpCode && pCode === cleanPpCode.toLowerCase()) return true;
-      const pName = (p.name || '').trim().toLowerCase();
-      if (cleanPpName && pName === cleanPpName.toLowerCase()) return true;
-      return false;
-    });
+    // Priority 1: Exact programmeId match (CRITICAL: prevents cross-code collisions)
+    let matchedProg: Programme | undefined = undefined;
+    if (cleanPpId) {
+      matchedProg = programmes.find(p => String(p._id || p.id || '').trim() === cleanPpId);
+    }
+
+    // Priority 2: Match by BOTH code and name
+    if (!matchedProg && cleanPpCode && cleanPpName) {
+      matchedProg = programmes.find(p => 
+        (p.code || '').trim().toLowerCase() === cleanPpCode.toLowerCase() &&
+        (p.name || '').trim().toLowerCase() === cleanPpName.toLowerCase()
+      );
+    }
+
+    // Priority 3: Match by name
+    if (!matchedProg && cleanPpName) {
+      matchedProg = programmes.find(p => 
+        (p.name || '').trim().toLowerCase() === cleanPpName.toLowerCase()
+      );
+    }
+
+    // Priority 4: Match by code only (fallback)
+    if (!matchedProg && cleanPpCode) {
+      matchedProg = programmes.find(p => 
+        (p.code || '').trim().toLowerCase() === cleanPpCode.toLowerCase()
+      );
+    }
 
     let progName = (matchedProg?.name || cleanPpName).trim();
     if (!progName || progName.toLowerCase() === 'programme' || progName.toLowerCase() === 'unknown') {

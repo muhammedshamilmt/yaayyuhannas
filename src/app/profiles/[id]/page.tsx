@@ -566,6 +566,18 @@ export default function ProfileDetailPage() {
                   </button>
 
                   <button
+                    onClick={() => setSelectedProgrammeFilter('sports')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                      selectedProgrammeFilter === 'sports'
+                        ? 'bg-orange-600 text-white shadow-sm'
+                        : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200/60'
+                    }`}
+                  >
+                    <span>⚽ Sports</span>
+                    <span className="ml-0.5 opacity-90">({sportsList.length})</span>
+                  </button>
+
+                  <button
                     onClick={() => setSelectedProgrammeFilter('arts-stage')}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
                       selectedProgrammeFilter === 'arts-stage'
@@ -588,18 +600,6 @@ export default function ProfileDetailPage() {
                     <span>🎨 Arts Non-Stage</span>
                     <span className="ml-0.5 opacity-90">({artsNonStageList.length})</span>
                   </button>
-
-                  <button
-                    onClick={() => setSelectedProgrammeFilter('sports')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                      selectedProgrammeFilter === 'sports'
-                        ? 'bg-orange-600 text-white shadow-sm'
-                        : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200/60'
-                    }`}
-                  >
-                    <span>⚽ Sports</span>
-                    <span className="ml-0.5 opacity-90">({sportsList.length})</span>
-                  </button>
                 </div>
               </div>
             </div>
@@ -616,7 +616,31 @@ export default function ProfileDetailPage() {
             ) : (
               <div className="space-y-8">
                 
-                {/* 1. ARTS STAGE SECTION */}
+                {/* 1. SPORTS SECTION */}
+                {(selectedProgrammeFilter === 'all' || selectedProgrammeFilter === 'sports') && sportsList.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center text-base">
+                          ⚽
+                        </span>
+                        <div>
+                          <h4 className="text-base font-bold text-slate-900">Sports Programmes</h4>
+                          <p className="text-xs text-slate-500">Physical athletics, team games, and field competitions</p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200 text-xs font-bold">
+                        {sportsList.length} {sportsList.length === 1 ? 'event' : 'events'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                      {sportsList.map(renderProgrammeCard)}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. ARTS STAGE SECTION */}
                 {(selectedProgrammeFilter === 'all' || selectedProgrammeFilter === 'arts-stage') && artsStageList.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between pb-1">
@@ -640,7 +664,7 @@ export default function ProfileDetailPage() {
                   </div>
                 )}
 
-                {/* 2. ARTS NON-STAGE SECTION */}
+                {/* 3. ARTS NON-STAGE SECTION */}
                 {(selectedProgrammeFilter === 'all' || selectedProgrammeFilter === 'arts-non-stage') && artsNonStageList.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between pb-1">
@@ -660,30 +684,6 @@ export default function ProfileDetailPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                       {artsNonStageList.map(renderProgrammeCard)}
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. SPORTS SECTION */}
-                {(selectedProgrammeFilter === 'all' || selectedProgrammeFilter === 'sports') && sportsList.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between pb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center text-base">
-                          ⚽
-                        </span>
-                        <div>
-                          <h4 className="text-base font-bold text-slate-900">Sports Programmes</h4>
-                          <p className="text-xs text-slate-500">Physical athletics, team games, and fun field sports</p>
-                        </div>
-                      </div>
-                      <span className="px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200 text-xs font-bold">
-                        {sportsList.length} {sportsList.length === 1 ? 'event' : 'events'}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-                      {sportsList.map(renderProgrammeCard)}
                     </div>
                   </div>
                 )}

@@ -86,18 +86,18 @@ export default function ProfilesPage() {
     return candidates.filter(candidate => {
       const teamTheme = getTeamTheme(candidate.team, teams);
       const search = searchTerm.toLowerCase().trim();
-      
+
       const matchesSearch = !search ||
         candidate.name.toLowerCase().includes(search) ||
         String(candidate.chestNumber || '').toLowerCase().includes(search) ||
         teamTheme.name.toLowerCase().includes(search) ||
         teamTheme.code.toLowerCase().includes(search);
 
-      const matchesTeam = selectedTeam === 'all' || 
-        candidate.team === selectedTeam || 
+      const matchesTeam = selectedTeam === 'all' ||
+        candidate.team === selectedTeam ||
         teamTheme.code === selectedTeam;
 
-      const matchesSection = selectedSection === 'all' || 
+      const matchesSection = selectedSection === 'all' ||
         candidate.section?.toLowerCase() === selectedSection.toLowerCase();
 
       return matchesSearch && matchesTeam && matchesSection;
@@ -158,11 +158,11 @@ export default function ProfilesPage() {
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Ayyuhannas • Wattaqa Arts Fest 2K25
           </div>
-          
+
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-3">
             Participant <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-blue-600 to-emerald-600">Profiles</span>
           </h1>
-          
+
           <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto mb-8 leading-relaxed">
             Live individual scores, podium achievements, and event registrations across ADĀLAH, SHAJĀʿAH, and QIYĀDAH.
           </p>
@@ -190,12 +190,12 @@ export default function ProfilesPage() {
       </header>
 
       {/* Main Interactive Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 -mt-6 sm:-mt-8 relative z-20">
-        
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 -mt-6 sm:-mt-8 relative z-20">
+
         {/* Search & Filter Toolbar */}
         <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/90 p-4 sm:p-5 mb-8 transition-all">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-            
+
             {/* Search Input */}
             <div className="lg:col-span-5 relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -292,7 +292,7 @@ export default function ProfilesPage() {
         </div>
 
         {/* Profiles Grid: WIDE CARD LAYOUT (2 columns with more width and less height) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {sortedCandidates.map((candidate) => {
             const stats = candidateStatsMap.get(String(candidate._id || candidate.chestNumber));
             const teamTheme = getTeamTheme(candidate.team, teams);
@@ -304,7 +304,7 @@ export default function ProfilesPage() {
 
             // Color palette for exp bars
             const expColors = [
-              'bg-violet-500', 'bg-indigo-500', 'bg-blue-500', 'bg-cyan-500', 
+              'bg-violet-500', 'bg-indigo-500', 'bg-blue-500', 'bg-cyan-500',
               'bg-teal-500', 'bg-emerald-500', 'bg-amber-400', 'bg-orange-500', 'bg-rose-500'
             ];
             const activeTicks = Math.min(24, Math.max(2, Math.round((totalPoints / 25) * 24)));
@@ -320,7 +320,7 @@ export default function ProfilesPage() {
                   {/* Subtle cloud and sun glow illustration */}
                   <div className="absolute -top-10 left-10 w-48 h-32 bg-white/70 rounded-full blur-xl pointer-events-none" />
                   <div className="absolute top-2 right-16 w-32 h-24 bg-sky-200/40 rounded-full blur-lg pointer-events-none" />
-                  
+
                   {/* Top-Right "Follow +" Style Pill Button */}
                   <div className="absolute top-3.5 right-4 z-10">
                     <span className="px-3.5 py-1.5 rounded-full bg-white/95 text-slate-800 text-xs font-bold shadow-sm border border-slate-200/60 backdrop-blur-md flex items-center gap-1.5 group-hover:bg-slate-900 group-hover:text-white transition-colors">
@@ -359,9 +359,8 @@ export default function ProfilesPage() {
                         return (
                           <span
                             key={i}
-                            className={`w-[2.5px] h-3.5 rounded-full transition-all ${
-                              isActive ? tickColor : 'bg-slate-200'
-                            }`}
+                            className={`w-[2.5px] h-3.5 rounded-full transition-all ${isActive ? tickColor : 'bg-slate-200'
+                              }`}
                           />
                         );
                       })}
@@ -410,7 +409,7 @@ export default function ProfilesPage() {
                 {/* 5. Bottom Badges / Action Row */}
                 <div className="border-t border-slate-100 px-5 sm:px-6 py-2.5 bg-slate-50/60 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
-                    <span 
+                    <span
                       className="px-2 py-0.5 rounded-md text-[11px] font-bold tracking-wide uppercase"
                       style={{
                         backgroundColor: `${teamTheme.color}15`,
