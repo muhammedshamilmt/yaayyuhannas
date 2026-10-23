@@ -131,6 +131,75 @@ export function getSectionTheme(section?: string) {
   }
 }
 
+export type ProgrammeGroupType = 'sports' | 'arts-stage' | 'arts-non-stage';
+
+export function classifyProgramme(
+  programme?: Programme | null,
+  code?: string,
+  name?: string,
+  category?: string
+): { category: 'arts' | 'sports'; subcategory: 'stage' | 'non-stage'; programmeType: ProgrammeGroupType; isStage: boolean } {
+  const cleanCode = (code || programme?.code || '').trim().toUpperCase();
+  const cleanName = (name || programme?.name || '').trim().toLowerCase();
+  const rawCat = (category || programme?.category || '').trim().toLowerCase();
+  const rawSub = (programme?.subcategory || '').trim().toLowerCase();
+
+  // 1. Check if Sports
+  const isSports = 
+    rawCat === 'sports' || 
+    cleanCode.startsWith('GS') || 
+    cleanCode.startsWith('GSS') || 
+    cleanCode.startsWith('BS') || 
+    cleanCode.startsWith('SPD') ||
+    cleanName.includes('cricket') ||
+    cleanName.includes('volly') ||
+    cleanName.includes('volleyball') ||
+    cleanName.includes('football') ||
+    cleanName.includes('tug of war') ||
+    cleanName.includes('race') ||
+    cleanName.includes('jump') ||
+    cleanName.includes('water balloon');
+
+  if (isSports) {
+    return {
+      category: 'sports',
+      subcategory: 'non-stage',
+      programmeType: 'sports',
+      isStage: false
+    };
+  }
+
+  // 2. Check if Arts Non-Stage
+  const isNonStage = 
+    rawSub === 'non-stage' ||
+    cleanCode.startsWith('ANS') ||
+    cleanCode.includes('NS') ||
+    cleanName.includes('writing') ||
+    cleanName.includes('drawing') ||
+    cleanName.includes('story') ||
+    cleanName.includes('typing') ||
+    cleanName.includes('painting') ||
+    cleanName.includes('calligraphy') ||
+    cleanName.includes('essay');
+
+  if (isNonStage) {
+    return {
+      category: 'arts',
+      subcategory: 'non-stage',
+      programmeType: 'arts-non-stage',
+      isStage: false
+    };
+  }
+
+  // 3. Otherwise Arts Stage
+  return {
+    category: 'arts',
+    subcategory: 'stage',
+    programmeType: 'arts-stage',
+    isStage: true
+  };
+}
+
 export interface CandidateResultDetail {
   result: Result;
   programmeName: string;
@@ -149,7 +218,9 @@ export interface CandidateRegisteredProgramme {
   programme?: Programme;
   programmeName: string;
   programmeCode: string;
-  category: string;
+  category: 'arts' | 'sports';
+  subcategory?: 'stage' | 'non-stage';
+  programmeType: ProgrammeGroupType;
   section: string;
   isStage: boolean;
   hasResult: boolean;
@@ -238,7 +309,6 @@ export function getCandidateStats(
     let pName = getProgrammeName(result, matchedProg);
     let pCode = getProgrammeCode(result, matchedProg);
 
-    // Fallback if name is still 'Unknown Programme' or empty
     if (!pName || pName === 'Unknown Programme') {
       if (result.programme) {
         pName = result.programme.includes(' - ') ? result.programme.split(' - ').slice(1).join(' - ').trim() : result.programme.trim();
@@ -249,7 +319,7 @@ export function getCandidateStats(
       }
     }
 
-    const cat = matchedProg?.category || (pCode?.toLowerCase().includes('gs') || pCode?.toLowerCase().includes('spd') ? 'sports' : 'arts');
+    const classification = classifyProgramme(matchedProg, pCode, pName, result.section);
 
     const dateVal = result.publishedAt || result.createdAt;
     const dateStr = dateVal ? new Date(dateVal).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
@@ -258,7 +328,7 @@ export function getCandidateStats(
       result,
       programmeName: pName,
       programmeCode: pCode,
-      category: cat,
+      category: classification.category,
       position: pos,
       positionPoints: posPts,
       grade: earnedGrade,
@@ -304,9 +374,8 @@ export function getCandidateStats(
     }
 
     const progCode = (matchedProg?.code || cleanPpCode).trim();
-    const category = matchedProg?.category || (progCode.toLowerCase().startsWith('gs') || cleanPpName.toLowerCase().includes('ball') || cleanPpName.toLowerCase().includes('jump') ? 'sports' : 'arts');
+    const classification = classifyProgramme(matchedProg, progCode, progName, matchedProg?.category);
     const section = matchedProg?.section || candidate.section || 'general';
-    const isStage = matchedProg?.isStage ?? true;
 
     // Check if this registered programme already has an announced result
     const matchedResult = resultDetails.find(rd => {
@@ -326,9 +395,11 @@ export function getCandidateStats(
       programme: matchedProg,
       programmeName: progName,
       programmeCode: progCode,
-      category,
+      category: classification.category,
+      subcategory: classification.subcategory,
+      programmeType: classification.programmeType,
       section,
-      isStage,
+      isStage: classification.isStage,
       hasResult: !!matchedResult,
       resultDetail: matchedResult
     });
@@ -341,13 +412,17 @@ export function getCandidateStats(
 
     if (!codeMatch && !nameMatch) {
       const matchedProg = findProgramme(rd.result, programmes);
+      const classification = classifyProgramme(matchedProg, rd.programmeCode, rd.programmeName, rd.category);
+
       registeredProgrammes.push({
         programme: matchedProg,
         programmeName: rd.programmeName,
         programmeCode: rd.programmeCode || (matchedProg?.code || '').trim(),
-        category: rd.category,
+        category: classification.category,
+        subcategory: classification.subcategory,
+        programmeType: classification.programmeType,
         section: candidate.section || 'general',
-        isStage: matchedProg?.isStage ?? true,
+        isStage: classification.isStage,
         hasResult: true,
         resultDetail: rd
       });

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Candidate, Team, Result, Programme, ProgrammeParticipant } from '@/types';
-import { getTeamTheme, getSectionTheme, getCandidateStats, CandidateStats } from '@/lib/profileHelper';
+import { getTeamTheme, getSectionTheme, getCandidateStats, CandidateStats, ProgrammeGroupType } from '@/lib/profileHelper';
 import { PublicNavbar } from '@/components/Navigation/PublicNavbar';
 import { PublicFooter } from '@/components/Navigation/PublicFooter';
 
@@ -21,6 +21,9 @@ export default function ProfileDetailPage() {
   const [programmeParticipants, setProgrammeParticipants] = useState<ProgrammeParticipant[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'participations' | 'results' | 'achievements'>('overview');
+  
+  // Category filter inside the Participations tab
+  const [selectedProgrammeFilter, setSelectedProgrammeFilter] = useState<'all' | ProgrammeGroupType>('all');
 
   useEffect(() => {
     if (candidateId) {
@@ -86,6 +89,21 @@ export default function ProfileDetailPage() {
     if (!candidate) return null;
     return getCandidateStats(candidate, results, programmeParticipants, programmes);
   }, [candidate, results, programmeParticipants, programmes]);
+
+  // Separate programmes into the 3 requested groups: Arts Stage, Arts Non-Stage, Sports
+  const { artsStageList, artsNonStageList, sportsList } = useMemo(() => {
+    if (!stats) return { artsStageList: [], artsNonStageList: [], sportsList: [] };
+
+    const artsStage = stats.registeredProgrammes.filter(p => p.programmeType === 'arts-stage');
+    const artsNonStage = stats.registeredProgrammes.filter(p => p.programmeType === 'arts-non-stage');
+    const sports = stats.registeredProgrammes.filter(p => p.programmeType === 'sports');
+
+    return {
+      artsStageList: artsStage,
+      artsNonStageList: artsNonStage,
+      sportsList: sports
+    };
+  }, [stats]);
 
   // Calculate overall festival rank dynamically among all candidates
   const candidateRank = useMemo(() => {
@@ -157,6 +175,68 @@ export default function ProfileDetailPage() {
   ];
   const activeTicks = Math.min(24, Math.max(2, Math.round((stats.totalPoints / 25) * 24)));
 
+  // Helper renderer for a single programme card with clean padding
+  const renderProgrammeCard = (item: typeof stats.registeredProgrammes[0], idx: number) => (
+    <div
+      key={idx}
+      className="bg-white rounded-2xl border border-slate-200/90 hover:border-indigo-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden shadow-2xs p-4 sm:p-5"
+    >
+      <div>
+        {/* Top Badges Row */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 font-mono text-xs font-bold border border-slate-200">
+            {item.programmeCode || 'EVENT'}
+          </span>
+          <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
+            item.programmeType === 'sports'
+              ? 'bg-orange-50 text-orange-700 border border-orange-200'
+              : item.programmeType === 'arts-non-stage'
+              ? 'bg-sky-50 text-sky-700 border border-sky-200'
+              : 'bg-purple-50 text-purple-700 border border-purple-200'
+          }`}>
+            {item.programmeType === 'sports' 
+              ? '⚽ Sports' 
+              : item.programmeType === 'arts-non-stage' 
+              ? '🎨 Arts Non-Stage' 
+              : '🎭 Arts Stage'}
+          </span>
+        </div>
+
+        {/* Programme Title */}
+        <h4 className="font-bold text-slate-900 text-base sm:text-lg mb-2 leading-snug break-words">
+          {item.programmeName}
+        </h4>
+
+        {/* Section and Type metadata */}
+        <div className="text-xs text-slate-500 flex items-center gap-2 mb-4">
+          <span className="capitalize font-medium">{item.section}</span>
+          <span>•</span>
+          <span className="font-medium">{item.isStage ? 'Stage Event' : 'Non-Stage'}</span>
+        </div>
+      </div>
+
+      {/* Status Footer */}
+      <div className="pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs mt-auto">
+        {item.hasResult && item.resultDetail ? (
+          <>
+            <span className="text-emerald-700 font-semibold flex items-center gap-1.5">
+              {item.resultDetail.position === 1 ? '🥇 1st Place' : item.resultDetail.position === 2 ? '🥈 2nd Place' : item.resultDetail.position === 3 ? '🥉 3rd Place' : '✓ Completed'}
+              {item.resultDetail.grade && <span className="font-bold text-emerald-800">• Grade {item.resultDetail.grade}</span>}
+            </span>
+            <span className="font-black text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+              +{item.resultDetail.totalPoints} pts
+            </span>
+          </>
+        ) : (
+          <span className="text-slate-500 flex items-center gap-1.5 font-medium">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            Scheduled / In Progress
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-slate-900 selection:text-white">
       {/* Public Navbar */}
@@ -189,7 +269,7 @@ export default function ProfileDetailPage() {
           </div>
         </div>
 
-        {/* HERO CARD: Styled after the user's reference image (wide aspect, atmospheric sky cover, overlapping avatar, exp bar) */}
+        {/* HERO CARD: Styled after reference image (wide aspect, atmospheric sky cover, overlapping avatar, exp bar) */}
         <div className="bg-white rounded-[28px] border border-slate-200/90 shadow-lg overflow-hidden mb-8">
           
           {/* Atmospheric Cover Header */}
@@ -458,90 +538,171 @@ export default function ProfileDetailPage() {
           </div>
         )}
 
-        {/* TAB 2: REGISTERED PROGRAMMES (REAL NAMES, NO UNKNOWNS) */}
+        {/* TAB 2: REGISTERED PROGRAMMES (SEPARATED AS: SPORTS, ARTS STAGE, ARTS NON-STAGE) */}
         {activeTab === 'participations' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-sm">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            
+            {/* Top Toolbar: Category Selector Filters */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">Registered Programmes</h3>
+                  <h3 className="text-base font-bold text-slate-900">Event Registrations</h3>
                   <p className="text-xs text-slate-500">
-                    Live schedule & registrations for this candidate with official programme names
+                    Categorized into Sports, Arts Stage, and Arts Non-Stage
                   </p>
                 </div>
-                <span className="px-3 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-xs font-bold">
-                  {stats.registeredProgrammes.length} total events
-                </span>
+
+                {/* Filter Pills */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setSelectedProgrammeFilter('all')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      selectedProgrammeFilter === 'all'
+                        ? 'bg-slate-900 text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                    }`}
+                  >
+                    All ({stats.registeredProgrammes.length})
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedProgrammeFilter('arts-stage')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                      selectedProgrammeFilter === 'arts-stage'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/60'
+                    }`}
+                  >
+                    <span>🎭 Arts Stage</span>
+                    <span className="ml-0.5 opacity-90">({artsStageList.length})</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedProgrammeFilter('arts-non-stage')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                      selectedProgrammeFilter === 'arts-non-stage'
+                        ? 'bg-sky-600 text-white shadow-sm'
+                        : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200/60'
+                    }`}
+                  >
+                    <span>🎨 Arts Non-Stage</span>
+                    <span className="ml-0.5 opacity-90">({artsNonStageList.length})</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedProgrammeFilter('sports')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                      selectedProgrammeFilter === 'sports'
+                        ? 'bg-orange-600 text-white shadow-sm'
+                        : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200/60'
+                    }`}
+                  >
+                    <span>⚽ Sports</span>
+                    <span className="ml-0.5 opacity-90">({sportsList.length})</span>
+                  </button>
+                </div>
               </div>
+            </div>
 
-              <div className="p-6">
-                {stats.registeredProgrammes.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {stats.registeredProgrammes.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-white rounded-2xl border border-slate-200 p-4.5 hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between"
-                      >
+            {/* Empty check */}
+            {stats.registeredProgrammes.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                <span className="text-3xl block mb-2">📋</span>
+                <h4 className="text-base font-bold text-slate-900 mb-1">No Registrations Recorded</h4>
+                <p className="text-slate-500 text-xs max-w-sm mx-auto">
+                  This participant is not currently registered in any active festival programmes.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                
+                {/* 1. ARTS STAGE SECTION */}
+                {(selectedProgrammeFilter === 'all' || selectedProgrammeFilter === 'arts-stage') && artsStageList.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-base">
+                          🎭
+                        </span>
                         <div>
-                          {/* Code and Category tags */}
-                          <div className="flex items-center justify-between gap-2 mb-2">
-                            <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-bold">
-                              {item.programmeCode || 'EVENT'}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                              item.category === 'sports' 
-                                ? 'bg-orange-50 text-orange-700 border border-orange-200' 
-                                : 'bg-purple-50 text-purple-700 border border-purple-200'
-                            }`}>
-                              {item.category === 'sports' ? '⚽ Sports' : '🎭 Arts'}
-                            </span>
-                          </div>
-
-                          {/* Real Programme Name */}
-                          <h4 className="font-bold text-slate-900 text-base mb-1.5">
-                            {item.programmeName}
-                          </h4>
-
-                          <div className="text-xs text-slate-500 flex items-center gap-2 mb-3">
-                            <span className="capitalize">{item.section}</span>
-                            <span>•</span>
-                            <span>{item.isStage ? 'Stage' : 'Non-Stage'}</span>
-                          </div>
-                        </div>
-
-                        {/* Status Footer */}
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                          {item.hasResult && item.resultDetail ? (
-                            <>
-                              <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                                {item.resultDetail.position === 1 ? '🥇 1st Place' : item.resultDetail.position === 2 ? '🥈 2nd Place' : item.resultDetail.position === 3 ? '🥉 3rd Place' : '✓ Completed'}
-                                {item.resultDetail.grade && ` • Grade ${item.resultDetail.grade}`}
-                              </span>
-                              <span className="font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                                +{item.resultDetail.totalPoints} pts
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-slate-500 flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                              Scheduled / In Progress
-                            </span>
-                          )}
+                          <h4 className="text-base font-bold text-slate-900">Arts Stage Programmes</h4>
+                          <p className="text-xs text-slate-500">Live stage performances and presentations</p>
                         </div>
                       </div>
-                    ))}
+                      <span className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-xs font-bold">
+                        {artsStageList.length} {artsStageList.length === 1 ? 'event' : 'events'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                      {artsStageList.map(renderProgrammeCard)}
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-center py-10">
-                    <span className="text-3xl block mb-2">📋</span>
-                    <h4 className="text-base font-bold text-slate-900 mb-1">No Registrations Recorded</h4>
-                    <p className="text-slate-500 text-xs max-w-sm mx-auto">
-                      This participant is not currently registered in any active festival programmes.
+                )}
+
+                {/* 2. ARTS NON-STAGE SECTION */}
+                {(selectedProgrammeFilter === 'all' || selectedProgrammeFilter === 'arts-non-stage') && artsNonStageList.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center text-base">
+                          🎨
+                        </span>
+                        <div>
+                          <h4 className="text-base font-bold text-slate-900">Arts Non-Stage Programmes</h4>
+                          <p className="text-xs text-slate-500">Writing, drawing, typing, and creative offline events</p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-xs font-bold">
+                        {artsNonStageList.length} {artsNonStageList.length === 1 ? 'event' : 'events'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                      {artsNonStageList.map(renderProgrammeCard)}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. SPORTS SECTION */}
+                {(selectedProgrammeFilter === 'all' || selectedProgrammeFilter === 'sports') && sportsList.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center text-base">
+                          ⚽
+                        </span>
+                        <div>
+                          <h4 className="text-base font-bold text-slate-900">Sports Programmes</h4>
+                          <p className="text-xs text-slate-500">Physical athletics, team games, and fun field sports</p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200 text-xs font-bold">
+                        {sportsList.length} {sportsList.length === 1 ? 'event' : 'events'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                      {sportsList.map(renderProgrammeCard)}
+                    </div>
+                  </div>
+                )}
+
+                {/* If active filter has 0 events */}
+                {selectedProgrammeFilter !== 'all' && (
+                  (selectedProgrammeFilter === 'arts-stage' && artsStageList.length === 0) ||
+                  (selectedProgrammeFilter === 'arts-non-stage' && artsNonStageList.length === 0) ||
+                  (selectedProgrammeFilter === 'sports' && sportsList.length === 0)
+                ) && (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
+                    <p className="text-slate-500 text-sm">
+                      No programmes registered under this category.
                     </p>
                   </div>
                 )}
+
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -563,18 +724,18 @@ export default function ProfileDetailPage() {
 
               <div className="p-6">
                 {stats.resultDetails.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                     {stats.resultDetails.map((item, idx) => (
                       <div
                         key={idx}
-                        className="bg-white rounded-2xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-md transition-all"
+                        className="bg-white rounded-2xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-md transition-all shadow-2xs"
                       >
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div>
                             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                               {item.programmeCode ? `${item.programmeCode} • ` : ''}{item.category}
                             </span>
-                            <h4 className="font-bold text-slate-900 text-base">
+                            <h4 className="font-bold text-slate-900 text-base leading-snug">
                               {item.programmeName}
                             </h4>
                           </div>
