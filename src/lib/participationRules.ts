@@ -249,9 +249,13 @@ export function getCandidateParticipationStats(
     const prog = progMap.get(reg.programmeId) || (reg.programmeCode ? progMap.get(reg.programmeCode) : undefined);
     if (!prog) continue;
 
-    // Only individual programmes count towards candidate limits
+    // Only individual programmes count towards candidate section limits
     const isIndividual = prog.positionType === 'individual' || (prog as any).type === 'individual';
     if (!isIndividual) continue;
+
+    // General programmes do NOT count towards candidate individual section limits
+    const isGeneral = (prog.section || '').toLowerCase().trim() === 'general';
+    if (isGeneral) continue;
 
     const typeKey = getProgrammeTypeKey(prog);
     if (typeKey === 'artsStage') {
@@ -365,7 +369,22 @@ export function checkCandidateProgrammeEligibility(
     isEditingCurrentRegistration = maybeIsEditingCurrentRegistration || false;
   }
 
-  // 1. Section check
+  // 1. General programmes check:
+  // General section programmes are open to all candidates (Senior, Junior, Sub-Junior)
+  // and do NOT have section limit restrictions, nor do they count towards candidate limits.
+  // Candidates who have completed their section limits can still be added to General programmes.
+  const isGeneralProg = (programme.section || '').toLowerCase().trim() === 'general';
+  if (isGeneralProg) {
+    return {
+      eligible: true,
+      reason: undefined,
+      currentCount: 0,
+      maxLimit: 999,
+      isSong: false
+    };
+  }
+
+  // 2. Section check
   if (programme.section && programme.section !== 'general') {
     if (normalizeSection(candidate.section) !== normalizeSection(programme.section)) {
       return {
@@ -378,7 +397,7 @@ export function checkCandidateProgrammeEligibility(
     }
   }
 
-  // 2. Individual check
+  // 3. Individual check
   const isIndividual = programme.positionType === 'individual' || (programme as any).type === 'individual';
   if (!isIndividual) {
     return { eligible: true, reason: undefined, currentCount: 0, maxLimit: 999, isSong: false };

@@ -110,7 +110,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Team already registered for this programme' }, { status: 400 });
     }
 
-    const isIndividual = programmeDoc?.positionType === 'individual' || (programmeDoc as any)?.type === 'individual';
+    const isGeneral = (programmeDoc?.section || '').toLowerCase().trim() === 'general';
+    const isIndividual = !isGeneral && (programmeDoc?.positionType === 'individual' || (programmeDoc as any)?.type === 'individual');
 
     if (isIndividual && participants && participants.length > 0) {
       const candidatesCollection = db.collection('candidates');
@@ -249,7 +250,8 @@ export async function PUT(request: NextRequest) {
         }, { status: 400 });
       }
 
-      const isIndividual = programmeDoc?.positionType === 'individual' || (programmeDoc as any)?.type === 'individual';
+      const isGeneral = (programmeDoc?.section || '').toLowerCase().trim() === 'general';
+      const isIndividual = !isGeneral && (programmeDoc?.positionType === 'individual' || (programmeDoc as any)?.type === 'individual');
 
       if (isIndividual && participants && participants.length > 0) {
         const candidatesCollection = db.collection('candidates');

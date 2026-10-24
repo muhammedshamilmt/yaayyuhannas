@@ -196,7 +196,8 @@ export default function TeamCandidatesPage() {
 
     participationStats.candidateParticipations.forEach(part => {
       const prog = getProgrammeForParticipant(part);
-      const isIndividual = prog ? (prog.positionType === 'individual' || (prog as any).type === 'individual') : false;
+      const isGeneral = (prog?.section || '').toLowerCase().trim() === 'general';
+      const isIndividual = prog ? ((prog.positionType === 'individual' || (prog as any).type === 'individual') && !isGeneral) : false;
       const isSports = (prog?.category || '').toLowerCase() === 'sports';
 
       if (isIndividual) {

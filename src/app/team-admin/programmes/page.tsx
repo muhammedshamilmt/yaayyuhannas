@@ -99,12 +99,14 @@ export default function TeamProgrammesPage() {
   const registeredProgrammeIds = [...new Set(participants.map(p => p.programmeId))];
   const registeredProgIdSet = new Set(registeredProgrammeIds);
 
-  // Set of individual programme IDs separated by Arts and Sports (using unique IDs to prevent cross-category code collision)
+  // Set of individual programme IDs separated by Arts and Sports (excluding General section programmes so general events do not consume individual section limits)
   const { individualArtsProgIdSet, individualSportsProgIdSet } = useMemo(() => {
     const artsSet = new Set<string>();
     const sportsSet = new Set<string>();
     programmes.forEach(p => {
       if (p.positionType === 'individual' || (p as any).type === 'individual') {
+        const isGeneral = (p.section || '').toLowerCase().trim() === 'general';
+        if (isGeneral) return; // General programmes are excluded from individual section limit counts
         const isSports = (p.category || '').toLowerCase() === 'sports';
         const targetSet = isSports ? sportsSet : artsSet;
         if (p._id) targetSet.add(p._id.toString());
@@ -709,7 +711,8 @@ function ProgrammeCard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const isIndividualProgramme = programme.positionType === 'individual' || (programme as any).type === 'individual';
+  const isGeneralProg = (programme.section || '').toLowerCase().trim() === 'general';
+  const isIndividualProgramme = (programme.positionType === 'individual' || (programme as any).type === 'individual') && !isGeneralProg;
   const isSports = (programme.category || '').toLowerCase() === 'sports';
   const categoryLabel = isSports ? 'Sports' : 'Arts';
   const currentMinLimit = isSports ? (minSportsLimit ?? 0) : (minArtsLimit ?? minLimit);
