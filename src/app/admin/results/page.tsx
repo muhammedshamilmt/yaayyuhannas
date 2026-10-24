@@ -4,8 +4,10 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
 import { Result, Programme, Candidate, ProgrammeParticipant } from '@/types';
+import { AdminResultsLeaderboard } from "@/components/admin/AdminResultsLeaderboard";
 
 export default function ResultsPage() {
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'manage'>('leaderboard');
   const [results, setResults] = useState<Result[]>([]);
   const [programmes, setProgrammes] = useState<Programme[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -757,9 +759,78 @@ export default function ResultsPage() {
     <>
       <Breadcrumb pageName="Results" />
 
-      <div className="space-y-6">
-        {/* Add New Result */}
-        <ShowcaseSection title="Add New Result">
+      {/* Admin Tab Navigation */}
+      <div className="bg-white rounded-2xl p-1.5 border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setActiveTab('leaderboard')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+              activeTab === 'leaderboard'
+                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>🏆</span>
+            <span>Live Leaderboard</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('manage')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+              activeTab === 'manage'
+                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>📝</span>
+            <span>Manage Results</span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">
+              {results.length}
+            </span>
+          </button>
+        </div>
+
+        {activeTab === 'leaderboard' ? (
+          <button
+            type="button"
+            onClick={() => setActiveTab('manage')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-xs"
+          >
+            <span>➕ Add New Result</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setActiveTab('leaderboard')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all shadow-xs"
+          >
+            <span>🏆 View Standings</span>
+          </button>
+        )}
+      </div>
+
+      {activeTab === 'leaderboard' && (
+        <AdminResultsLeaderboard
+          results={results}
+          programmes={programmes}
+          candidates={candidates}
+          teams={teams}
+          participants={participants}
+          onRefresh={fetchData}
+          onEditResult={(res) => {
+            startEdit(res);
+          }}
+          onSwitchToManageTab={() => setActiveTab('manage')}
+        />
+      )}
+
+      {activeTab === 'manage' && (
+        <div className="space-y-6">
+          {/* Add New Result */}
+          <ShowcaseSection title="Add New Result">
           <form onSubmit={(e) => handleSubmitWithStatus(e, 'published')} className="space-y-6">
             {/* Programme and Section Selection */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1923,6 +1994,7 @@ export default function ResultsPage() {
           )}
         </ShowcaseSection>
       </div>
+      )}
 
       {/* Edit Result Modal */}
       {editingResult && (
