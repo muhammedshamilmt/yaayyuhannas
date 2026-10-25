@@ -4,13 +4,24 @@ import { useState, useEffect } from 'react';
 import { Team, Result, Candidate, Programme } from '@/types';
 import { findProgramme, getResultPublishedTime } from '@/lib/resultsHelper';
 
+export interface WinnerItem {
+  type: 'individual' | 'team';
+  name: string;
+  team?: string;
+  teamColor?: string;
+  chestNumber?: string;
+  grade?: string;
+  points?: number;
+}
+
 interface ProgrammeResult {
   programme: Programme;
   result: Result;
   winners: {
-    first: Array<{ type: 'individual' | 'team'; name: string; team?: string; teamColor?: string; chestNumber?: string }>;
-    second: Array<{ type: 'individual' | 'team'; name: string; team?: string; teamColor?: string; chestNumber?: string }>;
-    third: Array<{ type: 'individual' | 'team'; name: string; team?: string; teamColor?: string; chestNumber?: string }>;
+    first: WinnerItem[];
+    second: WinnerItem[];
+    third: WinnerItem[];
+    gradedOnly: WinnerItem[];
   };
 }
 
@@ -93,73 +104,167 @@ export default function ResultsPage() {
       const programme = findProgramme(result, programmesData);
       if (!programme) return null;
 
+      // Grade lookups
+      const pgMap = new Map<string, { grade: string; points: number }>();
+      (result.participationGrades || []).forEach(pg => {
+        if (pg.chestNumber) {
+          pgMap.set(String(pg.chestNumber).trim(), { grade: pg.grade, points: pg.points });
+        }
+      });
+
+      const tgMap = new Map<string, { grade: string; points: number }>();
+      (result.participationTeamGrades || []).forEach(tg => {
+        if (tg.teamCode) {
+          tgMap.set(String(tg.teamCode).trim().toUpperCase(), { grade: tg.grade, points: tg.points });
+        }
+      });
+
+      const firstChestSet = new Set<string>();
+      const secondChestSet = new Set<string>();
+      const thirdChestSet = new Set<string>();
+      const firstTeamSet = new Set<string>();
+      const secondTeamSet = new Set<string>();
+      const thirdTeamSet = new Set<string>();
+
+      const first: WinnerItem[] = [
+        ...(result.firstPlace || []).map(p => {
+          const chest = String(p.chestNumber || '').trim();
+          firstChestSet.add(chest);
+          const candidate = candidatesData.find(c => c.chestNumber === p.chestNumber);
+          const team = teamsData.find(t => t.code === candidate?.team);
+          const gradeInfo = pgMap.get(chest);
+          return {
+            type: 'individual' as const,
+            name: candidate?.name || 'Unknown',
+            team: team?.name,
+            teamColor: team?.color,
+            chestNumber: p.chestNumber,
+            grade: (p as any).grade || gradeInfo?.grade,
+            points: result.firstPoints
+          };
+        }),
+        ...(result.firstPlaceTeams || []).map(t => {
+          const code = String(t.teamCode || '').trim().toUpperCase();
+          firstTeamSet.add(code);
+          const team = teamsData.find(team => team.code === t.teamCode);
+          const gradeInfo = tgMap.get(code);
+          return {
+            type: 'team' as const,
+            name: team?.name || t.teamCode,
+            team: team?.name,
+            teamColor: team?.color,
+            grade: (t as any).grade || gradeInfo?.grade,
+            points: result.firstPoints
+          };
+        })
+      ];
+
+      const second: WinnerItem[] = [
+        ...(result.secondPlace || []).map(p => {
+          const chest = String(p.chestNumber || '').trim();
+          secondChestSet.add(chest);
+          const candidate = candidatesData.find(c => c.chestNumber === p.chestNumber);
+          const team = teamsData.find(t => t.code === candidate?.team);
+          const gradeInfo = pgMap.get(chest);
+          return {
+            type: 'individual' as const,
+            name: candidate?.name || 'Unknown',
+            team: team?.name,
+            teamColor: team?.color,
+            chestNumber: p.chestNumber,
+            grade: (p as any).grade || gradeInfo?.grade,
+            points: result.secondPoints
+          };
+        }),
+        ...(result.secondPlaceTeams || []).map(t => {
+          const code = String(t.teamCode || '').trim().toUpperCase();
+          secondTeamSet.add(code);
+          const team = teamsData.find(team => team.code === t.teamCode);
+          const gradeInfo = tgMap.get(code);
+          return {
+            type: 'team' as const,
+            name: team?.name || t.teamCode,
+            team: team?.name,
+            teamColor: team?.color,
+            grade: (t as any).grade || gradeInfo?.grade,
+            points: result.secondPoints
+          };
+        })
+      ];
+
+      const third: WinnerItem[] = [
+        ...(result.thirdPlace || []).map(p => {
+          const chest = String(p.chestNumber || '').trim();
+          thirdChestSet.add(chest);
+          const candidate = candidatesData.find(c => c.chestNumber === p.chestNumber);
+          const team = teamsData.find(t => t.code === candidate?.team);
+          const gradeInfo = pgMap.get(chest);
+          return {
+            type: 'individual' as const,
+            name: candidate?.name || 'Unknown',
+            team: team?.name,
+            teamColor: team?.color,
+            chestNumber: p.chestNumber,
+            grade: (p as any).grade || gradeInfo?.grade,
+            points: result.thirdPoints
+          };
+        }),
+        ...(result.thirdPlaceTeams || []).map(t => {
+          const code = String(t.teamCode || '').trim().toUpperCase();
+          thirdTeamSet.add(code);
+          const team = teamsData.find(team => team.code === t.teamCode);
+          const gradeInfo = tgMap.get(code);
+          return {
+            type: 'team' as const,
+            name: team?.name || t.teamCode,
+            team: team?.name,
+            teamColor: team?.color,
+            grade: (t as any).grade || gradeInfo?.grade,
+            points: result.thirdPoints
+          };
+        })
+      ];
+
+      // Graded candidates who did NOT get 1st, 2nd, or 3rd prize
+      const gradedOnly: WinnerItem[] = [];
+
+      (result.participationGrades || []).forEach(pg => {
+        const chest = String(pg.chestNumber || '').trim();
+        if (!firstChestSet.has(chest) && !secondChestSet.has(chest) && !thirdChestSet.has(chest)) {
+          const candidate = candidatesData.find(c => c.chestNumber === pg.chestNumber);
+          const team = teamsData.find(t => t.code === candidate?.team);
+          gradedOnly.push({
+            type: 'individual',
+            name: candidate?.name || `Candidate #${pg.chestNumber}`,
+            team: team?.name,
+            teamColor: team?.color,
+            chestNumber: pg.chestNumber,
+            grade: pg.grade,
+            points: pg.points || result.participationPoints || 0
+          });
+        }
+      });
+
+      (result.participationTeamGrades || []).forEach(tg => {
+        const code = String(tg.teamCode || '').trim().toUpperCase();
+        if (!firstTeamSet.has(code) && !secondTeamSet.has(code) && !thirdTeamSet.has(code)) {
+          const team = teamsData.find(t => t.code === tg.teamCode);
+          gradedOnly.push({
+            type: 'team',
+            name: team?.name || tg.teamCode,
+            team: team?.name,
+            teamColor: team?.color,
+            grade: tg.grade,
+            points: tg.points || result.participationPoints || 0
+          });
+        }
+      });
+
       const winners = {
-        first: [
-          ...(result.firstPlace || []).map(p => {
-            const candidate = candidatesData.find(c => c.chestNumber === p.chestNumber);
-            const team = teamsData.find(t => t.code === candidate?.team);
-            return {
-              type: 'individual' as const,
-              name: candidate?.name || 'Unknown',
-              team: team?.name,
-              teamColor: team?.color,
-              chestNumber: p.chestNumber
-            };
-          }),
-          ...(result.firstPlaceTeams || []).map(t => {
-            const team = teamsData.find(team => team.code === t.teamCode);
-            return {
-              type: 'team' as const,
-              name: team?.name || t.teamCode,
-              team: team?.name,
-              teamColor: team?.color
-            };
-          })
-        ],
-        second: [
-          ...(result.secondPlace || []).map(p => {
-            const candidate = candidatesData.find(c => c.chestNumber === p.chestNumber);
-            const team = teamsData.find(t => t.code === candidate?.team);
-            return {
-              type: 'individual' as const,
-              name: candidate?.name || 'Unknown',
-              team: team?.name,
-              teamColor: team?.color,
-              chestNumber: p.chestNumber
-            };
-          }),
-          ...(result.secondPlaceTeams || []).map(t => {
-            const team = teamsData.find(team => team.code === t.teamCode);
-            return {
-              type: 'team' as const,
-              name: team?.name || t.teamCode,
-              team: team?.name,
-              teamColor: team?.color
-            };
-          })
-        ],
-        third: [
-          ...(result.thirdPlace || []).map(p => {
-            const candidate = candidatesData.find(c => c.chestNumber === p.chestNumber);
-            const team = teamsData.find(t => t.code === candidate?.team);
-            return {
-              type: 'individual' as const,
-              name: candidate?.name || 'Unknown',
-              team: team?.name,
-              teamColor: team?.color,
-              chestNumber: p.chestNumber
-            };
-          }),
-          ...(result.thirdPlaceTeams || []).map(t => {
-            const team = teamsData.find(team => team.code === t.teamCode);
-            return {
-              type: 'team' as const,
-              name: team?.name || t.teamCode,
-              team: team?.name,
-              teamColor: team?.color
-            };
-          })
-        ]
+        first,
+        second,
+        third,
+        gradedOnly
       };
 
       return { programme, result, winners };
@@ -788,14 +893,21 @@ export default function ResultsPage() {
                           <div className="space-y-2">
                             {pr.winners.first.map((winner, idx) => (
                               <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                                <p className="font-semibold">{winner.name}</p>
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="font-semibold text-gray-900">{winner.name}</p>
+                                  {winner.grade && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-extrabold bg-yellow-200 text-yellow-900 border border-yellow-300 shadow-2xs shrink-0">
+                                      Grade {winner.grade}
+                                    </span>
+                                  )}
+                                </div>
                                 {winner.type === 'individual' && (
-                                  <p className="text-sm text-gray-600">
+                                  <p className="text-sm text-gray-600 mt-1">
                                     #{winner.chestNumber} • {winner.team}
                                   </p>
                                 )}
                                 {winner.type === 'team' && (
-                                  <p className="text-sm text-gray-600">Team Event</p>
+                                  <p className="text-sm text-gray-600 mt-1">Team Event</p>
                                 )}
                               </div>
                             ))}
@@ -813,14 +925,21 @@ export default function ResultsPage() {
                           <div className="space-y-2">
                             {pr.winners.second.map((winner, idx) => (
                               <div key={idx} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                                <p className="font-semibold">{winner.name}</p>
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="font-semibold text-gray-900">{winner.name}</p>
+                                  {winner.grade && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-extrabold bg-blue-100 text-blue-900 border border-blue-200 shadow-2xs shrink-0">
+                                      Grade {winner.grade}
+                                    </span>
+                                  )}
+                                </div>
                                 {winner.type === 'individual' && (
-                                  <p className="text-sm text-gray-600">
+                                  <p className="text-sm text-gray-600 mt-1">
                                     #{winner.chestNumber} • {winner.team}
                                   </p>
                                 )}
                                 {winner.type === 'team' && (
-                                  <p className="text-sm text-gray-600">Team Event</p>
+                                  <p className="text-sm text-gray-600 mt-1">Team Event</p>
                                 )}
                               </div>
                             ))}
@@ -838,14 +957,21 @@ export default function ResultsPage() {
                           <div className="space-y-2">
                             {pr.winners.third.map((winner, idx) => (
                               <div key={idx} className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                                <p className="font-semibold">{winner.name}</p>
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="font-semibold text-gray-900">{winner.name}</p>
+                                  {winner.grade && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-extrabold bg-orange-100 text-orange-900 border border-orange-200 shadow-2xs shrink-0">
+                                      Grade {winner.grade}
+                                    </span>
+                                  )}
+                                </div>
                                 {winner.type === 'individual' && (
-                                  <p className="text-sm text-gray-600">
+                                  <p className="text-sm text-gray-600 mt-1">
                                     #{winner.chestNumber} • {winner.team}
                                   </p>
                                 )}
                                 {winner.type === 'team' && (
-                                  <p className="text-sm text-gray-600">Team Event</p>
+                                  <p className="text-sm text-gray-600 mt-1">Team Event</p>
                                 )}
                               </div>
                             ))}
@@ -853,6 +979,48 @@ export default function ResultsPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Graded Candidates Section (Grade without podium prize) */}
+                    {pr.winners.gradedOnly && pr.winners.gradedOnly.length > 0 && (
+                      <div className="mt-5 pt-4 border-t border-gray-100">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-xl">🎖️</span>
+                          <h4 className="font-bold text-purple-800 text-sm">
+                            Grade Holders ({pr.winners.gradedOnly.length})
+                          </h4>
+                          <span className="text-xs text-gray-500">
+                            • Candidates who achieved grade
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          {pr.winners.gradedOnly.map((winner, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-purple-50/70 border border-purple-200/80 rounded-lg p-3 flex items-center justify-between"
+                            >
+                              <div>
+                                <p className="font-semibold text-sm text-gray-900">{winner.name}</p>
+                                <p className="text-xs text-gray-600">
+                                  {winner.type === 'individual'
+                                    ? `#${winner.chestNumber} • ${winner.team || 'Unknown Team'}`
+                                    : winner.team || 'Team Event'}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-extrabold bg-purple-600 text-white shadow-xs">
+                                  Grade {winner.grade}
+                                </span>
+                                {winner.points ? (
+                                  <span className="text-xs font-bold text-purple-800">
+                                    +{winner.points} pts
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })

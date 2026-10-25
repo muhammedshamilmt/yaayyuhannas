@@ -769,53 +769,128 @@ export function AdminResultsLeaderboard({
                     </div>
 
                     {/* Expandable Podium Breakdown */}
-                    {isExpanded && (
-                      <div className="px-5 py-4 bg-slate-50/70 border-t border-slate-100 text-xs text-slate-700 space-y-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          {/* 1st Place */}
-                          <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/70">
-                            <div className="flex items-center gap-1.5 font-bold text-amber-800 mb-1">
-                              <span>🥇 1st Place</span>
-                              <span className="ml-auto text-amber-900 font-extrabold">+{res.firstPoints ?? 10} pts</span>
+                    {isExpanded && (() => {
+                      const firstChestSet = new Set((res.firstPlace || []).map(p => String(p.chestNumber || '').trim()));
+                      const secondChestSet = new Set((res.secondPlace || []).map(p => String(p.chestNumber || '').trim()));
+                      const thirdChestSet = new Set((res.thirdPlace || []).map(p => String(p.chestNumber || '').trim()));
+                      const firstTeamSet = new Set((res.firstPlaceTeams || []).map(t => String(t.teamCode || '').trim().toUpperCase()));
+                      const secondTeamSet = new Set((res.secondPlaceTeams || []).map(t => String(t.teamCode || '').trim().toUpperCase()));
+                      const thirdTeamSet = new Set((res.thirdPlaceTeams || []).map(t => String(t.teamCode || '').trim().toUpperCase()));
+
+                      const gradedOnlyCandidates = [
+                        ...(res.participationGrades || []).filter(pg => {
+                          const chest = String(pg.chestNumber || '').trim();
+                          return !firstChestSet.has(chest) && !secondChestSet.has(chest) && !thirdChestSet.has(chest);
+                        }).map(pg => {
+                          const cand = candidates.find(c => c.chestNumber === pg.chestNumber);
+                          const theme = getTeamTheme(cand?.team, teams);
+                          return {
+                            type: 'individual' as const,
+                            name: cand?.name || `Candidate #${pg.chestNumber}`,
+                            chestNumber: pg.chestNumber,
+                            teamName: theme.name,
+                            teamCode: cand?.team,
+                            grade: pg.grade,
+                            points: pg.points
+                          };
+                        }),
+                        ...(res.participationTeamGrades || []).filter(tg => {
+                          const code = String(tg.teamCode || '').trim().toUpperCase();
+                          return !firstTeamSet.has(code) && !secondTeamSet.has(code) && !thirdTeamSet.has(code);
+                        }).map(tg => {
+                          const theme = getTeamTheme(tg.teamCode, teams);
+                          return {
+                            type: 'team' as const,
+                            name: theme.name,
+                            chestNumber: '',
+                            teamName: theme.name,
+                            teamCode: tg.teamCode,
+                            grade: tg.grade,
+                            points: tg.points
+                          };
+                        })
+                      ];
+
+                      return (
+                        <div className="px-5 py-4 bg-slate-50/70 border-t border-slate-100 text-xs text-slate-700 space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {/* 1st Place */}
+                            <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/70">
+                              <div className="flex items-center gap-1.5 font-bold text-amber-800 mb-1">
+                                <span>🥇 1st Place</span>
+                                <span className="ml-auto text-amber-900 font-extrabold">+{res.firstPoints ?? 10} pts</span>
+                              </div>
+                              {renderWinnersList(res.firstPlace, res.firstPlaceTeams, candidates, teams, res.participationGrades, res.participationTeamGrades)}
                             </div>
-                            {renderWinnersList(res.firstPlace, res.firstPlaceTeams, candidates, teams)}
+
+                            {/* 2nd Place */}
+                            <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/70">
+                              <div className="flex items-center gap-1.5 font-bold text-blue-800 mb-1">
+                                <span>🥈 2nd Place</span>
+                                <span className="ml-auto text-blue-900 font-extrabold">+{res.secondPoints ?? 8} pts</span>
+                              </div>
+                              {renderWinnersList(res.secondPlace, res.secondPlaceTeams, candidates, teams, res.participationGrades, res.participationTeamGrades)}
+                            </div>
+
+                            {/* 3rd Place */}
+                            <div className="p-3 bg-orange-50/60 rounded-xl border border-orange-200/70">
+                              <div className="flex items-center gap-1.5 font-bold text-orange-800 mb-1">
+                                <span>🥉 3rd Place</span>
+                                <span className="ml-auto text-orange-900 font-extrabold">+{res.thirdPoints ?? 5} pts</span>
+                              </div>
+                              {renderWinnersList(res.thirdPlace, res.thirdPlaceTeams, candidates, teams, res.participationGrades, res.participationTeamGrades)}
+                            </div>
                           </div>
 
-                          {/* 2nd Place */}
-                          <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/70">
-                            <div className="flex items-center gap-1.5 font-bold text-blue-800 mb-1">
-                              <span>🥈 2nd Place</span>
-                              <span className="ml-auto text-blue-900 font-extrabold">+{res.secondPoints ?? 8} pts</span>
+                          {/* Graded Candidates without podium prize */}
+                          {gradedOnlyCandidates.length > 0 && (
+                            <div className="p-3 bg-purple-50/70 rounded-xl border border-purple-200/80">
+                              <div className="flex items-center gap-1.5 font-bold text-purple-900 mb-2">
+                                <span>🎖️ Grade Holders ({gradedOnlyCandidates.length})</span>
+                                <span className="text-[11px] text-purple-600 font-normal">• Graded participants</span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                {gradedOnlyCandidates.map((item, idx) => (
+                                  <div key={idx} className="bg-white/90 border border-purple-100 rounded-lg p-2.5 flex items-center justify-between text-xs shadow-2xs">
+                                    <div>
+                                      <p className="font-bold text-slate-800">{item.name}</p>
+                                      <p className="text-[10px] text-slate-500">
+                                        {item.type === 'individual' ? `#${item.chestNumber} • ${item.teamName}` : item.teamName}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <span className="px-2 py-0.5 rounded font-extrabold text-[10px] bg-purple-600 text-white shadow-2xs">
+                                        Grade {item.grade}
+                                      </span>
+                                      {item.points ? (
+                                        <span className="text-[10px] text-purple-700 font-bold">
+                                          +{item.points} pts
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                            {renderWinnersList(res.secondPlace, res.secondPlaceTeams, candidates, teams)}
-                          </div>
-
-                          {/* 3rd Place */}
-                          <div className="p-3 bg-orange-50/60 rounded-xl border border-orange-200/70">
-                            <div className="flex items-center gap-1.5 font-bold text-orange-800 mb-1">
-                              <span>🥉 3rd Place</span>
-                              <span className="ml-auto text-orange-900 font-extrabold">+{res.thirdPoints ?? 5} pts</span>
-                            </div>
-                            {renderWinnersList(res.thirdPlace, res.thirdPlaceTeams, candidates, teams)}
-                          </div>
-                        </div>
-
-                        {/* Action buttons */}
-                        <div className="flex items-center justify-between pt-2">
-                          <span className="text-[11px] text-slate-400">
-                            Status: <strong className="text-emerald-600 uppercase font-bold">{res.status || 'published'}</strong>
-                          </span>
-                          {onEditResult && (
-                            <button
-                              onClick={() => onEditResult(res)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
-                            >
-                              Edit Result in Manager &rarr;
-                            </button>
                           )}
+
+                          {/* Action buttons */}
+                          <div className="flex items-center justify-between pt-2">
+                            <span className="text-[11px] text-slate-400">
+                              Status: <strong className="text-emerald-600 uppercase font-bold">{res.status || 'published'}</strong>
+                            </span>
+                            {onEditResult && (
+                              <button
+                                onClick={() => onEditResult(res)}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                              >
+                                Edit Result in Manager &rarr;
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 );
               })
@@ -877,19 +952,30 @@ function LaurelWreath({ rank }: { rank: 1 | 2 | 3 }) {
 
 // Helper to render candidate or team winners in result drawer
 function renderWinnersList(
-  candidatesList?: { chestNumber: string }[],
-  teamsList?: { teamCode: string }[],
+  candidatesList?: { chestNumber: string; grade?: string }[],
+  teamsList?: { teamCode: string; grade?: string }[],
   candidates: Candidate[] = [],
-  teams: Team[] = []
+  teams: Team[] = [],
+  participationGrades: { chestNumber: string; grade: string; points?: number }[] = [],
+  participationTeamGrades: { teamCode: string; grade: string; points?: number }[] = []
 ) {
   if (teamsList && teamsList.length > 0) {
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {teamsList.map(t => {
           const theme = getTeamTheme(t.teamCode, teams);
+          const tg = participationTeamGrades.find(g => g.teamCode === t.teamCode);
+          const grade = t.grade || tg?.grade;
           return (
-            <div key={t.teamCode} className="font-semibold text-slate-800">
-              🚩 {theme.name} ({t.teamCode})
+            <div key={t.teamCode} className="flex items-center justify-between gap-1 text-slate-800">
+              <span className="font-semibold">
+                🚩 {theme.name} ({t.teamCode})
+              </span>
+              {grade && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                  Grade {grade}
+                </span>
+              )}
             </div>
           );
         })}
@@ -899,16 +985,25 @@ function renderWinnersList(
 
   if (candidatesList && candidatesList.length > 0) {
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {candidatesList.map(item => {
           const cand = candidates.find(c => c.chestNumber === item.chestNumber);
           const theme = getTeamTheme(cand?.team, teams);
+          const pg = participationGrades.find(g => g.chestNumber === item.chestNumber);
+          const grade = item.grade || pg?.grade;
           return (
-            <div key={item.chestNumber} className="text-slate-800">
-              <span className="font-bold">{cand?.name || `Candidate #${item.chestNumber}`}</span>
-              <span className="text-[10px] text-slate-500 ml-1">
-                (#{item.chestNumber} • {theme.name})
-              </span>
+            <div key={item.chestNumber} className="flex items-center justify-between gap-1 text-slate-800">
+              <div>
+                <span className="font-bold">{cand?.name || `Candidate #${item.chestNumber}`}</span>
+                <span className="text-[10px] text-slate-500 ml-1">
+                  (#{item.chestNumber} • {theme.name})
+                </span>
+              </div>
+              {grade && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                  Grade {grade}
+                </span>
+              )}
             </div>
           );
         })}

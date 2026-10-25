@@ -1773,35 +1773,63 @@ export default function ResultsPage() {
                           {/* Individual Results */}
                           {result.positionType === 'individual' && result.firstPlace && result.firstPlace.length > 0 && (
                             <div className="mb-2">
-                              {result.firstPlace.map((winner, index) => (
-                                <div key={index} className="mb-1">
-                                  <span className="font-medium text-gray-900">{winner.chestNumber}</span>
-                                </div>
-                              ))}
-                              <p className="text-gray-500">{result.firstPoints} pts each</p>
+                              {result.firstPlace.map((winner, index) => {
+                                const cand = candidates.find(c => c.chestNumber === winner.chestNumber);
+                                const grade = (winner as any).grade || result.participationGrades?.find(pg => pg.chestNumber === winner.chestNumber)?.grade;
+                                return (
+                                  <div key={index} className="mb-1 flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-gray-900 font-mono">{winner.chestNumber}</span>
+                                    {cand && <span className="text-xs text-gray-500 truncate max-w-[100px]">({cand.name})</span>}
+                                    {grade && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                                        Grade {grade}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <p className="text-gray-500 text-xs">+{result.firstPoints} pts each</p>
                             </div>
                           )}
                           {/* Team Results (group + general) */}
                           {(result.positionType === 'group' || result.positionType === 'general') && result.firstPlaceTeams && result.firstPlaceTeams.length > 0 && (
                             <div>
-                              {result.firstPlaceTeams.map((winner, index) => (
-                                <div key={index} className="mb-1 flex items-center">
-                                  <span className="inline-block w-4 h-4 rounded-full mr-2" style={{ backgroundColor: teams.find(t => t.code === winner.teamCode)?.color || '#6B7280' }}></span>
-                                  <span className="font-medium text-gray-900">{winner.teamCode}</span>
-                                </div>
-                              ))}
-                              <p className="text-gray-500">{result.firstPoints} pts each</p>
+                              {result.firstPlaceTeams.map((winner, index) => {
+                                const teamGrade = (winner as any).grade || result.participationTeamGrades?.find(tg => tg.teamCode === winner.teamCode)?.grade;
+                                return (
+                                  <div key={index} className="mb-1 flex items-center gap-1.5 flex-wrap">
+                                    <span className="inline-block w-3.5 h-3.5 rounded-full mr-1 shrink-0" style={{ backgroundColor: teams.find(t => t.code === winner.teamCode)?.color || '#6B7280' }}></span>
+                                    <span className="font-bold text-gray-900">{winner.teamCode}</span>
+                                    {teamGrade && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                                        Grade {teamGrade}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <p className="text-gray-500 text-xs">+{result.firstPoints} pts each</p>
                             </div>
                           )}
                           {/* Fallback for legacy data */}
                           {result.positionType !== 'individual' && (!result.firstPlaceTeams || result.firstPlaceTeams.length === 0) && result.firstPlace && result.firstPlace.length > 0 && (
                             <div className="mb-2">
-                              {result.firstPlace.map((winner, index) => (
-                                <div key={index} className="mb-1">
-                                  <span className="font-medium text-gray-900">{winner.chestNumber}</span>
-                                </div>
-                              ))}
-                              <p className="text-gray-500">{result.firstPoints} pts each</p>
+                              {result.firstPlace.map((winner, index) => {
+                                const cand = candidates.find(c => c.chestNumber === winner.chestNumber);
+                                const grade = (winner as any).grade || result.participationGrades?.find(pg => pg.chestNumber === winner.chestNumber)?.grade;
+                                return (
+                                  <div key={index} className="mb-1 flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-gray-900 font-mono">{winner.chestNumber}</span>
+                                    {cand && <span className="text-xs text-gray-500 truncate max-w-[100px]">({cand.name})</span>}
+                                    {grade && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                                        Grade {grade}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <p className="text-gray-500 text-xs">+{result.firstPoints} pts each</p>
                             </div>
                           )}
                           {(!result.firstPlace || result.firstPlace.length === 0) && (!result.firstPlaceTeams || result.firstPlaceTeams.length === 0) && (
@@ -1814,35 +1842,63 @@ export default function ResultsPage() {
                           {/* Individual Results */}
                           {result.positionType === 'individual' && result.secondPlace && result.secondPlace.length > 0 && (
                             <div className="mb-2">
-                              {result.secondPlace.map((winner, index) => (
-                                <div key={index} className="mb-1">
-                                  <span className="font-medium text-gray-900">{winner.chestNumber}</span>
-                                </div>
-                              ))}
-                              <p className="text-gray-500">{result.secondPoints} pts each</p>
+                              {result.secondPlace.map((winner, index) => {
+                                const cand = candidates.find(c => c.chestNumber === winner.chestNumber);
+                                const grade = (winner as any).grade || result.participationGrades?.find(pg => pg.chestNumber === winner.chestNumber)?.grade;
+                                return (
+                                  <div key={index} className="mb-1 flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-gray-900 font-mono">{winner.chestNumber}</span>
+                                    {cand && <span className="text-xs text-gray-500 truncate max-w-[100px]">({cand.name})</span>}
+                                    {grade && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                                        Grade {grade}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <p className="text-gray-500 text-xs">+{result.secondPoints} pts each</p>
                             </div>
                           )}
                           {/* Team Results (group + general) */}
                           {(result.positionType === 'group' || result.positionType === 'general') && result.secondPlaceTeams && result.secondPlaceTeams.length > 0 && (
                             <div>
-                              {result.secondPlaceTeams.map((winner, index) => (
-                                <div key={index} className="mb-1 flex items-center">
-                                  <span className="inline-block w-4 h-4 rounded-full mr-2" style={{ backgroundColor: teams.find(t => t.code === winner.teamCode)?.color || '#6B7280' }}></span>
-                                  <span className="font-medium text-gray-900">{winner.teamCode}</span>
-                                </div>
-                              ))}
-                              <p className="text-gray-500">{result.secondPoints} pts each</p>
+                              {result.secondPlaceTeams.map((winner, index) => {
+                                const teamGrade = (winner as any).grade || result.participationTeamGrades?.find(tg => tg.teamCode === winner.teamCode)?.grade;
+                                return (
+                                  <div key={index} className="mb-1 flex items-center gap-1.5 flex-wrap">
+                                    <span className="inline-block w-3.5 h-3.5 rounded-full mr-1 shrink-0" style={{ backgroundColor: teams.find(t => t.code === winner.teamCode)?.color || '#6B7280' }}></span>
+                                    <span className="font-bold text-gray-900">{winner.teamCode}</span>
+                                    {teamGrade && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                                        Grade {teamGrade}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <p className="text-gray-500 text-xs">+{result.secondPoints} pts each</p>
                             </div>
                           )}
                           {/* Fallback for legacy data */}
                           {result.positionType !== 'individual' && (!result.secondPlaceTeams || result.secondPlaceTeams.length === 0) && result.secondPlace && result.secondPlace.length > 0 && (
                             <div className="mb-2">
-                              {result.secondPlace.map((winner, index) => (
-                                <div key={index} className="mb-1">
-                                  <span className="font-medium text-gray-900">{winner.chestNumber}</span>
-                                </div>
-                              ))}
-                              <p className="text-gray-500">{result.secondPoints} pts each</p>
+                              {result.secondPlace.map((winner, index) => {
+                                const cand = candidates.find(c => c.chestNumber === winner.chestNumber);
+                                const grade = (winner as any).grade || result.participationGrades?.find(pg => pg.chestNumber === winner.chestNumber)?.grade;
+                                return (
+                                  <div key={index} className="mb-1 flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-gray-900 font-mono">{winner.chestNumber}</span>
+                                    {cand && <span className="text-xs text-gray-500 truncate max-w-[100px]">({cand.name})</span>}
+                                    {grade && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                                        Grade {grade}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <p className="text-gray-500 text-xs">+{result.secondPoints} pts each</p>
                             </div>
                           )}
                           {(!result.secondPlace || result.secondPlace.length === 0) && (!result.secondPlaceTeams || result.secondPlaceTeams.length === 0) && (
@@ -1855,35 +1911,63 @@ export default function ResultsPage() {
                           {/* Individual Results */}
                           {result.positionType === 'individual' && result.thirdPlace && result.thirdPlace.length > 0 && (
                             <div className="mb-2">
-                              {result.thirdPlace.map((winner, index) => (
-                                <div key={index} className="mb-1">
-                                  <span className="font-medium text-gray-900">{winner.chestNumber}</span>
-                                </div>
-                              ))}
-                              <p className="text-gray-500">{result.thirdPoints} pts each</p>
+                              {result.thirdPlace.map((winner, index) => {
+                                const cand = candidates.find(c => c.chestNumber === winner.chestNumber);
+                                const grade = (winner as any).grade || result.participationGrades?.find(pg => pg.chestNumber === winner.chestNumber)?.grade;
+                                return (
+                                  <div key={index} className="mb-1 flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-gray-900 font-mono">{winner.chestNumber}</span>
+                                    {cand && <span className="text-xs text-gray-500 truncate max-w-[100px]">({cand.name})</span>}
+                                    {grade && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                                        Grade {grade}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <p className="text-gray-500 text-xs">+{result.thirdPoints} pts each</p>
                             </div>
                           )}
                           {/* Team Results (group + general) */}
                           {(result.positionType === 'group' || result.positionType === 'general') && result.thirdPlaceTeams && result.thirdPlaceTeams.length > 0 && (
                             <div>
-                              {result.thirdPlaceTeams.map((winner, index) => (
-                                <div key={index} className="mb-1 flex items-center">
-                                  <span className="inline-block w-4 h-4 rounded-full mr-2" style={{ backgroundColor: teams.find(t => t.code === winner.teamCode)?.color || '#6B7280' }}></span>
-                                  <span className="font-medium text-gray-900">{winner.teamCode}</span>
-                                </div>
-                              ))}
-                              <p className="text-gray-500">{result.thirdPoints} pts each</p>
+                              {result.thirdPlaceTeams.map((winner, index) => {
+                                const teamGrade = (winner as any).grade || result.participationTeamGrades?.find(tg => tg.teamCode === winner.teamCode)?.grade;
+                                return (
+                                  <div key={index} className="mb-1 flex items-center gap-1.5 flex-wrap">
+                                    <span className="inline-block w-3.5 h-3.5 rounded-full mr-1 shrink-0" style={{ backgroundColor: teams.find(t => t.code === winner.teamCode)?.color || '#6B7280' }}></span>
+                                    <span className="font-bold text-gray-900">{winner.teamCode}</span>
+                                    {teamGrade && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                                        Grade {teamGrade}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <p className="text-gray-500 text-xs">+{result.thirdPoints} pts each</p>
                             </div>
                           )}
                           {/* Fallback for legacy data */}
                           {result.positionType !== 'individual' && (!result.thirdPlaceTeams || result.thirdPlaceTeams.length === 0) && result.thirdPlace && result.thirdPlace.length > 0 && (
                             <div className="mb-2">
-                              {result.thirdPlace.map((winner, index) => (
-                                <div key={index} className="mb-1">
-                                  <span className="font-medium text-gray-900">{winner.chestNumber}</span>
-                                </div>
-                              ))}
-                              <p className="text-gray-500">{result.thirdPoints} pts each</p>
+                              {result.thirdPlace.map((winner, index) => {
+                                const cand = candidates.find(c => c.chestNumber === winner.chestNumber);
+                                const grade = (winner as any).grade || result.participationGrades?.find(pg => pg.chestNumber === winner.chestNumber)?.grade;
+                                return (
+                                  <div key={index} className="mb-1 flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-gray-900 font-mono">{winner.chestNumber}</span>
+                                    {cand && <span className="text-xs text-gray-500 truncate max-w-[100px]">({cand.name})</span>}
+                                    {grade && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                                        Grade {grade}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <p className="text-gray-500 text-xs">+{result.thirdPoints} pts each</p>
                             </div>
                           )}
                           {(!result.thirdPlace || result.thirdPlace.length === 0) && (!result.thirdPlaceTeams || result.thirdPlaceTeams.length === 0) && (
