@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Result, Programme, Candidate, ProgrammeParticipant, Team } from '@/types';
 import { getTeamTheme, getSectionTheme } from '@/lib/profileHelper';
+import { getDefaultGradePoints } from '@/lib/resultsHelper';
 import { 
   Trophy, 
   Medal, 
@@ -196,7 +197,7 @@ export function AdminResultsLeaderboard({
           const chest = String(pg.chestNumber || '').trim();
           const cand = candMap.get(chest);
           const teamCode = (cand?.team || '').toUpperCase().trim();
-          const pts = pg.points || res.participationPoints || 0;
+          const pts = pg.points !== undefined && pg.points !== null ? pg.points : (getDefaultGradePoints(pg.grade) || res.participationPoints || 0);
           if (teamCode && map[teamCode]) {
             map[teamCode].totalPoints += pts;
             map[teamCode].totalParticipations += 1;
@@ -241,7 +242,7 @@ export function AdminResultsLeaderboard({
 
         (res.participationTeamGrades || []).forEach(tg => {
           const code = (tg.teamCode || '').toUpperCase().trim();
-          const pts = tg.points || res.participationPoints || 0;
+          const pts = tg.points !== undefined && tg.points !== null ? tg.points : (getDefaultGradePoints(tg.grade) || res.participationPoints || 0);
           if (code && map[code]) {
             map[code].totalPoints += pts;
             map[code].totalParticipations += 1;
@@ -791,7 +792,7 @@ export function AdminResultsLeaderboard({
                             teamName: theme.name,
                             teamCode: cand?.team,
                             grade: pg.grade,
-                            points: pg.points
+                            points: pg.points !== undefined && pg.points !== null ? pg.points : getDefaultGradePoints(pg.grade)
                           };
                         }),
                         ...(res.participationTeamGrades || []).filter(tg => {
@@ -806,7 +807,7 @@ export function AdminResultsLeaderboard({
                             teamName: theme.name,
                             teamCode: tg.teamCode,
                             grade: tg.grade,
-                            points: tg.points
+                            points: tg.points !== undefined && tg.points !== null ? tg.points : getDefaultGradePoints(tg.grade)
                           };
                         })
                       ];

@@ -6,6 +6,7 @@ import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
 import { Result, Programme, Candidate, ProgrammeParticipant } from '@/types';
 import { AdminResultsLeaderboard } from "@/components/admin/AdminResultsLeaderboard";
+import { getDefaultGradePoints } from '@/lib/resultsHelper';
 
 export default function ResultsPage() {
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'manage'>('leaderboard');
@@ -40,8 +41,16 @@ export default function ResultsPage() {
     thirdPoints: 5,
     participationPoints: 3,
     notes: '',
-    status: 'published' as 'draft' | 'published'
+    status: 'published' as 'draft' | 'published',
+    participationGrades: [] as { chestNumber: string; grade: 'A' | 'B' | 'C' | 'D' | 'E' | 'F'; points: number }[],
+    participationTeamGrades: [] as { teamCode: string; grade: 'A' | 'B' | 'C' | 'D' | 'E' | 'F'; points: number }[]
   });
+
+  // Modal new grade holder inputs
+  const [modalNewChest, setModalNewChest] = useState('');
+  const [modalNewGrade, setModalNewGrade] = useState<'A' | 'B' | 'C' | 'D' | 'E' | 'F'>('A');
+  const [modalNewPoints, setModalNewPoints] = useState(3);
+  const [modalNewTeam, setModalNewTeam] = useState('');
 
   // Enhanced form state
   const [selectedProgramme, setSelectedProgramme] = useState<Programme | null>(null);
@@ -274,13 +283,14 @@ export default function ResultsPage() {
     }));
   };
 
-  // Add participation grade
-  const addParticipationGrade = (chestNumber: string, grade: 'A' | 'B' | 'C' | 'D' | 'E' | 'F', points: number) => {
+  // Add participation grade with default marks: A=3, B=2, C=1 (editable)
+  const addParticipationGrade = (chestNumber: string, grade: 'A' | 'B' | 'C' | 'D' | 'E' | 'F', points?: number) => {
+    const finalPoints = points !== undefined ? points : getDefaultGradePoints(grade);
     setFormData(prev => ({
       ...prev,
       participationGrades: [
         ...prev.participationGrades.filter(pg => pg.chestNumber !== chestNumber),
-        { chestNumber, grade, points }
+        { chestNumber, grade, points: finalPoints }
       ]
     }));
   };
@@ -293,13 +303,14 @@ export default function ResultsPage() {
     }));
   };
 
-  // Add team participation grade
-  const addTeamParticipationGrade = (teamCode: string, grade: 'A' | 'B' | 'C' | 'D' | 'E' | 'F', points: number) => {
+  // Add team participation grade with default marks: A=3, B=2, C=1 (editable)
+  const addTeamParticipationGrade = (teamCode: string, grade: 'A' | 'B' | 'C' | 'D' | 'E' | 'F', points?: number) => {
+    const finalPoints = points !== undefined ? points : getDefaultGradePoints(grade);
     setFormData(prev => ({
       ...prev,
       participationTeamGrades: [
         ...prev.participationTeamGrades.filter(pg => pg.teamCode !== teamCode),
-        { teamCode, grade, points }
+        { teamCode, grade, points: finalPoints }
       ]
     }));
   };
@@ -531,7 +542,17 @@ export default function ResultsPage() {
       thirdPoints: result.thirdPoints ?? 5,
       participationPoints: result.participationPoints ?? 3,
       notes: result.notes || '',
-      status: result.status || 'published'
+      status: result.status || 'published',
+      participationGrades: (result.participationGrades || []).map(pg => ({
+        chestNumber: pg.chestNumber,
+        grade: pg.grade,
+        points: pg.points !== undefined && pg.points !== null ? pg.points : getDefaultGradePoints(pg.grade)
+      })),
+      participationTeamGrades: (result.participationTeamGrades || []).map(tg => ({
+        teamCode: tg.teamCode,
+        grade: tg.grade,
+        points: tg.points !== undefined && tg.points !== null ? tg.points : getDefaultGradePoints(tg.grade)
+      }))
     });
   };
 
@@ -553,7 +574,9 @@ export default function ResultsPage() {
       thirdPoints: editFormData.thirdPoints,
       participationPoints: editFormData.participationPoints,
       notes: editFormData.notes,
-      status: finalStatus
+      status: finalStatus,
+      participationGrades: editFormData.participationGrades,
+      participationTeamGrades: editFormData.participationTeamGrades
     };
 
     const { _id, ...safePayload } = payload;
@@ -1125,42 +1148,47 @@ export default function ResultsPage() {
                           </button>
                         </div>
 
-                        {/* Participation Grade */}
-                        <div className="flex items-center space-x-1">
+                        {/* Participation Grade (Default: A=3, B=2, C=1, editable) */}
+                        <div className="flex items-center space-x-1.5">
                           <select
                             value={participationGrade?.grade || ''}
                             onChange={(e) => {
-                              if (e.target.value) {
+                              const selGrade = e.target.value as 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | '';
+                              if (selGrade) {
                                 addTeamParticipationGrade(
                                   teamEntry.teamCode,
-                                  e.target.value as 'A' | 'B' | 'C' | 'D' | 'E' | 'F',
-                                  formData.participationPoints
+                                  selGrade,
+                                  getDefaultGradePoints(selGrade)
                                 );
                               } else {
                                 removeTeamParticipationGrade(teamEntry.teamCode);
                               }
                             }}
-                            className="text-xs px-1 py-1 border border-gray-300 rounded bg-white"
+                            className="text-xs px-2 py-1 border border-gray-300 rounded bg-white font-medium"
                           >
                             <option value="">Grade</option>
-                            <option value="A">A</option>
-                            <option value="B">B</option>
-                            <option value="C">C</option>
-                            <option value="D">D</option>
-                            <option value="E">E</option>
-                            <option value="F">F</option>
+                            <option value="A">Grade A (3 pts)</option>
+                            <option value="B">Grade B (2 pts)</option>
+                            <option value="C">Grade C (1 pt)</option>
+                            <option value="D">Grade D (0 pts)</option>
+                            <option value="E">Grade E (0 pts)</option>
+                            <option value="F">Grade F (0 pts)</option>
                           </select>
                           {participationGrade && (
-                            <input
-                              type="number"
-                              value={participationGrade.points}
-                              onChange={(e) => addTeamParticipationGrade(
-                                teamEntry.teamCode,
-                                participationGrade.grade,
-                                parseInt(e.target.value) || 0
-                              )}
-                              className="text-xs px-1 py-1 border border-gray-300 rounded bg-white w-12"
-                            />
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                value={participationGrade.points}
+                                onChange={(e) => addTeamParticipationGrade(
+                                  teamEntry.teamCode,
+                                  participationGrade.grade,
+                                  parseInt(e.target.value) || 0
+                                )}
+                                className="text-xs px-1.5 py-1 border border-gray-300 rounded bg-white w-12 font-bold text-center"
+                                title="Marks for this grade (editable)"
+                              />
+                              <span className="text-[10px] text-gray-400 font-medium">pts</span>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1240,42 +1268,47 @@ export default function ResultsPage() {
                           </button>
                         </div>
 
-                        {/* Participation Grade */}
-                        <div className="flex items-center space-x-1">
+                        {/* Participation Grade (Default: A=3, B=2, C=1, editable) */}
+                        <div className="flex items-center space-x-1.5">
                           <select
                             value={participationGrade?.grade || ''}
                             onChange={(e) => {
-                              if (e.target.value) {
+                              const selGrade = e.target.value as 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | '';
+                              if (selGrade) {
                                 addParticipationGrade(
                                   participant.chestNumber,
-                                  e.target.value as 'A' | 'B' | 'C' | 'D' | 'E' | 'F',
-                                  formData.participationPoints
+                                  selGrade,
+                                  getDefaultGradePoints(selGrade)
                                 );
                               } else {
                                 removeParticipationGrade(participant.chestNumber);
                               }
                             }}
-                            className="text-xs px-1 py-1 border border-gray-300 rounded bg-white"
+                            className="text-xs px-2 py-1 border border-gray-300 rounded bg-white font-medium"
                           >
                             <option value="">Grade</option>
-                            <option value="A">A</option>
-                            <option value="B">B</option>
-                            <option value="C">C</option>
-                            <option value="D">D</option>
-                            <option value="E">E</option>
-                            <option value="F">F</option>
+                            <option value="A">Grade A (3 pts)</option>
+                            <option value="B">Grade B (2 pts)</option>
+                            <option value="C">Grade C (1 pt)</option>
+                            <option value="D">Grade D (0 pts)</option>
+                            <option value="E">Grade E (0 pts)</option>
+                            <option value="F">Grade F (0 pts)</option>
                           </select>
                           {participationGrade && (
-                            <input
-                              type="number"
-                              value={participationGrade.points}
-                              onChange={(e) => addParticipationGrade(
-                                participant.chestNumber,
-                                participationGrade.grade,
-                                parseInt(e.target.value) || 0
-                              )}
-                              className="text-xs px-1 py-1 border border-gray-300 rounded bg-white w-12"
-                            />
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                value={participationGrade.points}
+                                onChange={(e) => addParticipationGrade(
+                                  participant.chestNumber,
+                                  participationGrade.grade,
+                                  parseInt(e.target.value) || 0
+                                )}
+                                className="text-xs px-1.5 py-1 border border-gray-300 rounded bg-white w-12 font-bold text-center"
+                                title="Marks for this grade (editable)"
+                              />
+                              <span className="text-[10px] text-gray-400 font-medium">pts</span>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -2291,6 +2324,262 @@ export default function ResultsPage() {
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
                   />
                 </div>
+              </div>
+
+              {/* Grade Holders & Marks (Default: A=3, B=2, C=1, editable) */}
+              <div className="pt-3 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-800">
+                      🎖️ Grade Holders & Marks
+                    </label>
+                    <p className="text-[11px] text-gray-500">
+                      Default marks: Grade A = 3, B = 2, C = 1 (editable)
+                    </p>
+                  </div>
+                </div>
+
+                {Boolean((editingResult.firstPlaceTeams && editingResult.firstPlaceTeams.length > 0) || editingResult.positionType === 'general' || editingResult.positionType === 'group') ? (
+                  /* Team Grade Holders */
+                  <div className="space-y-2">
+                    {editFormData.participationTeamGrades.map((tg, idx) => (
+                      <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <span className="text-xs font-bold text-gray-800 w-16">{tg.teamCode}</span>
+                        <select
+                          value={tg.grade}
+                          onChange={(e) => {
+                            const newGrade = e.target.value as 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+                            const newPts = getDefaultGradePoints(newGrade);
+                            setEditFormData(prev => ({
+                              ...prev,
+                              participationTeamGrades: prev.participationTeamGrades.map((item, i) =>
+                                i === idx ? { ...item, grade: newGrade, points: newPts } : item
+                              )
+                            }));
+                          }}
+                          className="text-xs px-2 py-1 border border-gray-300 rounded bg-white font-medium"
+                        >
+                          <option value="A">Grade A (3 pts)</option>
+                          <option value="B">Grade B (2 pts)</option>
+                          <option value="C">Grade C (1 pt)</option>
+                          <option value="D">Grade D (0 pts)</option>
+                          <option value="E">Grade E (0 pts)</option>
+                          <option value="F">Grade F (0 pts)</option>
+                        </select>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={tg.points}
+                            onChange={(e) => {
+                              const newPts = parseInt(e.target.value) || 0;
+                              setEditFormData(prev => ({
+                                ...prev,
+                                participationTeamGrades: prev.participationTeamGrades.map((item, i) =>
+                                  i === idx ? { ...item, points: newPts } : item
+                                )
+                              }));
+                            }}
+                            className="text-xs px-1.5 py-1 border border-gray-300 rounded bg-white w-14 font-bold text-center"
+                            title="Edit marks"
+                          />
+                          <span className="text-[10px] text-gray-400 font-medium">pts</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditFormData(prev => ({
+                            ...prev,
+                            participationTeamGrades: prev.participationTeamGrades.filter((_, i) => i !== idx)
+                          }))}
+                          className="text-red-500 hover:text-red-700 text-xs px-1.5 py-1 ml-auto"
+                          title="Remove grade"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    {editFormData.participationTeamGrades.length === 0 && (
+                      <p className="text-xs text-gray-400 italic py-1">No additional team grade holders recorded.</p>
+                    )}
+
+                    {/* Add Team Grade Row */}
+                    <div className="flex items-center gap-1.5 p-2 bg-blue-50/60 rounded-lg border border-dashed border-blue-200 mt-2">
+                      <input
+                        type="text"
+                        value={modalNewTeam}
+                        onChange={(e) => setModalNewTeam(e.target.value.toUpperCase())}
+                        placeholder="Team Code"
+                        className="text-xs px-2 py-1 border border-gray-300 rounded bg-white w-24 font-bold"
+                      />
+                      <select
+                        value={modalNewGrade}
+                        onChange={(e) => {
+                          const g = e.target.value as any;
+                          setModalNewGrade(g);
+                          setModalNewPoints(getDefaultGradePoints(g));
+                        }}
+                        className="text-xs px-2 py-1 border border-gray-300 rounded bg-white font-medium"
+                      >
+                        <option value="A">Grade A (3 pts)</option>
+                        <option value="B">Grade B (2 pts)</option>
+                        <option value="C">Grade C (1 pt)</option>
+                        <option value="D">Grade D (0 pts)</option>
+                        <option value="E">Grade E (0 pts)</option>
+                        <option value="F">Grade F (0 pts)</option>
+                      </select>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={modalNewPoints}
+                          onChange={(e) => setModalNewPoints(parseInt(e.target.value) || 0)}
+                          className="text-xs px-1.5 py-1 border border-gray-300 rounded bg-white w-14 font-bold text-center"
+                          title="Marks for this grade (editable)"
+                        />
+                        <span className="text-[10px] text-gray-400 font-medium">pts</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const tc = modalNewTeam.trim().toUpperCase();
+                          if (!tc) return;
+                          setEditFormData(prev => ({
+                            ...prev,
+                            participationTeamGrades: [
+                              ...prev.participationTeamGrades.filter(tg => tg.teamCode !== tc),
+                              { teamCode: tc, grade: modalNewGrade, points: modalNewPoints }
+                            ]
+                          }));
+                          setModalNewTeam('');
+                        }}
+                        className="px-2.5 py-1 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700 ml-auto cursor-pointer"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Individual Candidate Grade Holders */
+                  <div className="space-y-2">
+                    {editFormData.participationGrades.map((pg, idx) => {
+                      const cand = candidates.find(c => c.chestNumber === pg.chestNumber);
+                      return (
+                        <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="min-w-[80px]">
+                            <span className="text-xs font-mono font-bold text-gray-900">#{pg.chestNumber}</span>
+                            {cand && <span className="text-[10px] text-gray-500 block truncate max-w-[120px]">{cand.name}</span>}
+                          </div>
+                          <select
+                            value={pg.grade}
+                            onChange={(e) => {
+                              const newGrade = e.target.value as 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+                              const newPts = getDefaultGradePoints(newGrade);
+                              setEditFormData(prev => ({
+                                ...prev,
+                                participationGrades: prev.participationGrades.map((item, i) =>
+                                  i === idx ? { ...item, grade: newGrade, points: newPts } : item
+                                )
+                              }));
+                            }}
+                            className="text-xs px-2 py-1 border border-gray-300 rounded bg-white font-medium"
+                          >
+                            <option value="A">Grade A (3 pts)</option>
+                            <option value="B">Grade B (2 pts)</option>
+                            <option value="C">Grade C (1 pt)</option>
+                            <option value="D">Grade D (0 pts)</option>
+                            <option value="E">Grade E (0 pts)</option>
+                            <option value="F">Grade F (0 pts)</option>
+                          </select>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              value={pg.points}
+                              onChange={(e) => {
+                                const newPts = parseInt(e.target.value) || 0;
+                                setEditFormData(prev => ({
+                                  ...prev,
+                                  participationGrades: prev.participationGrades.map((item, i) =>
+                                    i === idx ? { ...item, points: newPts } : item
+                                  )
+                                }));
+                              }}
+                              className="text-xs px-1.5 py-1 border border-gray-300 rounded bg-white w-14 font-bold text-center"
+                              title="Edit marks"
+                            />
+                            <span className="text-[10px] text-gray-400 font-medium">pts</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditFormData(prev => ({
+                              ...prev,
+                              participationGrades: prev.participationGrades.filter((_, i) => i !== idx)
+                            }))}
+                            className="text-red-500 hover:text-red-700 text-xs px-1.5 py-1 ml-auto cursor-pointer"
+                            title="Remove grade"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {editFormData.participationGrades.length === 0 && (
+                      <p className="text-xs text-gray-400 italic py-1">No additional grade holders recorded.</p>
+                    )}
+
+                    {/* Add Individual Grade Row */}
+                    <div className="flex items-center gap-1.5 p-2 bg-blue-50/60 rounded-lg border border-dashed border-blue-200 mt-2">
+                      <input
+                        type="text"
+                        value={modalNewChest}
+                        onChange={(e) => setModalNewChest(e.target.value.trim())}
+                        placeholder="Chest #"
+                        className="text-xs px-2 py-1 border border-gray-300 rounded bg-white w-20 font-mono font-bold"
+                      />
+                      <select
+                        value={modalNewGrade}
+                        onChange={(e) => {
+                          const g = e.target.value as any;
+                          setModalNewGrade(g);
+                          setModalNewPoints(getDefaultGradePoints(g));
+                        }}
+                        className="text-xs px-2 py-1 border border-gray-300 rounded bg-white font-medium"
+                      >
+                        <option value="A">Grade A (3 pts)</option>
+                        <option value="B">Grade B (2 pts)</option>
+                        <option value="C">Grade C (1 pt)</option>
+                        <option value="D">Grade D (0 pts)</option>
+                        <option value="E">Grade E (0 pts)</option>
+                        <option value="F">Grade F (0 pts)</option>
+                      </select>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={modalNewPoints}
+                          onChange={(e) => setModalNewPoints(parseInt(e.target.value) || 0)}
+                          className="text-xs px-1.5 py-1 border border-gray-300 rounded bg-white w-14 font-bold text-center"
+                          title="Marks for this grade (editable)"
+                        />
+                        <span className="text-[10px] text-gray-400 font-medium">pts</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const chest = modalNewChest.trim();
+                          if (!chest) return;
+                          setEditFormData(prev => ({
+                            ...prev,
+                            participationGrades: [
+                              ...prev.participationGrades.filter(pg => pg.chestNumber !== chest),
+                              { chestNumber: chest, grade: modalNewGrade, points: modalNewPoints }
+                            ]
+                          }));
+                          setModalNewChest('');
+                        }}
+                        className="px-2.5 py-1 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700 ml-auto cursor-pointer"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Notes */}

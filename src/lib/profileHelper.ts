@@ -1,5 +1,5 @@
 import { Candidate, Team, Result, Programme, ProgrammeParticipant } from '@/types';
-import { findProgramme, getProgrammeName, getProgrammeCode } from '@/lib/resultsHelper';
+import { findProgramme, getProgrammeName, getProgrammeCode, getDefaultGradePoints } from '@/lib/resultsHelper';
 
 export interface TeamTheme {
   code: string;
@@ -346,9 +346,7 @@ export function getCandidateStats(
     let gPts = 0;
     if (gradeItem) {
       earnedGrade = gradeItem.grade || earnedGrade;
-      gPts = Number(gradeItem.points ?? result.participationPoints ?? (
-        gradeItem.grade === 'A' ? 5 : gradeItem.grade === 'B' ? 3 : gradeItem.grade === 'C' ? 1 : 0
-      ));
+      gPts = Number(gradeItem.points ?? result.participationPoints ?? getDefaultGradePoints(gradeItem.grade));
     }
 
     const eventPoints = posPts + gPts;

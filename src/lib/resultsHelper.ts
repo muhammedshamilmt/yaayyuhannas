@@ -174,3 +174,31 @@ export function getResultPublishedTime(result: (Partial<Result> & { publishedAt?
 
 // Backward compatibility alias
 export const getResultAddedTime = getResultPublishedTime;
+
+/**
+ * Standard default marks / points for participation grades:
+ * A -> 3
+ * B -> 2
+ * C -> 1
+ * D / E / F -> 0
+ */
+export const DEFAULT_GRADE_POINTS: Record<string, number> = {
+  'A': 3,
+  'B': 2,
+  'C': 1,
+  'D': 0,
+  'E': 0,
+  'F': 0,
+};
+
+/**
+ * Returns default marks for a given grade string (e.g. 'A' -> 3, 'B' -> 2, 'C' -> 1).
+ */
+export function getDefaultGradePoints(grade?: string | null): number {
+  if (!grade) return 0;
+  const normalized = grade.trim().toUpperCase();
+  if (normalized === 'A' || normalized === 'A+') return 3;
+  if (normalized === 'B' || normalized === 'B+') return 2;
+  if (normalized === 'C' || normalized === 'C+') return 1;
+  return DEFAULT_GRADE_POINTS[normalized] ?? 0;
+}

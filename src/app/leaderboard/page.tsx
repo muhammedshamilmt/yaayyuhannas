@@ -9,7 +9,7 @@ import { PerformanceMetrics } from '@/components/Leaderboard/PerformanceMetrics'
 import { LiveUpdates } from '@/components/Leaderboard/LiveUpdates';
 import { TeamProfile } from '@/components/Leaderboard/TeamProfile';
 import { IndividualProfile } from '@/components/Leaderboard/IndividualProfile';
-import { findProgramme, getProgrammeName } from '@/lib/resultsHelper';
+import { findProgramme, getProgrammeName, getDefaultGradePoints } from '@/lib/resultsHelper';
 
 interface TeamStats {
     team: Team;
@@ -230,7 +230,7 @@ export default function DynamicLeaderboardPage() {
                 const candidate = candidates.find(c => c.chestNumber === participant.chestNumber);
                 if (candidate && teamStatsMap[candidate.team]) {
                     const teamStat = teamStatsMap[candidate.team];
-                    const points = participant.points || result.participationPoints || 0;
+                    const points = participant.points !== undefined && participant.points !== null ? participant.points : (getDefaultGradePoints(participant.grade) || result.participationPoints || 0);
                     if (points > 0) {
                         teamStat.totalPoints += points;
                         
@@ -398,7 +398,7 @@ export default function DynamicLeaderboardPage() {
                 (result.participationGrades || []).forEach(participant => {
                     if (individualStatsMap[participant.chestNumber]) {
                         const individualStat = individualStatsMap[participant.chestNumber];
-                        const points = participant.points || result.participationPoints || 0;
+                        const points = participant.points !== undefined && participant.points !== null ? participant.points : (getDefaultGradePoints(participant.grade) || result.participationPoints || 0);
                         
                         if (points > 0) {
                             individualStat.totalPoints += points;

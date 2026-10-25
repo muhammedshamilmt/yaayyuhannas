@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Team, Result, Candidate, Programme } from '@/types';
-import { findProgramme, getResultPublishedTime } from '@/lib/resultsHelper';
+import { findProgramme, getResultPublishedTime, getDefaultGradePoints } from '@/lib/resultsHelper';
 
 export interface WinnerItem {
   type: 'individual' | 'team';
@@ -109,14 +109,16 @@ export default function ResultsPage() {
       const pgMap = new Map<string, { grade: string; points: number }>();
       (result.participationGrades || []).forEach(pg => {
         if (pg.chestNumber) {
-          pgMap.set(String(pg.chestNumber).trim(), { grade: pg.grade, points: pg.points });
+          const pts = pg.points !== undefined && pg.points !== null ? pg.points : getDefaultGradePoints(pg.grade);
+          pgMap.set(String(pg.chestNumber).trim(), { grade: pg.grade, points: pts });
         }
       });
 
       const tgMap = new Map<string, { grade: string; points: number }>();
       (result.participationTeamGrades || []).forEach(tg => {
         if (tg.teamCode) {
-          tgMap.set(String(tg.teamCode).trim().toUpperCase(), { grade: tg.grade, points: tg.points });
+          const pts = tg.points !== undefined && tg.points !== null ? tg.points : getDefaultGradePoints(tg.grade);
+          tgMap.set(String(tg.teamCode).trim().toUpperCase(), { grade: tg.grade, points: pts });
         }
       });
 
@@ -241,7 +243,7 @@ export default function ResultsPage() {
             teamColor: team?.color,
             chestNumber: pg.chestNumber,
             grade: pg.grade,
-            points: pg.points || result.participationPoints || 0
+            points: pg.points !== undefined && pg.points !== null ? pg.points : getDefaultGradePoints(pg.grade)
           });
         }
       });
@@ -256,7 +258,7 @@ export default function ResultsPage() {
             team: team?.name,
             teamColor: team?.color,
             grade: tg.grade,
-            points: tg.points || result.participationPoints || 0
+            points: tg.points !== undefined && tg.points !== null ? tg.points : getDefaultGradePoints(tg.grade)
           });
         }
       });
