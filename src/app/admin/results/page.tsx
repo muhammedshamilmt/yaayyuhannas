@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import Link from 'next/link';
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
 import { Result, Programme, Candidate, ProgrammeParticipant } from '@/types';
@@ -793,23 +794,36 @@ export default function ResultsPage() {
           </button>
         </div>
 
-        {activeTab === 'leaderboard' ? (
-          <button
-            type="button"
-            onClick={() => setActiveTab('manage')}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-xs"
+        <div className="flex items-center gap-2">
+          <Link
+            href="/result-screen"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200/80 transition-all shadow-xs"
+            title="Open TV Result Screen (for Projector/Screening)"
           >
-            <span>➕ Add New Result</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setActiveTab('leaderboard')}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all shadow-xs"
-          >
-            <span>🏆 View Standings</span>
-          </button>
-        )}
+            <span>📺</span>
+            <span>TV Screen Mode ↗</span>
+          </Link>
+
+          {activeTab === 'leaderboard' ? (
+            <button
+              type="button"
+              onClick={() => setActiveTab('manage')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-xs"
+            >
+              <span>➕ Add New Result</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setActiveTab('leaderboard')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all shadow-xs"
+            >
+              <span>🏆 View Standings</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {activeTab === 'leaderboard' && (

@@ -932,15 +932,39 @@ function LaurelWreath({ rank }: { rank: 1 | 2 | 3 }) {
       <div className="relative flex items-center justify-center">
         {/* Laurel branches SVG */}
         <svg
-          viewBox="0 0 100 80"
-          className="w-20 h-16 sm:w-24 sm:h-20 drop-shadow-md text-white/90 fill-current"
+          viewBox="0 0 120 90"
+          className="w-24 h-20 text-white fill-current drop-shadow-md"
         >
           {/* Left branch */}
-          <path d="M 22 62 C 16 50 14 36 20 22 C 21 20 23 21 23 23 C 18 35 20 48 26 58 C 24 57 20 54 20 50 C 18 43 20 34 25 27 C 22 34 23 43 26 50 C 27 52 28 54 29 56 C 26 48 29 39 34 32 C 32 39 32 46 34 52 C 31 43 36 36 42 30 C 39 37 39 44 40 50 C 38 41 44 35 50 32 C 46 39 45 46 45 51 C 36 60 28 64 22 62 Z" />
+          <g>
+            <path d="M 52 74 C 36 72 24 58 24 42 C 24 28 32 16 44 10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M 50 73 C 44 73 40 68 42 64 C 45 64 49 67 50 73 Z" />
+            <path d="M 38 65 C 32 65 28 60 30 56 C 33 56 37 59 38 65 Z" />
+            <path d="M 28 54 C 22 53 19 48 22 44 C 25 44 28 48 28 54 Z" />
+            <path d="M 23 41 C 18 39 16 33 19 30 C 22 31 24 35 23 41 Z" />
+            <path d="M 24 28 C 20 25 20 19 24 17 C 26 19 27 23 24 28 Z" />
+            <path d="M 31 17 C 28 13 30 8 34 7 C 36 9 35 14 31 17 Z" />
+            <path d="M 42 9 C 40 5 44 1 48 1 C 49 4 47 8 42 9 Z" />
+            <path d="M 44 58 C 42 54 43 49 47 48 C 48 51 46 56 44 58 Z" />
+            <path d="M 35 46 C 34 42 36 37 40 37 C 41 40 38 44 35 46 Z" />
+            <path d="M 32 33 C 32 29 35 25 39 26 C 39 29 36 32 32 33 Z" />
+          </g>
           {/* Right branch (mirrored) */}
-          <path d="M 78 62 C 84 50 86 36 80 22 C 79 20 77 21 77 23 C 82 35 80 48 74 58 C 76 57 80 54 80 50 C 82 43 80 34 75 27 C 78 34 77 43 74 50 C 73 52 72 54 71 56 C 74 48 71 39 66 32 C 68 39 68 46 66 52 C 69 43 64 36 58 30 C 61 37 61 44 60 50 C 62 41 56 35 50 32 C 54 39 55 46 55 51 C 64 60 72 64 78 62 Z" />
-          {/* Bottom tie ribbon */}
-          <path d="M 46 64 C 48 66 52 66 54 64 C 55 67 52 69 50 69 C 48 69 45 67 46 64 Z" />
+          <g transform="translate(120, 0) scale(-1, 1)">
+            <path d="M 52 74 C 36 72 24 58 24 42 C 24 28 32 16 44 10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M 50 73 C 44 73 40 68 42 64 C 45 64 49 67 50 73 Z" />
+            <path d="M 38 65 C 32 65 28 60 30 56 C 33 56 37 59 38 65 Z" />
+            <path d="M 28 54 C 22 53 19 48 22 44 C 25 44 28 48 28 54 Z" />
+            <path d="M 23 41 C 18 39 16 33 19 30 C 22 31 24 35 23 41 Z" />
+            <path d="M 24 28 C 20 25 20 19 24 17 C 26 19 27 23 24 28 Z" />
+            <path d="M 31 17 C 28 13 30 8 34 7 C 36 9 35 14 31 17 Z" />
+            <path d="M 42 9 C 40 5 44 1 48 1 C 49 4 47 8 42 9 Z" />
+            <path d="M 44 58 C 42 54 43 49 47 48 C 48 51 46 56 44 58 Z" />
+            <path d="M 35 46 C 34 42 36 37 40 37 C 41 40 38 44 35 46 Z" />
+            <path d="M 32 33 C 32 29 35 25 39 26 C 39 29 36 32 32 33 Z" />
+          </g>
+          {/* Bottom Ribbon */}
+          <path d="M 55 75 C 58 77 62 77 65 75 C 67 78 63 81 60 81 C 57 81 53 78 55 75 Z" />
         </svg>
         <span className="absolute font-black text-3xl sm:text-4xl tracking-tighter text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">
           {rank}

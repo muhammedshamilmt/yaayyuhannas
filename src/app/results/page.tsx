@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Team, Result, Candidate, Programme } from '@/types';
 import { findProgramme, getResultPublishedTime } from '@/lib/resultsHelper';
 
@@ -504,26 +505,41 @@ export default function ResultsPage() {
       {/* Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-          <div className="flex flex-wrap border-b">
-            {[
-              { key: 'overview', label: '📊 Overview', icon: '📊' },
-              { key: 'programmes', label: '🎭 Programme Results', icon: '🎭' },
-              { key: 'categories', label: '📂 Category Results', icon: '📂' },
-              { key: 'sections', label: '🏛️ Section Results', icon: '🏛️' }
-            ].map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key as any)}
-                className={`px-6 py-4 font-medium text-sm md:text-base transition-colors duration-200 ${
-                  activeTab === tab.key
-                    ? 'text-green-600 border-b-2 border-green-600 bg-green-50'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                }`}
+          <div className="flex flex-wrap items-center justify-between border-b px-2">
+            <div className="flex flex-wrap">
+              {[
+                { key: 'overview', label: '📊 Overview', icon: '📊' },
+                { key: 'programmes', label: '🎭 Programme Results', icon: '🎭' },
+                { key: 'categories', label: '📂 Category Results', icon: '📂' },
+                { key: 'sections', label: '🏛️ Section Results', icon: '🏛️' }
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key as any)}
+                  className={`px-6 py-4 font-medium text-sm md:text-base transition-colors duration-200 ${
+                    activeTab === tab.key
+                      ? 'text-green-600 border-b-2 border-green-600 bg-green-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="hidden md:inline">{tab.label}</span>
+                  <span className="md:hidden">{tab.icon}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="py-2 px-3">
+              <Link
+                href="/result-screen"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-sm transition-all"
+                title="Launch Live TV Screening Mode"
               >
-                <span className="hidden md:inline">{tab.label}</span>
-                <span className="md:hidden">{tab.icon}</span>
-              </button>
-            ))}
+                <span>📺</span>
+                <span>TV Screening Mode ↗</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
