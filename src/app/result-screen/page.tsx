@@ -5,24 +5,27 @@ import Link from 'next/link';
 import { Result, Programme, Candidate, Team } from '@/types';
 import { getTeamTheme, getSectionTheme } from '@/lib/profileHelper';
 import { getDefaultGradePoints } from '@/lib/resultsHelper';
-import { 
-  Trophy, 
-  RotateCw, 
-  Maximize, 
-  Minimize, 
-  Play, 
-  Pause, 
-  Search, 
-  Clock, 
-  Sparkles, 
-  ChevronDown, 
-  ChevronUp, 
-  Radio, 
+import {
+  Trophy,
+  RotateCw,
+  Maximize,
+  Minimize,
+  Play,
+  Pause,
+  Search,
+  Clock,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Radio,
   Award,
   Filter,
   Flame,
   CheckCircle2,
-  Tv
+  Tv,
+  Star,
+  Medal,
+  User
 } from 'lucide-react';
 
 export default function ResultScreenPage() {
@@ -36,6 +39,8 @@ export default function ResultScreenPage() {
   const [selectedSection, setSelectedSection] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  // Star Performers Section Filter state ('all' | 'senior' | 'junior' | 'sub-junior')
+  const [starPerformerSection, setStarPerformerSection] = useState<string>('all');
 
   // Expandable results map for showing grade-only holders
   const [expandedResults, setExpandedResults] = useState<Record<string, boolean>>({});
@@ -291,6 +296,146 @@ export default function ResultScreenPage() {
   const rank2 = teamStandings[1];
   const rank3 = teamStandings[2];
 
+  // Compute individual star performers dynamically across all published results
+  const individualStats = useMemo(() => {
+    const candMap: Record<string, {
+      candidate: Candidate;
+      team: Team | { code: string; name: string; color: string };
+      totalPoints: number;
+      totalWins: number;
+      medals: { gold: number; silver: number; bronze: number };
+      rank: number;
+      firstWins: number;
+      secondWins: number;
+      thirdWins: number;
+      gradesCount: number;
+      section: string;
+    }> = {};
+
+    candidates.forEach(c => {
+      const chest = String(c.chestNumber || '').trim();
+      if (!chest) return;
+      const teamCode = (c.team || '').toUpperCase().trim();
+      const teamObj = teams.find(t => (t.code || '').toUpperCase().trim() === teamCode);
+      const teamTheme = getTeamTheme(teamCode, teams);
+
+      candMap[chest] = {
+        candidate: c,
+        team: teamObj || { code: teamCode, name: teamTheme.name, color: teamTheme.color },
+        totalPoints: 0,
+        totalWins: 0,
+        medals: { gold: 0, silver: 0, bronze: 0 },
+        rank: 0,
+        firstWins: 0,
+        secondWins: 0,
+        thirdWins: 0,
+        gradesCount: 0,
+        section: (c.section || '').toLowerCase().trim()
+      };
+    });
+
+    const progMap = new Map<string, Programme>();
+    programmes.forEach(p => {
+      if (p._id) progMap.set(p._id.toString(), p);
+      if (p.id) progMap.set(String(p.id), p);
+      if (p.code) progMap.set(p.code.toUpperCase().trim(), p);
+    });
+
+    publishedResults.forEach(res => {
+      // Only individual-type programmes count towards star performers
+      if (res.positionType !== 'individual') return;
+
+      let prog = res.programmeId ? progMap.get(res.programmeId) : undefined;
+      if (!prog && res.programme) {
+        const codeMatch = res.programme.match(/^([A-Za-z0-9_-]+)/);
+        if (codeMatch) prog = progMap.get(codeMatch[1].toUpperCase().trim());
+      }
+
+      if (selectedCategory !== 'all') {
+        const cat = (prog?.category || '').toLowerCase().trim();
+        if (cat !== selectedCategory.toLowerCase().trim()) return;
+      }
+
+      const firstPoints = res.firstPoints ?? 10;
+      const secondPoints = res.secondPoints ?? 8;
+      const thirdPoints = res.thirdPoints ?? 5;
+
+      (res.firstPlace || []).forEach(p => {
+        const chest = String(p.chestNumber || '').trim();
+        if (candMap[chest]) {
+          candMap[chest].totalPoints += firstPoints;
+          candMap[chest].medals.gold += 1;
+          candMap[chest].firstWins += 1;
+          candMap[chest].totalWins += 1;
+        }
+      });
+
+      (res.secondPlace || []).forEach(p => {
+        const chest = String(p.chestNumber || '').trim();
+        if (candMap[chest]) {
+          candMap[chest].totalPoints += secondPoints;
+          candMap[chest].medals.silver += 1;
+          candMap[chest].secondWins += 1;
+          candMap[chest].totalWins += 1;
+        }
+      });
+
+      (res.thirdPlace || []).forEach(p => {
+        const chest = String(p.chestNumber || '').trim();
+        if (candMap[chest]) {
+          candMap[chest].totalPoints += thirdPoints;
+          candMap[chest].medals.bronze += 1;
+          candMap[chest].thirdWins += 1;
+          candMap[chest].totalWins += 1;
+        }
+      });
+
+      (res.participationGrades || []).forEach(pg => {
+        const chest = String(pg.chestNumber || '').trim();
+        if (candMap[chest]) {
+          const pts = pg.points !== undefined && pg.points !== null
+            ? pg.points
+            : (getDefaultGradePoints(pg.grade) || res.participationPoints || 0);
+          candMap[chest].totalPoints += pts;
+          candMap[chest].gradesCount += 1;
+        }
+      });
+    });
+
+    return Object.values(candMap)
+      .filter(item => item.totalPoints > 0)
+      .sort((a, b) => {
+        if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+        if (b.totalWins !== a.totalWins) return b.totalWins - a.totalWins;
+        if (b.medals.gold !== a.medals.gold) return b.medals.gold - a.medals.gold;
+        if (b.medals.silver !== a.medals.silver) return b.medals.silver - a.medals.silver;
+        return b.medals.bronze - a.medals.bronze;
+      });
+  }, [publishedResults, candidates, teams, programmes, selectedCategory]);
+
+  // Filter individual performers by selected section (and re-rank accordingly)
+  const filteredStarPerformers = useMemo(() => {
+    let list = individualStats;
+    const sec = starPerformerSection.toLowerCase().trim();
+    if (sec !== 'all') {
+      list = list.filter(item => {
+        const itemSec = (item.section || item.candidate.section || '').toLowerCase().trim();
+        return itemSec === sec;
+      });
+    }
+    return list.map((item, index) => ({
+      ...item,
+      rank: index + 1
+    }));
+  }, [individualStats, starPerformerSection]);
+
+  // Sync starPerformerSection when global selectedSection changes
+  useEffect(() => {
+    if (selectedSection && selectedSection !== 'all') {
+      setStarPerformerSection(selectedSection);
+    }
+  }, [selectedSection]);
+
   // Processed list of latest results for screening
   const filteredResultsList = useMemo(() => {
     let list = [...publishedResults].sort((a, b) => {
@@ -320,12 +465,12 @@ export default function ResultScreenPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-amber-100">
-      
+
       {/* ========================================================================= */}
       {/* TV SCREEN TOP BROADCAST HEADER & DISPLAY CONTROLS                          */}
       {/* ========================================================================= */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
-        
+
         {/* Left: Branding & Live Ticker */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-white shadow-md text-xl">
@@ -355,11 +500,10 @@ export default function ResultScreenPage() {
               <button
                 key={sec}
                 onClick={() => setSelectedSection(sec)}
-                className={`px-3 py-1.5 rounded-lg capitalize transition-all cursor-pointer ${
-                  selectedSection === sec
-                    ? 'bg-white text-slate-900 font-black shadow-xs'
-                    : 'hover:text-slate-900'
-                }`}
+                className={`px-3 py-1.5 rounded-lg capitalize transition-all cursor-pointer ${selectedSection === sec
+                  ? 'bg-white text-slate-900 font-black shadow-xs'
+                  : 'hover:text-slate-900'
+                  }`}
               >
                 {sec === 'all' ? 'All Sections' : sec}
               </button>
@@ -372,11 +516,10 @@ export default function ResultScreenPage() {
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg capitalize transition-all cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-white text-slate-900 font-black shadow-xs'
-                    : 'hover:text-slate-900'
-                }`}
+                className={`px-3 py-1.5 rounded-lg capitalize transition-all cursor-pointer ${selectedCategory === cat
+                  ? 'bg-white text-slate-900 font-black shadow-xs'
+                  : 'hover:text-slate-900'
+                  }`}
               >
                 {cat === 'all' ? 'All' : cat}
               </button>
@@ -396,11 +539,10 @@ export default function ResultScreenPage() {
           <button
             onClick={() => setAutoRefresh(!autoRefresh)}
             title="Toggle Live Auto-Refresh"
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
-              autoRefresh 
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 ring-2 ring-emerald-500/10'
-                : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
-            }`}
+            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${autoRefresh
+              ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 ring-2 ring-emerald-500/10'
+              : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
+              }`}
           >
             {autoRefresh ? (
               <>
@@ -438,212 +580,420 @@ export default function ResultScreenPage() {
       {/* ========================================================================= */}
       {/* MAIN SCREEN CONTENT                                                       */}
       {/* ========================================================================= */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
-        
+      <main className="flex-1 max-w-[1500px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+
         {/* ======================================================================= */}
-        {/* TOP SECTION: 3D ISOMETRIC PODIUM LEADERBOARD (MATCHING IMAGE 2 EXACTLY) */}
+        {/* TOP SECTION: LEADERBOARD PODIUM (LEFT) + STAR PERFORMERS (RIGHT)        */}
         {/* ======================================================================= */}
-        <section className="relative bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden">
-          {/* Subtle Warm Sunburst Spotlight Radial Gradient Background */}
-          <div 
-            className="absolute inset-x-0 top-0 h-96 pointer-events-none opacity-80"
-            style={{
-              background: 'radial-gradient(ellipse 70% 60% at 50% 10%, rgba(254, 240, 138, 0.45) 0%, rgba(254, 215, 170, 0.25) 45%, rgba(255, 255, 255, 0) 80%)'
-            }}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
 
-          {/* Leaderboard Card Header */}
-          <div className="relative pt-7 pb-4 px-6 sm:px-8 border-b border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl sm:text-3xl">🏆</span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                    Leaderboard
-                  </h2>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Live Standings
-                  </span>
-                </div>
-                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                  Real-time festival championship standings calculated dynamically across all published results
-                </p>
-              </div>
-            </div>
+          {/* ===================================================================== */}
+          {/* LEFT: 3D ISOMETRIC PODIUM LEADERBOARD (lg:col-span-7)                 */}
+          {/* ===================================================================== */}
+          <section className="lg:col-span-7 flex flex-col justify-between relative bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden">
+            {/* Subtle Warm Sunburst Spotlight Radial Gradient Background */}
+            <div
+              className="absolute inset-x-0 top-0 h-96 pointer-events-none opacity-80"
+              style={{
+                background: 'radial-gradient(ellipse 70% 60% at 50% 10%, rgba(254, 240, 138, 0.45) 0%, rgba(254, 215, 170, 0.25) 45%, rgba(255, 255, 255, 0) 80%)'
+              }}
+            />
 
-            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400">
-              <Tv className="w-4 h-4 text-slate-500" />
-              <span>Screening Mode</span>
-            </div>
-          </div>
-
-          {/* 3D Isometric / Perspective Podium */}
-          <div className="relative pt-8 pb-6 px-4 sm:px-8 max-w-4xl mx-auto">
-            <div className="flex justify-center items-end gap-3 sm:gap-6 pt-12 pb-2">
-              
-              {/* ============================================================ */}
-              {/* RANK 2: LEFT PODIUM (Silver / Ice-Blue)                      */}
-              {/* ============================================================ */}
-              <div className="flex-1 max-w-[220px] flex flex-col items-center">
-                {rank2 ? (
-                  <div className="flex flex-col items-center mb-3 text-center transition-transform hover:-translate-y-1">
-                    <div className="relative">
-                      {/* Squircle Card Icon */}
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-slate-100 to-blue-50 border-2 border-blue-200 shadow-md flex items-center justify-center text-3xl">
-                        🥈
-                      </div>
-                      <span className="absolute -top-1.5 -right-1 text-sm">⭐</span>
-                    </div>
-                    <h3 className="font-extrabold text-slate-800 text-sm sm:text-base mt-2 truncate max-w-[140px]">
-                      {rank2.team.name}
-                    </h3>
-                    <div className="flex items-center gap-1 text-blue-600 font-bold text-xs sm:text-sm mt-0.5">
-                      <span className="text-xs">💎</span>
-                      <span>{rank2.totalPoints.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-1.5 text-[10px] text-slate-500 font-medium bg-slate-100/90 px-2 py-0.5 rounded-full">
-                      <span>🥇{rank2.medals.gold}</span>
-                      <span>🥈{rank2.medals.silver}</span>
-                      <span>🥉{rank2.medals.bronze}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="h-28 flex items-center justify-center text-xs text-slate-400">No Team</div>
-                )}
-
-                {/* 3D Isometric Podium Block: Rank 2 */}
-                <div className="w-full flex flex-col items-center">
-                  <div 
-                    className="w-full h-6 bg-gradient-to-r from-blue-200 via-sky-200 to-blue-300 border-t border-x border-white/60 shadow-xs"
-                    style={{ clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)' }}
-                  />
-                  <div className="w-full h-44 sm:h-52 bg-gradient-to-b from-[#93C5FD] via-[#60A5FA] to-[#3B82F6] rounded-b-2xl shadow-lg border-b border-x border-blue-400/40 flex flex-col items-center justify-center p-3 relative overflow-hidden">
-                    <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
-                    <ScreenLaurelWreath rank={2} />
-                    <span className="text-[11px] font-semibold text-white/90 mt-2 tracking-wider uppercase">
-                      Runner Up
+            {/* Leaderboard Card Header */}
+            <div className="relative pt-6 pb-4 px-5 sm:px-7 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl sm:text-3xl">🏆</span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                      Team Leaderboard
+                    </h2>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Live Standings
                     </span>
                   </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Real-time festival championship standings calculated dynamically across published results
+                  </p>
                 </div>
               </div>
 
-              {/* ============================================================ */}
-              {/* RANK 1: CENTER PODIUM (Gold / Warm Amber) - TALL & LEADING   */}
-              {/* ============================================================ */}
-              <div className="flex-1 max-w-[240px] flex flex-col items-center -mt-8 z-10">
-                {rank1 ? (
-                  <div className="flex flex-col items-center mb-3 text-center transition-transform hover:-translate-y-1">
-                    <div className="relative">
-                      {/* Crown on top */}
-                      <div className="absolute -top-4 inset-x-0 flex justify-center text-lg animate-bounce">
-                        👑
-                      </div>
-                      {/* Squircle Card Icon */}
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-br from-amber-100 via-yellow-50 to-amber-200 border-2 border-amber-300 shadow-xl flex items-center justify-center text-4xl ring-4 ring-amber-400/20">
-                        🥇
-                      </div>
-                      <span className="absolute -top-1 -right-1 text-base">✨</span>
-                    </div>
-                    <h3 className="font-black text-slate-900 text-base sm:text-lg mt-2 tracking-tight truncate max-w-[160px]">
-                      {rank1.team.name}
-                    </h3>
-                    <div className="flex items-center gap-1 text-amber-600 font-extrabold text-sm sm:text-base mt-0.5">
-                      <span className="text-sm">💎</span>
-                      <span>{rank1.totalPoints.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-1.5 text-xs text-amber-900 font-bold bg-amber-100/90 border border-amber-200/80 px-2.5 py-0.5 rounded-full shadow-xs">
-                      <span>🥇 {rank1.medals.gold}</span>
-                      <span>🥈 {rank1.medals.silver}</span>
-                      <span>🥉 {rank1.medals.bronze}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="h-32 flex items-center justify-center text-xs text-slate-400">No Team</div>
-                )}
+              <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60">
+                <Tv className="w-3.5 h-3.5 text-slate-400" />
+                <span>Screening</span>
+              </div>
+            </div>
 
-                {/* 3D Isometric Podium Block: Rank 1 */}
-                <div className="w-full flex flex-col items-center">
-                  <div 
-                    className="w-full h-8 bg-gradient-to-r from-[#FEF08A] via-[#FDE047] to-[#FACC15] border-t border-x border-white/80 shadow-xs"
-                    style={{ clipPath: 'polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%)' }}
-                  />
-                  <div className="w-full h-56 sm:h-64 bg-gradient-to-b from-[#F59E0B] via-[#EAB308] to-[#CA8A04] rounded-b-2xl shadow-2xl border-b-2 border-x border-amber-500/50 flex flex-col items-center justify-center p-3 relative overflow-hidden">
-                    <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
-                    <ScreenLaurelWreath rank={1} />
-                    <span className="text-xs font-bold text-amber-950/80 bg-white/70 px-2.5 py-0.5 rounded-full mt-2 tracking-wider uppercase shadow-xs">
-                      Champion
-                    </span>
+            {/* 3D Isometric / Perspective Podium */}
+            <div className="relative flex-1 flex flex-col justify-between pt-6 pb-6 px-3 sm:px-6">
+              <div className="flex justify-center items-end gap-2.5 sm:gap-4 pt-10 pb-2">
+
+                {/* ============================================================ */}
+                {/* RANK 2: LEFT PODIUM (Silver / Ice-Blue)                      */}
+                {/* ============================================================ */}
+                <div className="flex-1 max-w-[190px] sm:max-w-[210px] flex flex-col items-center">
+                  {rank2 ? (
+                    <div className="flex flex-col items-center mb-3 text-center transition-transform hover:-translate-y-1">
+                      <div className="relative">
+                        {/* Squircle Card Icon */}
+                        <div className="w-14 h-14 sm:w-18 sm:h-18 rounded-3xl bg-gradient-to-br from-slate-100 to-blue-50 border-2 border-blue-200 shadow-md flex items-center justify-center text-2xl sm:text-3xl">
+                          🥈
+                        </div>
+                        <span className="absolute -top-1.5 -right-1 text-sm">⭐</span>
+                      </div>
+                      <h3 className="font-extrabold text-slate-800 text-sm sm:text-base mt-2 truncate max-w-[140px]">
+                        {rank2.team.name}
+                      </h3>
+                      <div className="flex items-center gap-1 text-blue-600 font-bold text-xs sm:text-sm mt-0.5">
+                        <span className="text-xs">💎</span>
+                        <span>{rank2.totalPoints.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-1 mt-1.5 text-[10px] text-slate-500 font-medium bg-slate-100/90 px-2 py-0.5 rounded-full">
+                        <span>🥇{rank2.medals.gold}</span>
+                        <span>🥈{rank2.medals.silver}</span>
+                        <span>🥉{rank2.medals.bronze}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-28 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                  )}
+
+                  {/* 3D Isometric Podium Block: Rank 2 */}
+                  <div className="w-full flex flex-col items-center">
+                    <div
+                      className="w-full h-6 bg-gradient-to-r from-blue-200 via-sky-200 to-blue-300 border-t border-x border-white/60 shadow-xs"
+                      style={{ clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)' }}
+                    />
+                    <div className="w-full h-40 sm:h-48 bg-gradient-to-b from-[#93C5FD] via-[#60A5FA] to-[#3B82F6] rounded-b-2xl shadow-lg border-b border-x border-blue-400/40 flex flex-col items-center justify-center p-3 relative overflow-hidden">
+                      <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
+                      <ScreenLaurelWreath rank={2} />
+                      <span className="text-[11px] font-semibold text-white/90 mt-2 tracking-wider uppercase">
+                        Runner Up
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* ============================================================ */}
-              {/* RANK 3: RIGHT PODIUM (Bronze / Coral-Peach)                  */}
-              {/* ============================================================ */}
-              <div className="flex-1 max-w-[220px] flex flex-col items-center">
-                {rank3 ? (
-                  <div className="flex flex-col items-center mb-3 text-center transition-transform hover:-translate-y-1">
-                    <div className="relative">
-                      {/* Squircle Card Icon */}
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-orange-100 to-rose-50 border-2 border-orange-200 shadow-md flex items-center justify-center text-3xl">
-                        🥉
+                {/* ============================================================ */}
+                {/* RANK 1: CENTER PODIUM (Gold / Warm Amber) - TALL & LEADING   */}
+                {/* ============================================================ */}
+                <div className="flex-1 max-w-[210px] sm:max-w-[230px] flex flex-col items-center -mt-8 z-10">
+                  {rank1 ? (
+                    <div className="flex flex-col items-center mb-3 text-center transition-transform hover:-translate-y-1">
+                      <div className="relative">
+                        {/* Crown on top */}
+                        <div className="absolute -top-4 inset-x-0 flex justify-center text-lg animate-bounce">
+                          👑
+                        </div>
+                        {/* Squircle Card Icon */}
+                        <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-3xl bg-gradient-to-br from-amber-100 via-yellow-50 to-amber-200 border-2 border-amber-300 shadow-xl flex items-center justify-center text-3xl sm:text-4xl ring-4 ring-amber-400/20">
+                          🥇
+                        </div>
+                        <span className="absolute -top-1 -right-1 text-base">✨</span>
                       </div>
-                      <span className="absolute -top-1.5 -right-1 text-sm">⭐</span>
+                      <h3 className="font-black text-slate-900 text-sm sm:text-lg mt-2 tracking-tight truncate max-w-[150px]">
+                        {rank1.team.name}
+                      </h3>
+                      <div className="flex items-center gap-1 text-amber-600 font-extrabold text-sm sm:text-base mt-0.5">
+                        <span className="text-sm">💎</span>
+                        <span>{rank1.totalPoints.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1.5 text-xs text-amber-900 font-bold bg-amber-100/90 border border-amber-200/80 px-2.5 py-0.5 rounded-full shadow-xs">
+                        <span>🥇 {rank1.medals.gold}</span>
+                        <span>🥈 {rank1.medals.silver}</span>
+                        <span>🥉 {rank1.medals.bronze}</span>
+                      </div>
                     </div>
-                    <h3 className="font-extrabold text-slate-800 text-sm sm:text-base mt-2 truncate max-w-[140px]">
-                      {rank3.team.name}
-                    </h3>
-                    <div className="flex items-center gap-1 text-orange-600 font-bold text-xs sm:text-sm mt-0.5">
-                      <span className="text-xs">💎</span>
-                      <span>{rank3.totalPoints.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-1.5 text-[10px] text-slate-500 font-medium bg-slate-100/90 px-2 py-0.5 rounded-full">
-                      <span>🥇{rank3.medals.gold}</span>
-                      <span>🥈{rank3.medals.silver}</span>
-                      <span>🥉{rank3.medals.bronze}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="h-28 flex items-center justify-center text-xs text-slate-400">No Team</div>
-                )}
+                  ) : (
+                    <div className="h-32 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                  )}
 
-                {/* 3D Isometric Podium Block: Rank 3 */}
-                <div className="w-full flex flex-col items-center">
-                  <div 
-                    className="w-full h-6 bg-gradient-to-r from-orange-200 via-amber-200 to-orange-300 border-t border-x border-white/60 shadow-xs"
-                    style={{ clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)' }}
-                  />
-                  <div className="w-full h-36 sm:h-44 bg-gradient-to-b from-[#FB923C] via-[#F97316] to-[#EA580C] rounded-b-2xl shadow-lg border-b border-x border-orange-400/40 flex flex-col items-center justify-center p-3 relative overflow-hidden">
-                    <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
-                    <ScreenLaurelWreath rank={3} />
-                    <span className="text-[11px] font-semibold text-white/90 mt-2 tracking-wider uppercase">
-                      3rd Place
-                    </span>
+                  {/* 3D Isometric Podium Block: Rank 1 */}
+                  <div className="w-full flex flex-col items-center">
+                    <div
+                      className="w-full h-8 bg-gradient-to-r from-[#FEF08A] via-[#FDE047] to-[#FACC15] border-t border-x border-white/80 shadow-xs"
+                      style={{ clipPath: 'polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%)' }}
+                    />
+                    <div className="w-full h-52 sm:h-60 bg-gradient-to-b from-[#F59E0B] via-[#EAB308] to-[#CA8A04] rounded-b-2xl shadow-2xl border-b-2 border-x border-amber-500/50 flex flex-col items-center justify-center p-3 relative overflow-hidden">
+                      <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
+                      <ScreenLaurelWreath rank={1} />
+                      <span className="text-xs font-bold text-amber-950/80 bg-white/70 px-2.5 py-0.5 rounded-full mt-2 tracking-wider uppercase shadow-xs">
+                        Champion
+                      </span>
+                    </div>
                   </div>
                 </div>
+
+                {/* ============================================================ */}
+                {/* RANK 3: RIGHT PODIUM (Bronze / Coral-Peach)                  */}
+                {/* ============================================================ */}
+                <div className="flex-1 max-w-[190px] sm:max-w-[210px] flex flex-col items-center">
+                  {rank3 ? (
+                    <div className="flex flex-col items-center mb-3 text-center transition-transform hover:-translate-y-1">
+                      <div className="relative">
+                        {/* Squircle Card Icon */}
+                        <div className="w-14 h-14 sm:w-18 sm:h-18 rounded-3xl bg-gradient-to-br from-orange-100 to-rose-50 border-2 border-orange-200 shadow-md flex items-center justify-center text-2xl sm:text-3xl">
+                          🥉
+                        </div>
+                        <span className="absolute -top-1.5 -right-1 text-sm">⭐</span>
+                      </div>
+                      <h3 className="font-extrabold text-slate-800 text-sm sm:text-base mt-2 truncate max-w-[140px]">
+                        {rank3.team.name}
+                      </h3>
+                      <div className="flex items-center gap-1 text-orange-600 font-bold text-xs sm:text-sm mt-0.5">
+                        <span className="text-xs">💎</span>
+                        <span>{rank3.totalPoints.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-1 mt-1.5 text-[10px] text-slate-500 font-medium bg-slate-100/90 px-2 py-0.5 rounded-full">
+                        <span>🥇{rank3.medals.gold}</span>
+                        <span>🥈{rank3.medals.silver}</span>
+                        <span>🥉{rank3.medals.bronze}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-28 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                  )}
+
+                  {/* 3D Isometric Podium Block: Rank 3 */}
+                  <div className="w-full flex flex-col items-center">
+                    <div
+                      className="w-full h-6 bg-gradient-to-r from-orange-200 via-amber-200 to-orange-300 border-t border-x border-white/60 shadow-xs"
+                      style={{ clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)' }}
+                    />
+                    <div className="w-full h-32 sm:h-40 bg-gradient-to-b from-[#FB923C] via-[#F97316] to-[#EA580C] rounded-b-2xl shadow-lg border-b border-x border-orange-400/40 flex flex-col items-center justify-center p-3 relative overflow-hidden">
+                      <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
+                      <ScreenLaurelWreath rank={3} />
+                      <span className="text-[11px] font-semibold text-white/90 mt-2 tracking-wider uppercase">
+                        3rd Place
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
               </div>
 
+              {/* Subtitle status bar & dots */}
+              <div className="mt-4 pt-3.5 border-t border-slate-100 flex flex-col items-center justify-center gap-1.5">
+                <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>Leaderboard updated {getRelativeTime(lastRefreshedAt)}</span>
+                  <span>•</span>
+                  <span>{publishedResults.length} published results counted</span>
+                </div>
+
+                {/* Carousel dots */}
+                <div className="flex justify-center items-center gap-1.5 mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-slate-700"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ===================================================================== */}
+          {/* RIGHT: STAR PERFORMERS CARD (lg:col-span-5)                           */}
+          {/* ===================================================================== */}
+          <section className="lg:col-span-5 flex flex-col justify-between relative bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden">
+            {/* Subtle Star Purple-Amber Radial Gradient Background */}
+            <div
+              className="absolute inset-x-0 top-0 h-64 pointer-events-none opacity-60"
+              style={{
+                background: 'radial-gradient(ellipse 70% 60% at 50% 10%, rgba(245, 158, 11, 0.20) 0%, rgba(168, 85, 247, 0.12) 50%, rgba(255, 255, 255, 0) 80%)'
+              }}
+            />
+
+            {/* Star Performers Header with Section Filter Tabs */}
+            <div className="relative pt-6 pb-4 px-5 sm:px-6 border-b border-slate-100 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center shadow-md text-xl shrink-0">
+                    ⭐
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                        Star Performers
+                      </h2>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                        Top Stars
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Top individual candidates by score
+                    </p>
+                  </div>
+                </div>
+
+                <span className="hidden sm:inline-flex text-xs font-bold text-slate-400">
+                  {filteredStarPerformers.length} Ranked
+                </span>
+              </div>
+
+              {/* Section Tabs: All, Senior, Junior, Sub-Junior */}
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  Filter by Section:
+                </span>
+                <div className="inline-flex p-1 bg-slate-100/90 rounded-xl text-xs font-bold text-slate-600 border border-slate-200/60">
+                  {[
+                    { key: 'all', label: 'All' },
+                    { key: 'senior', label: 'Senior' },
+                    { key: 'junior', label: 'Junior' },
+                    { key: 'sub-junior', label: 'Sub-Jr' }
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setStarPerformerSection(tab.key)}
+                      className={`px-3 py-1 rounded-lg capitalize transition-all cursor-pointer text-xs ${starPerformerSection === tab.key
+                        ? 'bg-white text-slate-900 font-black shadow-xs'
+                        : 'hover:text-slate-900 text-slate-500'
+                        }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* Subtitle status bar */}
-            <div className="flex items-center justify-center gap-2 mt-6 text-xs text-slate-500">
-              <RotateCw className="w-3.5 h-3.5" />
-              <span>Leaderboard updated {getRelativeTime(lastRefreshedAt)}</span>
-              <span>•</span>
-              <span>{publishedResults.length} published results counted</span>
+            {/* List of Top Star Performers */}
+            <div className="relative flex-1 p-4 sm:p-5 overflow-y-auto max-h-[480px] space-y-2.5">
+              {filteredStarPerformers.length === 0 ? (
+                <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                  <span className="text-4xl mb-2">⭐</span>
+                  <p className="font-bold text-sm text-slate-600">No Star Performers Found</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    No points recorded yet for {starPerformerSection === 'all' ? 'any candidate' : `${starPerformerSection} section`}
+                  </p>
+                </div>
+              ) : (
+                filteredStarPerformers.slice(0, 5).map((performer) => {
+                  const isFirst = performer.rank === 1;
+                  const isSecond = performer.rank === 2;
+                  const isThird = performer.rank === 3;
+
+                  return (
+                    <div
+                      key={performer.candidate.chestNumber}
+                      className={`p-3 rounded-2xl border transition-all duration-200 flex items-center justify-between gap-3 ${isFirst
+                        ? 'bg-gradient-to-r from-amber-50/90 via-yellow-50/60 to-white border-amber-300 shadow-sm ring-1 ring-amber-400/20'
+                        : isSecond
+                          ? 'bg-gradient-to-r from-slate-50 via-blue-50/40 to-white border-slate-300 shadow-xs'
+                          : isThird
+                            ? 'bg-gradient-to-r from-orange-50/60 to-white border-orange-200 shadow-xs'
+                            : 'bg-white hover:bg-slate-50/80 border-slate-200/80 shadow-xs'
+                        }`}
+                    >
+                      {/* Left: Rank Badge + Avatar + Candidate Info */}
+                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                        {/* Rank Badge */}
+                        <div className="shrink-0 flex items-center justify-center">
+                          {isFirst ? (
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 text-amber-950 font-black text-sm flex items-center justify-center shadow-xs">
+                              🥇
+                            </div>
+                          ) : isSecond ? (
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 text-slate-800 font-black text-sm flex items-center justify-center shadow-xs">
+                              🥈
+                            </div>
+                          ) : isThird ? (
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-200 to-amber-200 text-orange-900 font-black text-sm flex items-center justify-center shadow-xs">
+                              🥉
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 font-extrabold text-xs flex items-center justify-center border border-slate-200">
+                              #{performer.rank}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Candidate Avatar or Chest Initial */}
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                          {performer.candidate.profileImage ? (
+                            <img
+                              src={performer.candidate.profileImage}
+                              alt={performer.candidate.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div
+                              className="w-full h-full flex items-center justify-center font-bold text-white text-xs"
+                              style={{ backgroundColor: performer.team.color || '#6366F1' }}
+                            >
+                              {performer.candidate.chestNumber}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Name & Metadata */}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="font-extrabold text-slate-900 text-sm truncate">
+                              {performer.candidate.name}
+                            </h4>
+                            {isFirst && <span className="text-xs">👑</span>}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 font-medium">
+                            <span className="font-mono font-bold text-slate-700">#{performer.candidate.chestNumber}</span>
+                            <span>•</span>
+                            <span
+                              className="px-1.5 py-0.2 rounded text-[10px] font-bold text-white"
+                              style={{ backgroundColor: performer.team.color || '#64748B' }}
+                            >
+                              {performer.team.name || performer.team.code}
+                            </span>
+                            {performer.section && (
+                              <>
+                                <span>•</span>
+                                <span className="capitalize text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded">
+                                  {performer.section}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Points & Medals */}
+                      <div className="text-right shrink-0">
+                        <div className="flex items-center justify-end gap-1 font-black text-sm sm:text-base text-slate-900">
+                          <span className="text-xs text-amber-500">💎</span>
+                          <span>{performer.totalPoints}</span>
+                          <span className="text-xs font-semibold text-slate-500">pts</span>
+                        </div>
+                        <div className="flex items-center justify-end gap-1 mt-1 text-[11px] font-semibold text-slate-600">
+                          {performer.medals.gold > 0 && (
+                            <span className="bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded-md">🥇{performer.medals.gold}</span>
+                          )}
+                          {performer.medals.silver > 0 && (
+                            <span className="bg-slate-100 text-slate-800 px-1.5 py-0.2 rounded-md">🥈{performer.medals.silver}</span>
+                          )}
+                          {performer.medals.bronze > 0 && (
+                            <span className="bg-orange-100 text-orange-900 px-1.5 py-0.2 rounded-md">🥉{performer.medals.bronze}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
-            {/* Carousel dots */}
-            <div className="flex justify-center items-center gap-1.5 mt-3">
-              <span className="w-2 h-2 rounded-full bg-slate-700"></span>
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-            </div>
-          </div>
-        </section>
+            {/* Bottom mini footer for star performers */}
+            {filteredStarPerformers.length > 0 && (
+              <div className="p-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium px-5">
+                <span>Section: <strong className="capitalize">{starPerformerSection === 'all' ? 'All Sections' : starPerformerSection}</strong></span>
+                <span className="text-[11px] text-slate-400">Auto-updated live</span>
+              </div>
+            )}
+          </section>
+
+        </div>
 
         {/* ======================================================================= */}
         {/* BOTTOM SECTION: RESULTS LIST (DEFAULT PRIZES, CLICK TO SEE OTHER/GRADES)*/}
@@ -745,9 +1095,8 @@ export default function ResultScreenPage() {
                     {/* Programme Header Bar */}
                     <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0 ${
-                          isSports ? 'bg-orange-100 text-orange-600' : 'bg-purple-100 text-purple-600'
-                        }`}>
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0 ${isSports ? 'bg-orange-100 text-orange-600' : 'bg-purple-100 text-purple-600'
+                          }`}>
                           {isSports ? '⚽' : '🎨'}
                         </div>
                         <div>
@@ -779,11 +1128,10 @@ export default function ResultScreenPage() {
                         <button
                           type="button"
                           onClick={() => toggleResultExpand(res._id?.toString() || String(index))}
-                          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                            isExpanded
-                              ? 'bg-purple-600 text-white shadow-xs'
-                              : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
-                          }`}
+                          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${isExpanded
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
+                            }`}
                         >
                           <span>🎖️ {gradedOnlyCandidates.length} Grade Holders</span>
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -793,7 +1141,7 @@ export default function ResultScreenPage() {
 
                     {/* DEFAULT VIEW: PODIUM PRIZES (1st, 2nd, 3rd) with Candidate, Team, Points, and Grade */}
                     <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                      
+
                       {/* 1st Place Card */}
                       <div className="bg-gradient-to-b from-yellow-50/80 to-amber-50/40 rounded-2xl border-2 border-yellow-200/80 p-4 shadow-xs">
                         <div className="flex items-center justify-between pb-2 mb-3 border-b border-yellow-200/60">

@@ -56,21 +56,6 @@ export function findProgramme(
         p.name?.trim().toLowerCase() === name
       );
       if (matchCodeAndName) return matchCodeAndName;
-
-      // Priority 3: Match code and section
-      if (section) {
-        const matchCodeAndSection = programmes.find(p => 
-          p.code?.trim().toLowerCase() === code &&
-          p.section?.trim().toLowerCase() === section
-        );
-        if (matchCodeAndSection) return matchCodeAndSection;
-      }
-
-      // Priority 4: Match by code only
-      const matchCodeOnly = programmes.find(p => 
-        p.code?.trim().toLowerCase() === code
-      );
-      if (matchCodeOnly) return matchCodeOnly;
     }
 
     // 2c. Match by programme name
@@ -208,7 +193,7 @@ export function getDefaultGradePoints(grade?: string | null): number {
  * Returns the matching Result object if found, or undefined otherwise.
  */
 export function findExistingResultForProgramme(
-  programme: Programme | { _id?: string; id?: string; code?: string; name?: string; section?: string } | null | undefined,
+  programme: Programme | { _id?: string; id?: string; code?: string; name?: string; section?: string; festId?: string } | null | undefined,
   results: Result[] = [],
   targetSection?: string | null
 ): Result | undefined {
@@ -218,38 +203,48 @@ export function findExistingResultForProgramme(
   const progCode = programme.code ? programme.code.trim().toLowerCase() : null;
   const progName = programme.name ? programme.name.trim().toLowerCase() : null;
   const expectedSection = (targetSection || programme.section || '').trim().toLowerCase();
+  const progFestId = (programme as any).festId ? String((programme as any).festId).trim() : null;
 
   return results.find(r => {
+    // 0. Fest ID check: must match if both documents have festId
+    const rFestId = (r as any).festId ? String((r as any).festId).trim() : null;
+    if (progFestId && rFestId && progFestId !== rFestId) {
+      return false;
+    }
+
     const rProgId = r.programmeId ? String(r.programmeId).trim() : null;
     const rProgStr = r.programme ? String(r.programme).trim().toLowerCase() : '';
     const rSection = (r.section || '').trim().toLowerCase();
 
     // Section comparison (if specified)
     const sectionMatches = !expectedSection || !rSection || expectedSection === rSection;
+    if (!sectionMatches) return false;
 
-    // 1. Exact programmeId match
+    // 1. Exact programmeId match (ObjectId string) - HIGHEST CONFIDENCE
     if (progId && rProgId && progId === rProgId) {
-      return sectionMatches;
+      return true;
     }
 
-    // 2. Programme code matched to r.programmeId
-    if (progCode && rProgId && progCode === rProgId.toLowerCase()) {
-      return sectionMatches;
+    // 2. Exact code AND name match (when r.programme is "CODE - NAME")
+    if (rProgStr.includes(' - ')) {
+      const parts = rProgStr.split(' - ');
+      const rCode = parts[0].trim().toLowerCase();
+      const rName = parts.slice(1).join(' - ').trim().toLowerCase();
+
+      // Must match BOTH code AND name to prevent collisions between programmes sharing codes
+      if (progCode && rCode && progCode === rCode && progName && rName && progName === rName) {
+        return true;
+      }
     }
 
-    // 3. Programme code matched to r.programme prefix "CODE - "
-    if (progCode && rProgStr.startsWith(`${progCode} - `)) {
-      return sectionMatches;
-    }
-
-    // 4. Exact "CODE - Name" match
+    // 3. Exact full string match "CODE - Name"
     if (progCode && progName && rProgStr === `${progCode} - ${progName}`) {
-      return sectionMatches;
+      return true;
     }
 
-    // 5. Match by exact name
+    // 4. Exact name match ONLY if result has no code prefix or name strictly matches
     if (progName && rProgStr === progName) {
-      return sectionMatches;
+      return true;
     }
 
     return false;
