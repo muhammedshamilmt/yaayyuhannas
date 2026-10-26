@@ -30,7 +30,7 @@ export function About() {
               </h2>
               
               <p className="text-gray-600 text-lg leading-relaxed mb-8">
-                Festival 2K25 brings together three dynamic teams in an exciting showcase of creativity and athletic excellence. 
+                AYYUHANNAAS 2K26 brings together three dynamic teams in an exciting showcase of creativity and athletic excellence. 
                 With 135 talented students participating across 200+ diverse programs spanning visual arts, performing arts, 
                 and competitive sports.
               </p>
@@ -102,7 +102,7 @@ export function About() {
               </div>
               
               <div className="bg-gradient-to-br from-orange-50 to-red-50 border border-orange-200 rounded-2xl p-6 text-center">
-                <div className="text-3xl font-bold text-orange-600 mb-2">2025</div>
+                <div className="text-3xl font-bold text-orange-600 mb-2">2026</div>
                 <div className="text-orange-700 font-medium text-sm">Festival Year</div>
                 <div className="text-orange-600 text-xs mt-1">Grand celebration</div>
               </div>

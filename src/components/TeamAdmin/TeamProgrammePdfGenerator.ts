@@ -110,7 +110,7 @@ export function createTeamProgrammesGridPdf(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.5);
     doc.setTextColor(245, 158, 11); // Amber / Gold
-    const festTitle = (meta.festivalName || 'AYYUHANNAAS ARTS FESTIVAL 2K25').toUpperCase();
+    const festTitle = (meta.festivalName || 'AYYUHANNAAS ARTS FESTIVAL 2K26').toUpperCase();
     doc.text(festTitle, textStartX, headerY + 6.5);
 
     const festTitleWidth = doc.getTextWidth(festTitle);

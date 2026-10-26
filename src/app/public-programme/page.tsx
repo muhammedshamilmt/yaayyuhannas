@@ -384,7 +384,7 @@ export default function PublicProgrammePage() {
         <div className="max-w-6xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-xs sm:text-sm font-medium text-emerald-300 mb-4">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Ayyuhannas Arts & Sports Fest 2K25
+            Ayyuhannas Arts & Sports Fest 2K26
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mb-3 sm:mb-4">

@@ -15,12 +15,12 @@ export function Hero() {
         <div className="flex items-center space-x-2">
           <Image
             src="/images/festival-logo.png"
-            alt="Festival 2K25"
+            alt="Ayyuhannas 2K26"
             width={40}
             height={40}
             className="rounded-full"
           />
-          <span className="font-bold text-xl">Ayyuhannas 2K25</span>
+          <span className="font-bold text-xl">Ayyuhannas 2K26</span>
         </div>
 
         <div className="hidden md:flex items-center space-x-8 text-gray-500">

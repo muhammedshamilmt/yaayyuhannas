@@ -5,12 +5,12 @@ export function Logo() {
     <div className="flex items-center space-x-2">
       <Image
         src="/images/festival-logo.png"
-        alt="Festival 2K25"
+        alt="AYYUHANNAAS 2K26"
         width={32}
         height={32}
         className="rounded-full"
       />
-      <span className="font-bold text-lg text-gray-900 dark:text-white">Festival 2K25</span>
+      <span className="font-bold text-lg text-gray-900 dark:text-white">AYYUHANNAAS 2K26</span>
     </div>
   );
 }

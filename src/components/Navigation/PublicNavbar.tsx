@@ -77,7 +77,7 @@ export function PublicNavbar() {
               AYYU HANNAS
             </span>
             <span className="text-[10px] font-semibold text-gray-500 uppercase leading-none mt-1">
-              Arts Fest 2K25
+              Arts Fest 2K26
             </span>
           </div>
         </Link>

@@ -47,7 +47,7 @@ const Breadcrumb = ({ pageName }: BreadcrumbProps) => {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
             {pageName}
           </h2>
-          <p className="text-sm text-gray-600 mt-1">Festival 2K25 Management</p>
+          <p className="text-sm text-gray-600 mt-1">AYYUHANNAAS 2K26 Management</p>
         </div>
       </div>
 

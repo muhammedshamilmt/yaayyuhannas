@@ -220,8 +220,8 @@ export default function ScheduleLivePreviewPage() {
 
   const exportMeta: FestExportMeta = useMemo(() => {
     return {
-      festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K25',
-      year: festInfo?.year || '2025',
+      festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K26',
+      year: festInfo?.year || '2026',
       venue: festInfo?.venue || 'Campus Auditorium',
       generatedDate: new Date().toLocaleDateString('en-GB', {
         day: '2-digit',

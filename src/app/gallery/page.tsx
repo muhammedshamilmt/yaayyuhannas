@@ -84,7 +84,7 @@ export default function PublicGalleryPage() {
           Festival <span className="text-blue-600">Gallery</span>
         </h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Relive the best moments from Ayyuhannas Arts Fest 2K25. Browse through our collection of events, performances, and behind-the-scenes magic.
+          Relive the best moments from Ayyuhannas Arts Fest 2K26. Browse through our collection of events, performances, and behind-the-scenes magic.
         </p>
       </div>
 

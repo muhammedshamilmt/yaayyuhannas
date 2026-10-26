@@ -13,15 +13,15 @@ export function Footer() {
             <div className="flex items-center space-x-2 mb-4">
               <Image
                 src="/images/festival-logo.png"
-                alt="Festival 2K25"
+                alt="AYYUHANNAAS 2K26"
                 width={32}
                 height={32}
                 className="rounded-full"
               />
-              <span className="font-bold text-xl text-white">Festival 2K25</span>
+              <span className="font-bold text-xl text-white">AYYUHANNAAS 2K26</span>
             </div>
             <p className="text-gray-400 mb-6 max-w-md">
-              Join Festival 2K25 Arts & Sports Festival with 135 talented students competing across 200+ programs in three dynamic teams: Sumud, Aqsa, and Inthifada.
+              Join AYYUHANNAAS 2K26 Arts & Sports Festival with 135 talented students competing across 200+ programs in three dynamic teams: Sumud, Aqsa, and Inthifada.
             </p>
             <div className="flex space-x-4">
               <div className="w-10 h-10 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full border-2 border-gray-700"></div>
@@ -47,7 +47,7 @@ export function Footer() {
           <div>
             <h4 className="text-white font-semibold mb-4">Contact</h4>
             <ul className="space-y-2">
-              <li className="text-gray-400">📧 festival2k25@example.com</li>
+              <li className="text-gray-400">📧 ayyuhannas2k26@example.com</li>
               <li className="text-gray-400">📱 +1 (555) 123-4567</li>
               <li className="text-gray-400">📍 Festival Grounds, Main Campus</li>
             </ul>
@@ -58,7 +58,7 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-gray-400 text-sm">
-            © 2025 Festival 2K25. All rights reserved.
+            © 2026 AYYUHANNAAS 2K26. All rights reserved.
           </p>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Privacy Policy</a>

@@ -67,7 +67,7 @@ export const AchievementPoster = forwardRef<HTMLDivElement, AchievementPosterPro
 
         {/* Top Header */}
         <div className="absolute -left-52 top-20 w-full text-center z-20">
-          <span className="text-[#3a1715] text-2xl font-semibold">Ayyuhannas Arts Fest 2K25</span>
+          <span className="text-[#3a1715] text-2xl font-semibold">Ayyuhannas Arts Fest 2K26</span>
         </div>
 
         {/* Left Side Content Container */}

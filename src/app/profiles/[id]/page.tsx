@@ -209,7 +209,7 @@ export default function ProfileDetailPage() {
             </div>
             <h2 className="text-2xl font-bold text-slate-900 mb-2">Profile Not Found</h2>
             <p className="text-slate-500 text-sm mb-6">
-              The requested participant (#{candidateId}) could not be located in Ayyuhannas Arts Fest 2K25.
+              The requested participant (#{candidateId}) could not be located in Ayyuhannas Arts Fest 2K26.
             </p>
             <Link
               href="/profiles"
@@ -442,7 +442,7 @@ export default function ProfileDetailPage() {
               </span>
             )}
             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white text-slate-700 border border-slate-200">
-              Ayyuhannas 2K25
+              Ayyuhannas 2K26
             </span>
           </div>
         </div>

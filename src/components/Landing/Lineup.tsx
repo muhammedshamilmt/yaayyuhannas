@@ -66,7 +66,7 @@ export function Lineup() {
           
           <p className="text-gray-600 text-lg leading-relaxed max-w-2xl mx-auto">
             Three dynamic teams ready to showcase their talents in arts, sports, and creative competitions. 
-            Each team brings unique strengths and passionate dedication to Festival 2K25.
+            Each team brings unique strengths and passionate dedication to AYYUHANNAAS 2K26.
           </p>
         </div>
 
@@ -199,7 +199,7 @@ export function Lineup() {
         <div className="text-center mt-16 pt-12 border-t border-gray-200">
           <h3 className="text-2xl font-bold text-gray-900 mb-4">Ready to Support Your Team?</h3>
           <p className="text-gray-600 mb-8 max-w-md mx-auto">
-            Join the excitement and cheer for your favorite team throughout Festival 2K25
+            Join the excitement and cheer for your favorite team throughout AYYUHANNAAS 2K26
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 shadow-lg">

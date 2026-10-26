@@ -255,12 +255,12 @@ export default function AdminPrintPage() {
           <div className="scorecard">
             <header className="header">
               <div className="header-title">
-                <h1>Ayyuhannas Arts fest 2025</h1>
+                <h1>Ayyuhannas Arts fest 2026</h1>
                 <p>scorecard</p>
               </div>
               <div className="logo-section" aria-hidden="true">
                 <div className="logo"></div>
-                <p><strong>Ayyuhannas</strong><br />Arts fest 2025</p>
+                <p><strong>Ayyuhannas</strong><br />Arts fest 2026</p>
               </div>
             </header>
 

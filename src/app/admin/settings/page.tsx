@@ -12,10 +12,10 @@ export default function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    name: 'Ayyuhannas Arts Festival 2K25',
-    year: '2025',
-    startDate: '2025-03-10',
-    endDate: '2025-03-16',
+    name: 'Ayyuhannas Arts Festival 2K26',
+    year: '2026',
+    startDate: '2026-03-10',
+    endDate: '2026-03-16',
     venue: 'Ayyuhannas Campus',
     description: 'Annual arts and sports festival celebrating creativity, talent, and teamwork among students.',
     minCandidateParticipation: 1,
@@ -35,10 +35,10 @@ export default function SettingsPage() {
         if (res.ok) {
           const data: FestivalInfo = await res.json();
           setFormData({
-            name: data.name || 'Ayyuhannas Arts Festival 2K25',
-            year: data.year || '2025',
-            startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '2025-03-10',
-            endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '2025-03-16',
+            name: data.name || 'Ayyuhannas Arts Festival 2K26',
+            year: data.year || '2026',
+            startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '2026-03-10',
+            endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '2026-03-16',
             venue: data.venue || 'Ayyuhannas Campus',
             description: data.description || '',
             minCandidateParticipation: data.minCandidateParticipation ?? 2,

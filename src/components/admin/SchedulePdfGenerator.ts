@@ -439,7 +439,7 @@ export function createScheduleJsPdf(
       },
       didDrawPage: () => {
         // Footer on every page
-        const str = `Page ${doc.getNumberOfPages()}  |  ${meta.festivalName || 'Arts Fest 2K25'} Official Call Sheet`;
+        const str = `Page ${doc.getNumberOfPages()}  |  ${meta.festivalName || 'Arts Fest 2K26'} Official Call Sheet`;
         doc.setFontSize(8);
         doc.setTextColor(148, 163, 184);
         doc.text(str, pageWidth / 2, pageHeight - 6, { align: 'center' });

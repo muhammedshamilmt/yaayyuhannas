@@ -31,13 +31,13 @@ export function Navbar() {
                         <Link href="/" className={`flex items-center space-x-2 transition-all duration-500 ease-in-out`}>
                             <Image
                                 src="/images/festival-logo.png"
-                                alt="Festival 2K25"
+                                alt="AYYUHANNAAS 2K26"
                                 width={isScrolled ? 40 : 32}
                                 height={isScrolled ? 40 : 32}
                                 className="rounded-full"
                             />
                             <span className={`font-bold text-white transition-all duration-500 ease-in-out ${isScrolled ? "text-2xl" : "text-xl"}`}>
-                                Festival 2K25
+                                AYYUHANNAAS 2K26
                             </span>
                         </Link>
                     </div>

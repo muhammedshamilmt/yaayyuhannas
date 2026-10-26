@@ -31,7 +31,7 @@ export default function SearchPage() {
         type: "result",
         name: "Classical Singing (P001)",
         winner: "Chest No. 002 - Fatima Hassan",
-        date: "March 15, 2025",
+        date: "March 15, 2026",
         details: "Senior • Individual • 10 Points"
       },
       {

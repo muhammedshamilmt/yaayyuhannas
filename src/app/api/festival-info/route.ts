@@ -14,10 +14,10 @@ export async function GET() {
     // If no festival info exists, create default data
     if (!festivalInfo) {
       const defaultInfo: FestivalInfo = {
-        name: 'Ayyuhannas Arts Festival 2K25',
-        year: '2025',
-        startDate: new Date('2025-03-10'),
-        endDate: new Date('2025-03-14'),
+        name: 'Ayyuhannas Arts Festival 2K26',
+        year: '2026',
+        startDate: new Date('2026-03-10'),
+        endDate: new Date('2026-03-14'),
         venue: 'Ayyuhannas Campus',
         description: 'Annual arts and sports festival celebrating creativity, talent, and teamwork among students.',
         status: 'ongoing',

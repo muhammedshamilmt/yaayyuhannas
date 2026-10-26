@@ -30,7 +30,7 @@ export function Contact() {
           </div>
 
           <p className="text-gray-500 text-lg mb-12 max-w-2xl mx-auto leading-relaxed">
-            Have questions about Festival 2K25? We're here to help<br />
+            Have questions about AYYUHANNAAS 2K26? We're here to help<br />
             with registration, events, and general information
           </p>
         </div>

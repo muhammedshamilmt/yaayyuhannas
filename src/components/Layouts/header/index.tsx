@@ -35,7 +35,7 @@ export function Header() {
           <div className="flex items-center space-x-3">
             <Image
               src="/images/festival-logo.png"
-              alt="Festival 2K25"
+              alt="AYYUHANNAAS 2K26"
               width={40}
               height={40}
               className="rounded-full shadow-lg"

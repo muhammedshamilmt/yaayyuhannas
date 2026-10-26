@@ -84,8 +84,8 @@ export default function BasicPage() {
       <Breadcrumb pageName="Basic" />
 
       <div className="space-y-6">
-        {/* Festival 2K25 Structure */}
-        <ShowcaseSection title="Festival 2K25 Structure">
+        {/* Festival 2K26 Structure */}
+        <ShowcaseSection title="Festival 2K26 Structure">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">

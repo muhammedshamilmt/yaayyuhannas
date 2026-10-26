@@ -218,7 +218,7 @@ export default function CandidatesPage() {
           team: false,
         },
         sortBy: 'chestNumber',
-        festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K25',
+        festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K26',
         venue: festInfo?.venue || 'Campus Venue',
       });
     } catch (err) {
@@ -244,7 +244,7 @@ export default function CandidatesPage() {
           team: teamCode === 'all',
         },
         sortBy: 'chestNumber',
-        festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K25',
+        festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K26',
         venue: festInfo?.venue || 'Campus Venue',
       });
     } catch (err) {
@@ -271,7 +271,7 @@ export default function CandidatesPage() {
           team: isPdf && exportStrictPdf ? false : exportIncludeTeam,
         },
         sortBy: exportSortBy,
-        festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K25',
+        festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K26',
         venue: festInfo?.venue || 'Campus Venue',
       };
 
@@ -302,7 +302,7 @@ export default function CandidatesPage() {
           format: 'pdf',
           includeFields: { chestNumber: true, name: true },
           sortBy: exportSortBy,
-          festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K25',
+          festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K26',
           venue: festInfo?.venue || 'Campus Venue',
         });
         await new Promise((resolve) => setTimeout(resolve, 400));
@@ -327,7 +327,7 @@ export default function CandidatesPage() {
           format: 'xls',
           includeFields: { chestNumber: true, name: true, section: false, points: false, team: false },
           sortBy: exportSortBy,
-          festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K25',
+          festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K26',
           venue: festInfo?.venue || 'Campus Venue',
         });
         await new Promise((resolve) => setTimeout(resolve, 400));
