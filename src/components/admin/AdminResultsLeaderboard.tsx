@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { Result, Programme, Candidate, ProgrammeParticipant, Team } from '@/types';
-import { getTeamTheme, getSectionTheme } from '@/lib/profileHelper';
+import { getTeamTheme, getSectionTheme, classifyProgramme } from '@/lib/profileHelper';
 import { getDefaultGradePoints } from '@/lib/resultsHelper';
 import { 
   Trophy, 
@@ -67,7 +67,7 @@ export function AdminResultsLeaderboard({
   onSwitchToManageTab
 }: AdminResultsLeaderboardProps) {
   const [selectedSection, setSelectedSection] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'arts' | 'sports'>('arts');
   const [expandedResultId, setExpandedResultId] = useState<string | null>(null);
   const [resultsSearch, setResultsSearch] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -77,6 +77,30 @@ export function AdminResultsLeaderboard({
   const publishedResults = useMemo(() => {
     return results.filter(r => r.status === 'published' || !r.status);
   }, [results]);
+
+  // Helper map for programmes: id/code -> programme
+  const progMap = useMemo(() => {
+    const map = new Map<string, Programme>();
+    programmes.forEach(p => {
+      if (p._id) map.set(p._id.toString(), p);
+      if (p.id) map.set(String(p.id), p);
+      if (p.code) map.set(p.code.toUpperCase().trim(), p);
+    });
+    return map;
+  }, [programmes]);
+
+  // Published results filtered by category
+  const publishedResultsForCategory = useMemo(() => {
+    return publishedResults.filter(r => {
+      let prog = r.programmeId ? progMap.get(r.programmeId) : undefined;
+      if (!prog && r.programme) {
+        prog = programmes.find(p => p._id?.toString() === r.programmeId || (p.code && r.programme?.startsWith(p.code)));
+      }
+      const rawCat = (prog?.category || (r as any).category || '').toLowerCase().trim();
+      const resCat = rawCat === 'sports' ? 'sports' : rawCat === 'arts' ? 'arts' : classifyProgramme(prog, prog?.code, r.programme).category || 'arts';
+      return resCat === selectedCategory;
+    });
+  }, [publishedResults, selectedCategory, progMap, programmes]);
 
   // Compute standings dynamically from published results
   const teamStandings: TeamStanding[] = useMemo(() => {
@@ -129,14 +153,6 @@ export function AdminResultsLeaderboard({
       if (c.chestNumber) candMap.set(String(c.chestNumber).trim(), c);
     });
 
-    // Helper map for programmes: id/code -> programme
-    const progMap = new Map<string, Programme>();
-    programmes.forEach(p => {
-      if (p._id) progMap.set(p._id.toString(), p);
-      if (p.id) progMap.set(String(p.id), p);
-      if (p.code) progMap.set(p.code.toUpperCase().trim(), p);
-    });
-
     // Process published results (filtered by section and category if specified)
     publishedResults.forEach(res => {
       // Find matching programme
@@ -152,11 +168,10 @@ export function AdminResultsLeaderboard({
         if (resSec !== selectedSection.toLowerCase().trim()) return;
       }
 
-      // Check category filter
-      if (selectedCategory !== 'all') {
-        const cat = (prog?.category || '').toLowerCase().trim();
-        if (cat !== selectedCategory.toLowerCase().trim()) return;
-      }
+      // Check category filter: strict separation between Arts and Sports (No 'All')
+      const rawCat = (prog?.category || (res as any).category || '').toLowerCase().trim();
+      const resCat = rawCat === 'sports' ? 'sports' : rawCat === 'arts' ? 'arts' : classifyProgramme(prog, prog?.code, res.programme).category || 'arts';
+      if (resCat !== selectedCategory) return;
 
       const isIndividual = res.positionType === 'individual';
       const isTeamBased = res.positionType === 'group' || res.positionType === 'general';
@@ -275,9 +290,18 @@ export function AdminResultsLeaderboard({
   const rank3 = teamStandings[2];
   const otherTeams = teamStandings.slice(3);
 
-  // Latest published results in chronological order (most recent first)
+  // Latest published results in chronological order (filtered by category)
   const latestResults = useMemo(() => {
-    const list = [...publishedResults].sort((a, b) => {
+    const list = publishedResults.filter(r => {
+      let prog = r.programmeId ? progMap.get(r.programmeId) : undefined;
+      if (!prog && r.programme) {
+        const codeMatch = r.programme.match(/^([A-Za-z0-9_-]+)/);
+        if (codeMatch) prog = progMap.get(codeMatch[1].toUpperCase().trim());
+      }
+      const rawCat = (prog?.category || (r as any).category || '').toLowerCase().trim();
+      const resCat = rawCat === 'sports' ? 'sports' : rawCat === 'arts' ? 'arts' : classifyProgramme(prog, prog?.code, r.programme).category || 'arts';
+      return resCat === selectedCategory;
+    }).sort((a, b) => {
       const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return timeB - timeA;
@@ -290,7 +314,7 @@ export function AdminResultsLeaderboard({
       const sec = (r.section || '').toLowerCase();
       return name.includes(q) || sec.includes(q);
     }).slice(0, 10);
-  }, [publishedResults, resultsSearch]);
+  }, [publishedResults, resultsSearch, selectedCategory, progMap]);
 
   const handleManualRefresh = () => {
     setIsRefreshing(true);
@@ -351,7 +375,7 @@ export function AdminResultsLeaderboard({
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Real-time festival championship standings calculated dynamically across all published results
+              Real-time {selectedCategory === 'arts' ? 'Arts' : 'Sports'} championship standings calculated separately across published results
             </p>
           </div>
 
@@ -374,19 +398,20 @@ export function AdminResultsLeaderboard({
               ))}
             </div>
 
-            {/* Category Filter */}
-            <div className="inline-flex p-1 bg-slate-100/90 rounded-xl text-xs font-medium text-slate-600">
-              {['all', 'arts', 'sports'].map(cat => (
+            {/* Category Filter: Separate Arts vs Sports (No All) */}
+            <div className="inline-flex p-1 bg-slate-100/90 rounded-xl text-xs font-bold text-slate-600 border border-slate-200">
+              {(['arts', 'sports'] as const).map(cat => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-2.5 py-1 rounded-lg capitalize transition-all ${
+                  className={`px-3 py-1 rounded-lg capitalize transition-all cursor-pointer flex items-center gap-1.5 ${
                     selectedCategory === cat
-                      ? 'bg-white text-slate-900 font-bold shadow-xs'
-                      : 'hover:text-slate-900'
+                      ? 'bg-white text-slate-900 font-black shadow-xs'
+                      : 'hover:text-slate-900 text-slate-500'
                   }`}
                 >
-                  {cat === 'all' ? 'All' : cat}
+                  <span>{cat === 'arts' ? '🎨' : '⚽'}</span>
+                  <span>{cat === 'arts' ? 'Arts' : 'Sports'}</span>
                 </button>
               ))}
             </div>
@@ -592,7 +617,7 @@ export function AdminResultsLeaderboard({
             <RotateCw className="w-3.5 h-3.5" />
             <span>Leaderboard updated {getRelativeTime(lastRefreshedAt)}</span>
             <span>•</span>
-            <span>{publishedResults.length} published results counted</span>
+            <span>{publishedResultsForCategory.length} published {selectedCategory === 'arts' ? 'Arts' : 'Sports'} results counted</span>
           </div>
 
           {/* Carousel dots like image 2 */}
@@ -662,7 +687,7 @@ export function AdminResultsLeaderboard({
                   Latest Results Announcements
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                  {publishedResults.length} Published
+                  {publishedResultsForCategory.length} Published ({selectedCategory === 'arts' ? 'Arts' : 'Sports'})
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">

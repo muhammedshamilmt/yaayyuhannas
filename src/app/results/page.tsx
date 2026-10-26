@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Team, Result, Candidate, Programme } from '@/types';
 import { findProgramme, getResultPublishedTime, getDefaultGradePoints } from '@/lib/resultsHelper';
+import { classifyProgramme } from '@/lib/profileHelper';
 
 export interface WinnerItem {
   type: 'individual' | 'team';
@@ -61,7 +62,7 @@ export default function ResultsPage() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState<'overview' | 'programmes' | 'categories' | 'sections'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'arts' | 'sports'>('arts');
   const [selectedSection, setSelectedSection] = useState<string>('all');
   const [selectedProgrammeSection, setSelectedProgrammeSection] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'recently-added' | 'first-added' | 'name-asc'>('recently-added');
@@ -374,7 +375,9 @@ export default function ResultsPage() {
         progName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         progCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
         progSec.includes(searchTerm.toLowerCase());
-      const matchesCategory = selectedCategory === 'all' || pr.programme.category === selectedCategory;
+      const rawCat = (pr.programme.category || (pr.result as any).category || '').toLowerCase().trim();
+      const prCat = rawCat === 'sports' ? 'sports' : rawCat === 'arts' ? 'arts' : classifyProgramme(pr.programme, pr.programme?.code, pr.result.programme).category || 'arts';
+      const matchesCategory = prCat === selectedCategory;
       const matchesSection = selectedProgrammeSection === 'all' || progSec === selectedProgrammeSection.toLowerCase();
 
       return matchesSearch && matchesCategory && matchesSection;
@@ -717,16 +720,23 @@ export default function ResultsPage() {
                   />
                 </div>
                 <div>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white text-gray-700"
-                  >
-                    <option value="all">All Categories</option>
-                    {categories.map((category, idx) => (
-                      <option key={`category-${idx}-${category}`} value={category}>{category}</option>
+                  <div className="inline-flex p-1 bg-gray-100 rounded-lg border border-gray-200 w-full justify-center">
+                    {(['arts', 'sports'] as const).map(cat => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                          selectedCategory === cat
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-900'
+                        }`}
+                      >
+                        <span>{cat === 'arts' ? '🎨' : '⚽'}</span>
+                        <span>{cat === 'arts' ? 'Arts' : 'Sports'}</span>
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
                 <div>
                   <select
@@ -770,12 +780,19 @@ export default function ResultsPage() {
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  All ({programmeResults.length})
+                  All ({programmeResults.filter(pr => {
+                    const rawCat = (pr.programme.category || (pr.result as any).category || '').toLowerCase().trim();
+                    const cat = rawCat === 'sports' ? 'sports' : rawCat === 'arts' ? 'arts' : classifyProgramme(pr.programme, pr.programme?.code, pr.result.programme).category || 'arts';
+                    return cat === selectedCategory;
+                  }).length})
                 </button>
                 {programmeSections.map((sec) => {
-                  const count = programmeResults.filter(
-                    pr => (pr.result.section || pr.programme.section || '').toLowerCase() === sec.toLowerCase()
-                  ).length;
+                  const count = programmeResults.filter(pr => {
+                    const rawCat = (pr.programme.category || (pr.result as any).category || '').toLowerCase().trim();
+                    const cat = rawCat === 'sports' ? 'sports' : rawCat === 'arts' ? 'arts' : classifyProgramme(pr.programme, pr.programme?.code, pr.result.programme).category || 'arts';
+                    const secMatch = (pr.result.section || pr.programme.section || '').toLowerCase() === sec.toLowerCase();
+                    return cat === selectedCategory && secMatch;
+                  }).length;
                   const isSelected = selectedProgrammeSection.toLowerCase() === sec.toLowerCase();
                   return (
                     <button
@@ -795,14 +812,14 @@ export default function ResultsPage() {
 
                 <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
                   <span>
-                    Showing <strong className="text-gray-900">{filteredResults.length}</strong> results
+                    Showing <strong className="text-gray-900">{filteredResults.length}</strong> {selectedCategory} results
                   </span>
-                  {(selectedProgrammeSection !== 'all' || selectedCategory !== 'all' || searchTerm) && (
+                  {(selectedProgrammeSection !== 'all' || searchTerm) && (
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedProgrammeSection('all');
-                        setSelectedCategory('all');
+                        setSelectedCategory('arts');
                         setSearchTerm('');
                       }}
                       className="ml-2 font-semibold text-rose-600 hover:text-rose-800 cursor-pointer"
@@ -819,18 +836,18 @@ export default function ResultsPage() {
               {filteredResults.length === 0 ? (
                 <div className="bg-white rounded-lg shadow-md border border-gray-200 p-12 text-center">
                   <div className="text-6xl mb-4">🎭</div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">No Programme Results Found</h3>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">No {selectedCategory === 'arts' ? 'Arts' : 'Sports'} Results Found</h3>
                   <p className="text-gray-600 mb-4">
-                    {searchTerm || selectedCategory !== 'all' || selectedProgrammeSection !== 'all'
-                      ? 'Try adjusting your search or filter criteria.'
-                      : 'Programme results will appear here once competitions are completed.'}
+                    {searchTerm || selectedProgrammeSection !== 'all'
+                      ? 'Try adjusting your search or section filter.'
+                      : `Results for ${selectedCategory} will appear here once competitions are completed.`}
                   </p>
-                  {(searchTerm || selectedCategory !== 'all' || selectedProgrammeSection !== 'all') && (
+                  {(searchTerm || selectedProgrammeSection !== 'all') && (
                     <button
                       type="button"
                       onClick={() => {
                         setSearchTerm('');
-                        setSelectedCategory('all');
+                        setSelectedCategory('arts');
                         setSelectedProgrammeSection('all');
                       }}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors cursor-pointer inline-flex items-center gap-1.5"
@@ -848,7 +865,7 @@ export default function ResultsPage() {
 
                   return (
                     <div
-                      key={pr.result._id || index}
+                      key={pr.result._id?.toString() || index}
                       className={`bg-white rounded-lg shadow-md border p-6 transition-all ${
                         isLatest ? 'border-emerald-400 ring-2 ring-emerald-500/20 shadow-lg' : 'border-gray-200'
                       }`}

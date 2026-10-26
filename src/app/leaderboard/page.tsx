@@ -10,6 +10,7 @@ import { LiveUpdates } from '@/components/Leaderboard/LiveUpdates';
 import { TeamProfile } from '@/components/Leaderboard/TeamProfile';
 import { IndividualProfile } from '@/components/Leaderboard/IndividualProfile';
 import { findProgramme, getProgrammeName, getDefaultGradePoints } from '@/lib/resultsHelper';
+import { classifyProgramme } from '@/lib/profileHelper';
 
 interface TeamStats {
     team: Team;
@@ -85,6 +86,7 @@ export default function DynamicLeaderboardPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
     const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<'arts' | 'sports'>('arts');
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [liveUpdates, setLiveUpdates] = useState<LiveUpdate[]>([]);
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -141,7 +143,7 @@ export default function DynamicLeaderboardPage() {
         if (teams.length > 0 && results.length > 0 && candidates.length > 0) {
             calculateAdvancedStats();
         }
-    }, [teams, results, candidates, programmes]);
+    }, [teams, results, candidates, programmes, selectedCategory]);
 
     const calculateAdvancedStats = () => {
         // Enhanced team statistics calculation
@@ -167,15 +169,29 @@ export default function DynamicLeaderboardPage() {
         });
 
         // Calculate detailed statistics from results in chronological order
+        const getResultCategory = (res: Result, prog?: Programme): 'arts' | 'sports' => {
+            const rawCat = (prog?.category || (res as any).category || '').toLowerCase().trim();
+            if (rawCat === 'sports') return 'sports';
+            if (rawCat === 'arts') return 'arts';
+            return classifyProgramme(prog, prog?.code, res.programme).category || 'arts';
+        };
+
         const sortedResults = [...results].sort((a, b) => {
             const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
             const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
             return timeA - timeB;
         });
-        const recentResults = sortedResults.slice(-10); // Last 10 results for momentum
+
+        // Filter results by selectedCategory: strict separation between Arts and Sports (No 'All')
+        const categoryResults = sortedResults.filter(result => {
+            const programme = findProgramme(result, programmes);
+            return getResultCategory(result, programme) === selectedCategory;
+        });
+
+        const recentResults = categoryResults.slice(-10); // Last 10 results for momentum
         let totalParticipations = 0;
 
-        sortedResults.forEach((result, index) => {
+        categoryResults.forEach((result, index) => {
             const programme = findProgramme(result, programmes);
             const programmeName = getProgrammeName(result, programme);
             const category = programme?.category || 'general';
@@ -358,7 +374,7 @@ export default function DynamicLeaderboardPage() {
             }
         });
 
-        sortedResults.forEach(result => {
+        categoryResults.forEach(result => {
             const programme = findProgramme(result, programmes);
             const programmeName = getProgrammeName(result, programme);
             const category = programme?.category || 'general';
@@ -720,16 +736,44 @@ const getRankBadge = (rank: number) => {
                     </div>
                 </div>
 
-                {/* Control Panel */}
+                {/* Control Panel & Category Filter */}
                 <div className="bg-white rounded-lg shadow-md p-6 mb-8">
                     <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-                        <div className="flex flex-col sm:flex-row gap-4 flex-1">
+                        {/* Category Switcher: Arts vs Sports (Strict Separation, No All) */}
+                        <div className="inline-flex p-1 bg-gray-100 rounded-xl border border-gray-200">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedCategory('arts')}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                    selectedCategory === 'arts'
+                                        ? 'bg-purple-600 text-white shadow-md'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                            >
+                                <span>🎨</span>
+                                <span>Arts Championship</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedCategory('sports')}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                    selectedCategory === 'sports'
+                                        ? 'bg-orange-500 text-white shadow-md'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                            >
+                                <span>⚽</span>
+                                <span>Sports Championship</span>
+                            </button>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-4 flex-1 w-full lg:w-auto">
                             <input
                                 type="text"
                                 placeholder="Search teams or performers..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                             />
                         </div>
                         
@@ -794,7 +838,9 @@ const getRankBadge = (rank: number) => {
                     <div className="space-y-8">
                         {/* Dynamic Championship Podium */}
                         <div className="bg-white rounded-lg shadow-md p-8">
-                            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">🏆 Live Championship Standings</h2>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+                                🏆 Live {selectedCategory === 'arts' ? 'Arts' : 'Sports'} Championship Standings
+                            </h2>
                             {teamStats.length >= 3 ? (
                                 <div className="flex items-end justify-center gap-8 mb-8">
                                     {/* Second Place */}

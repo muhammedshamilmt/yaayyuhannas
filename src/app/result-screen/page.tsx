@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { Result, Programme, Candidate, Team } from '@/types';
-import { getTeamTheme, getSectionTheme } from '@/lib/profileHelper';
+import { getTeamTheme, getSectionTheme, classifyProgramme } from '@/lib/profileHelper';
 import { getDefaultGradePoints } from '@/lib/resultsHelper';
 import {
   Trophy,
@@ -279,6 +279,20 @@ export default function ResultScreenPage() {
     return results.filter(r => r.status === 'published' || !r.status);
   }, [results]);
 
+  // Published results filtered by category
+  const publishedResultsForCategory = useMemo(() => {
+    return publishedResults.filter(r => {
+      let prog = programmes.find(p => p._id?.toString() === r.programmeId || (r.programme && p.name && r.programme.includes(p.name)));
+      if (!prog && r.programme) {
+        const codeMatch = r.programme.match(/^([A-Za-z0-9_-]+)/);
+        if (codeMatch) prog = programmes.find(p => p.code?.toUpperCase().trim() === codeMatch[1].toUpperCase().trim());
+      }
+      const rawCat = (prog?.category || (r as any).category || '').toLowerCase().trim();
+      const cat = rawCat === 'sports' ? 'sports' : rawCat === 'arts' ? 'arts' : classifyProgramme(prog, prog?.code, r.programme).category || 'arts';
+      return cat === selectedCategory.toLowerCase().trim();
+    });
+  }, [publishedResults, selectedCategory, programmes]);
+
   // Compute standings dynamically for the 3D podium
   const teamStandings = useMemo(() => {
     const map: Record<string, {
@@ -344,10 +358,9 @@ export default function ResultScreenPage() {
         if (resSec !== selectedSection.toLowerCase().trim()) return;
       }
 
-      if (selectedCategory !== 'all') {
-        const cat = (prog?.category || '').toLowerCase().trim();
-        if (cat !== selectedCategory.toLowerCase().trim()) return;
-      }
+      const rawCat = (prog?.category || (res as any).category || '').toLowerCase().trim();
+      const cat = rawCat === 'sports' ? 'sports' : rawCat === 'arts' ? 'arts' : classifyProgramme(prog, prog?.code, res.programme).category || 'arts';
+      if (cat !== selectedCategory.toLowerCase().trim()) return;
 
       const isIndividual = res.positionType === 'individual';
       const isTeamBased = res.positionType === 'group' || res.positionType === 'general';
@@ -489,10 +502,9 @@ export default function ResultScreenPage() {
         if (codeMatch) prog = progMap.get(codeMatch[1].toUpperCase().trim());
       }
 
-      if (selectedCategory !== 'all') {
-        const cat = (prog?.category || '').toLowerCase().trim();
-        if (cat !== selectedCategory.toLowerCase().trim()) return;
-      }
+      const rawCat = (prog?.category || (res as any).category || '').toLowerCase().trim();
+      const cat = rawCat === 'sports' ? 'sports' : rawCat === 'arts' ? 'arts' : classifyProgramme(prog, prog?.code, res.programme).category || 'arts';
+      if (cat !== selectedCategory.toLowerCase().trim()) return;
 
       const firstPoints = res.firstPoints ?? 10;
       const secondPoints = res.secondPoints ?? 8;
@@ -586,12 +598,16 @@ export default function ResultScreenPage() {
       list = list.filter(r => (r.section || '').toLowerCase() === selectedSection.toLowerCase());
     }
 
-    if (selectedCategory !== 'all') {
-      list = list.filter(r => {
-        const prog = programmes.find(p => p._id?.toString() === r.programmeId || (r.programme && p.name && r.programme.includes(p.name)));
-        return (prog?.category || '').toLowerCase() === selectedCategory.toLowerCase();
-      });
-    }
+    list = list.filter(r => {
+      let prog = programmes.find(p => p._id?.toString() === r.programmeId || (r.programme && p.name && r.programme.includes(p.name)));
+      if (!prog && r.programme) {
+        const codeMatch = r.programme.match(/^([A-Za-z0-9_-]+)/);
+        if (codeMatch) prog = programmes.find(p => p.code?.toUpperCase().trim() === codeMatch[1].toUpperCase().trim());
+      }
+      const rawCat = (prog?.category || (r as any).category || '').toLowerCase().trim();
+      const cat = rawCat === 'sports' ? 'sports' : rawCat === 'arts' ? 'arts' : classifyProgramme(prog, prog?.code, r.programme).category || 'arts';
+      return cat === selectedCategory.toLowerCase();
+    });
 
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase().trim();
@@ -957,7 +973,7 @@ export default function ResultScreenPage() {
                   <RotateCw className="w-3 h-3 text-slate-400" />
                   <span>Leaderboard updated {getRelativeTime(lastRefreshedAt)}</span>
                   <span>•</span>
-                  <span>{publishedResults.length} published results counted</span>
+                  <span>{publishedResultsForCategory.length} published {selectedCategory === 'arts' ? 'Arts' : 'Sports'} results counted</span>
                 </div>
 
                 {/* Carousel dots */}
