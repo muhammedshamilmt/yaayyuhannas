@@ -158,7 +158,7 @@ export default function ResultScreenPage() {
 
   // Filter states
   const [selectedSection, setSelectedSection] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('arts');
   const [searchTerm, setSearchTerm] = useState('');
   // Star Performers Section Filter state ('all' | 'senior' | 'junior' | 'sub-junior')
   const [starPerformerSection, setStarPerformerSection] = useState<string>('all');
@@ -661,18 +661,19 @@ export default function ResultScreenPage() {
               ))}
             </div>
 
-            {/* Category Filter Pills */}
+            {/* Category Filter Pills (Arts / Sports) */}
             <div className="inline-flex p-0.5 bg-slate-100 rounded-xl text-xs font-semibold text-slate-600">
-              {['all', 'arts', 'sports'].map(cat => (
+              {(['arts', 'sports'] as const).map(cat => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-2.5 py-1 rounded-lg capitalize transition-all cursor-pointer text-xs ${selectedCategory === cat
+                  className={`px-3 py-1 rounded-lg capitalize transition-all cursor-pointer text-xs flex items-center gap-1 ${selectedCategory === cat
                     ? 'bg-white text-slate-900 font-black shadow-xs'
                     : 'hover:text-slate-900'
                     }`}
                 >
-                  {cat === 'all' ? 'All' : cat}
+                  <span>{cat === 'arts' ? '🎨' : '⚽'}</span>
+                  <span>{cat === 'arts' ? 'Arts' : 'Sports'}</span>
                 </button>
               ))}
             </div>

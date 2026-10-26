@@ -6,10 +6,11 @@ import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
 import { Result, Programme, Candidate, ProgrammeParticipant } from '@/types';
 import { AdminResultsLeaderboard } from "@/components/admin/AdminResultsLeaderboard";
+import { AdminDraftSimulator } from "@/components/admin/AdminDraftSimulator";
 import { getDefaultGradePoints, findExistingResultForProgramme } from '@/lib/resultsHelper';
 
 export default function ResultsPage() {
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'manage'>('leaderboard');
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'manage' | 'draft-simulator'>('leaderboard');
   const [results, setResults] = useState<Result[]>([]);
   const [programmes, setProgrammes] = useState<Programme[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -869,6 +870,22 @@ export default function ResultsPage() {
               {results.length}
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('draft-simulator')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+              activeTab === 'draft-simulator'
+                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>⚡</span>
+            <span>Draft Simulation</span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+              {results.filter(r => r.status === 'draft').length} Drafts
+            </span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -883,21 +900,21 @@ export default function ResultsPage() {
             <span>TV Screen Mode ↗</span>
           </Link>
 
-          {activeTab === 'leaderboard' ? (
-            <button
-              type="button"
-              onClick={() => setActiveTab('manage')}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-xs"
-            >
-              <span>➕ Add New Result</span>
-            </button>
-          ) : (
+          {activeTab === 'manage' ? (
             <button
               type="button"
               onClick={() => setActiveTab('leaderboard')}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all shadow-xs"
             >
               <span>🏆 View Standings</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setActiveTab('manage')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-xs"
+            >
+              <span>➕ Add New Result</span>
             </button>
           )}
         </div>
@@ -915,6 +932,20 @@ export default function ResultsPage() {
             startEdit(res);
           }}
           onSwitchToManageTab={() => setActiveTab('manage')}
+        />
+      )}
+
+      {activeTab === 'draft-simulator' && (
+        <AdminDraftSimulator
+          results={results}
+          programmes={programmes}
+          candidates={candidates}
+          teams={teams}
+          participants={participants}
+          onRefresh={fetchData}
+          onEditResult={(res) => {
+            startEdit(res);
+          }}
         />
       )}
 
