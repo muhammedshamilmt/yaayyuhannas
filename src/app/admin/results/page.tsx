@@ -6,7 +6,7 @@ import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { ShowcaseSection } from "@/components/Layouts/showcase-section";
 import { Result, Programme, Candidate, ProgrammeParticipant } from '@/types';
 import { AdminResultsLeaderboard } from "@/components/admin/AdminResultsLeaderboard";
-import { getDefaultGradePoints } from '@/lib/resultsHelper';
+import { getDefaultGradePoints, findExistingResultForProgramme } from '@/lib/resultsHelper';
 
 export default function ResultsPage() {
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'manage'>('leaderboard');
@@ -64,6 +64,7 @@ export default function ResultsPage() {
   // Programme Searchable Selector State
   const [programmeSearch, setProgrammeSearch] = useState('');
   const [isProgrammeDropdownOpen, setIsProgrammeDropdownOpen] = useState(false);
+  const [programmeSelectFilter, setProgrammeSelectFilter] = useState<'all' | 'not-added' | 'added'>('all');
   const programmeDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close programme dropdown on outside click
@@ -77,17 +78,52 @@ export default function ResultsPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Summary counts of programmes added vs not added
+  const programmesStatusCounts = useMemo(() => {
+    let added = 0;
+    let notAdded = 0;
+    programmes.forEach(p => {
+      if (findExistingResultForProgramme(p, results)) {
+        added++;
+      } else {
+        notAdded++;
+      }
+    });
+    return { all: programmes.length, added, notAdded };
+  }, [programmes, results]);
+
   // Filter programmes for the Add Result combobox
-  const filteredProgrammesForSelect = programmes.filter(prog => {
-    if (!programmeSearch.trim()) return true;
-    const term = programmeSearch.toLowerCase().trim();
-    const nameMatch = prog.name?.toLowerCase().includes(term);
-    const codeMatch = prog.code?.toLowerCase().includes(term);
-    const catMatch = prog.category?.toLowerCase().includes(term);
-    const subcatMatch = prog.subcategory?.toLowerCase().includes(term);
-    const secMatch = prog.section?.toLowerCase().includes(term);
-    return Boolean(nameMatch || codeMatch || catMatch || subcatMatch || secMatch);
-  });
+  const filteredProgrammesForSelect = useMemo(() => {
+    return programmes.filter(prog => {
+      // 1. Text Search Match
+      if (programmeSearch.trim()) {
+        const term = programmeSearch.toLowerCase().trim();
+        const nameMatch = prog.name?.toLowerCase().includes(term);
+        const codeMatch = prog.code?.toLowerCase().includes(term);
+        const catMatch = prog.category?.toLowerCase().includes(term);
+        const subcatMatch = prog.subcategory?.toLowerCase().includes(term);
+        const secMatch = prog.section?.toLowerCase().includes(term);
+        if (!nameMatch && !codeMatch && !catMatch && !subcatMatch && !secMatch) {
+          return false;
+        }
+      }
+
+      // 2. Filter by Added / Not Added status
+      if (programmeSelectFilter !== 'all') {
+        const hasResult = Boolean(findExistingResultForProgramme(prog, results));
+        if (programmeSelectFilter === 'not-added' && hasResult) return false;
+        if (programmeSelectFilter === 'added' && !hasResult) return false;
+      }
+
+      return true;
+    });
+  }, [programmes, programmeSearch, programmeSelectFilter, results]);
+
+  // Check if a result already exists for the selected programme (and section)
+  const existingResultForSelected = useMemo(() => {
+    if (!selectedProgramme) return undefined;
+    return findExistingResultForProgramme(selectedProgramme, results, selectedSection || selectedProgramme.section);
+  }, [selectedProgramme, results, selectedSection]);
 
   const [formData, setFormData] = useState({
     programme: '',
@@ -166,9 +202,6 @@ export default function ResultsPage() {
   const handleProgrammeSelection = (programmeId: string) => {
     const programme = programmes.find(p => p._id?.toString() === programmeId);
     setSelectedProgramme(programme || null);
-    setSelectedSection('');
-    setFilteredParticipants([]);
-    setShowParticipants(false);
     setIsProgrammeDropdownOpen(false);
 
     if (programme) {
@@ -181,25 +214,41 @@ export default function ResultsPage() {
         thirdPoints: programme.thirdPoints ?? 5,
         participationPoints: programme.participationPoints ?? 3
       }));
+
+      const autoSec = (programme.section || '').toLowerCase().trim();
+      if (autoSec && ['senior', 'junior', 'sub-junior', 'general'].includes(autoSec)) {
+        handleSectionSelection(autoSec, programme);
+      } else {
+        setSelectedSection('');
+        setFilteredParticipants([]);
+        setFilteredTeams([]);
+        setShowParticipants(false);
+      }
     } else {
       setFormData(prev => ({
         ...prev,
         programme: '',
-        positionType: '' as any
+        positionType: '' as any,
+        section: '' as any
       }));
+      setSelectedSection('');
+      setFilteredParticipants([]);
+      setFilteredTeams([]);
+      setShowParticipants(false);
     }
   };
 
   // Handle section selection
-  const handleSectionSelection = (section: string) => {
+  const handleSectionSelection = (section: string, prog?: Programme | null) => {
+    const activeProgramme = prog !== undefined ? prog : selectedProgramme;
     setSelectedSection(section);
     setFormData(prev => ({ ...prev, section: section as any }));
 
-    if (selectedProgramme && section) {
-      if (selectedProgramme.positionType === 'general' || selectedProgramme.positionType === 'group') {
+    if (activeProgramme && section) {
+      if (activeProgramme.positionType === 'general' || activeProgramme.positionType === 'group') {
         // For general AND group programmes, assign position/mark at team level
         const programmeParticipants = participants.filter(p =>
-          p.programmeId === selectedProgramme._id?.toString()
+          p.programmeId === activeProgramme._id?.toString()
         );
 
         const registeredTeams = programmeParticipants.map(pp => {
@@ -218,7 +267,7 @@ export default function ResultsPage() {
       } else {
         // For individual programmes only, show per-participant cards
         const programmeParticipants = participants.filter(p =>
-          p.programmeId === selectedProgramme._id?.toString()
+          p.programmeId === activeProgramme._id?.toString()
         );
 
         const detailedParticipants = programmeParticipants.flatMap(pp =>
@@ -329,6 +378,11 @@ export default function ResultsPage() {
 
     if (!formData.programme || !formData.section || !formData.positionType) {
       alert('Please fill in all required fields');
+      return;
+    }
+
+    if (existingResultForSelected) {
+      alert(`A result for this programme (${selectedProgramme?.code} - ${selectedProgramme?.name}) has already been added. You can edit the existing result, but cannot add it again.`);
       return;
     }
 
@@ -910,8 +964,19 @@ export default function ResultsPage() {
                           {selectedProgramme.code}
                         </div>
                         <div>
-                          <div className="font-bold text-gray-900 text-sm">
-                            {selectedProgramme.name}
+                          <div className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                            <span>{selectedProgramme.name}</span>
+                            {existingResultForSelected && (
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[11px] font-bold border flex items-center gap-1 shrink-0 ${
+                                  existingResultForSelected.status === 'draft'
+                                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                    : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                }`}
+                              >
+                                {existingResultForSelected.status === 'draft' ? '📝 Draft Added' : '✓ Added'}
+                              </span>
+                            )}
                           </div>
                           <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-500">
                             <span className="capitalize font-semibold text-blue-700">{selectedProgramme.category}</span>
@@ -976,47 +1041,106 @@ export default function ResultsPage() {
 
                     {isProgrammeDropdownOpen && (
                       <div className="absolute left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-2xl z-40 max-h-72 overflow-y-auto divide-y divide-gray-100 animate-in fade-in slide-in-from-top-1 duration-150">
-                        <div className="p-2.5 bg-gray-50/90 text-xs font-semibold text-gray-500 flex items-center justify-between sticky top-0 z-10 border-b border-gray-100 backdrop-blur-xs">
-                          <span>{filteredProgrammesForSelect.length} programmes found</span>
-                          {selectedProgramme && (
+                        <div className="p-2.5 bg-gray-50/95 text-xs font-semibold text-gray-500 sticky top-0 z-10 border-b border-gray-100 backdrop-blur-xs flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-700 font-bold">{filteredProgrammesForSelect.length} programmes found</span>
+                            {selectedProgramme && (
+                              <button
+                                type="button"
+                                onClick={() => setIsProgrammeDropdownOpen(false)}
+                                className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                              >
+                                Keep current
+                              </button>
+                            )}
+                          </div>
+                          {/* Filter Pills: All, Not Added (Pending), Added */}
+                          <div className="flex items-center gap-1.5 pt-0.5">
                             <button
                               type="button"
-                              onClick={() => setIsProgrammeDropdownOpen(false)}
-                              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                              onClick={() => setProgrammeSelectFilter('all')}
+                              className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                programmeSelectFilter === 'all'
+                                  ? 'bg-blue-600 text-white shadow-xs'
+                                  : 'bg-gray-200/80 text-gray-700 hover:bg-gray-300'
+                              }`}
                             >
-                              Keep current
+                              All ({programmesStatusCounts.all})
                             </button>
-                          )}
+                            <button
+                              type="button"
+                              onClick={() => setProgrammeSelectFilter('not-added')}
+                              className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                programmeSelectFilter === 'not-added'
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                              }`}
+                            >
+                              Not Added ({programmesStatusCounts.notAdded})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setProgrammeSelectFilter('added')}
+                              className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                programmeSelectFilter === 'added'
+                                  ? 'bg-amber-600 text-white shadow-xs'
+                                  : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                              }`}
+                            >
+                              Added ({programmesStatusCounts.added})
+                            </button>
+                          </div>
                         </div>
 
                         {filteredProgrammesForSelect.length === 0 ? (
                           <div className="p-6 text-center text-sm text-gray-500">
                             <p className="font-semibold text-gray-700">No programmes found</p>
-                            <p className="text-xs text-gray-400 mt-1">No match for &quot;{programmeSearch}&quot;</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {programmeSelectFilter !== 'all' 
+                                ? `No programmes matching filter "${programmeSelectFilter}" and query "${programmeSearch}"`
+                                : `No match for "${programmeSearch}"`}
+                            </p>
                           </div>
                         ) : (
                           filteredProgrammesForSelect.map((programme) => {
                             const isSelected = selectedProgramme?._id?.toString() === programme._id?.toString();
+                            const existingResult = findExistingResultForProgramme(programme, results);
                             return (
-                              <button
+                              <div
                                 key={programme._id?.toString()}
-                                type="button"
                                 onClick={() => {
+                                  if (existingResult) {
+                                    // Already added: cannot add duplicate, directly open edit modal!
+                                    setIsProgrammeDropdownOpen(false);
+                                    setProgrammeSearch('');
+                                    startEdit(existingResult);
+                                    return;
+                                  }
                                   handleProgrammeSelection(programme._id!.toString());
                                   setProgrammeSearch('');
                                   setIsProgrammeDropdownOpen(false);
                                 }}
-                                className={`w-full text-left p-3 hover:bg-blue-50/80 transition-colors flex items-center justify-between group cursor-pointer ${
-                                  isSelected ? 'bg-blue-50/90 font-medium' : ''
+                                className={`w-full text-left p-3 transition-colors flex items-center justify-between group cursor-pointer ${
+                                  existingResult
+                                    ? 'bg-amber-50/40 hover:bg-amber-50/80 border-l-4 border-amber-400'
+                                    : isSelected
+                                    ? 'bg-blue-50/90 font-medium'
+                                    : 'hover:bg-blue-50/80'
                                 }`}
                               >
                                 <div className="flex items-center gap-3">
-                                  <span className="px-2.5 py-1 rounded-md text-xs font-bold font-mono bg-blue-100 text-blue-800 border border-blue-200 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                  <span
+                                    className={`px-2.5 py-1 rounded-md text-xs font-bold font-mono border transition-colors ${
+                                      existingResult
+                                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                        : 'bg-blue-100 text-blue-800 border-blue-200 group-hover:bg-blue-600 group-hover:text-white'
+                                    }`}
+                                  >
                                     {programme.code}
                                   </span>
                                   <div>
-                                    <div className="text-sm font-semibold text-gray-900 group-hover:text-blue-900">
-                                      {programme.name}
+                                    <div className="text-sm font-semibold text-gray-900 group-hover:text-blue-900 flex items-center gap-2">
+                                      <span>{programme.name}</span>
                                     </div>
                                     <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
                                       <span className="capitalize">{programme.category}</span>
@@ -1028,15 +1152,51 @@ export default function ResultsPage() {
                                           <span className="capitalize">{programme.section}</span>
                                         </>
                                       )}
+                                      {existingResult && (
+                                        <>
+                                          <span>•</span>
+                                          <span className="text-amber-700 font-medium italic">Cannot add again (click to edit)</span>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
-                                {isSelected && (
-                                  <span className="text-blue-600 font-bold text-xs flex items-center gap-1">
-                                    ✓ Selected
-                                  </span>
-                                )}
-                              </button>
+                                <div className="flex items-center gap-2">
+                                  {existingResult ? (
+                                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                      <span
+                                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold border flex items-center gap-1 shrink-0 ${
+                                          existingResult.status === 'draft'
+                                            ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                            : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                        }`}
+                                      >
+                                        {existingResult.status === 'draft' ? '📝 Draft Added' : '✓ Added'}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setIsProgrammeDropdownOpen(false);
+                                          setProgrammeSearch('');
+                                          startEdit(existingResult);
+                                        }}
+                                        className="px-2.5 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-md text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
+                                        title="Click to edit this already added result"
+                                      >
+                                        <span>✏️ Edit</span>
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      {isSelected && (
+                                        <span className="text-blue-600 font-bold text-xs flex items-center gap-1">
+                                          ✓ Selected
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             );
                           })
                         )}
@@ -1075,6 +1235,69 @@ export default function ResultsPage() {
               </div>
             </div>
 
+            {/* Warning when a result is already added for this programme and section */}
+            {existingResultForSelected && (
+              <div className="p-5 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-300 rounded-2xl shadow-sm space-y-4 animate-in fade-in duration-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-800 flex items-center justify-center text-xl shrink-0">
+                      ⚠️
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="font-bold text-gray-900 text-base">
+                          Result Already Recorded for this Programme
+                        </h4>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                          existingResultForSelected.status === 'draft'
+                            ? 'bg-amber-100 text-amber-800 border-amber-300'
+                            : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        }`}>
+                          {existingResultForSelected.status === 'draft' ? '📝 Draft Saved' : '✓ Published'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">
+                        A result is already recorded for <strong>{selectedProgramme?.name}</strong> ({selectedSection || selectedProgramme?.section}).
+                        Duplicate result creation is disabled. You can edit the existing result directly below.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(existingResultForSelected)}
+                    className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 shrink-0 self-start sm:self-auto cursor-pointer"
+                  >
+                    <span>✏️</span>
+                    <span>Edit Existing Result</span>
+                  </button>
+                </div>
+
+                {/* Quick overview of existing result */}
+                <div className="bg-white/90 border border-amber-200 rounded-xl p-3.5 text-xs text-gray-700 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <span className="text-gray-400 block font-medium">1st Place</span>
+                    <span className="font-bold text-gray-900">
+                      {existingResultForSelected.firstPlace?.length ? existingResultForSelected.firstPlace.join(', ') : (existingResultForSelected.firstPlaceTeams?.join(', ') || 'None')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block font-medium">2nd Place</span>
+                    <span className="font-bold text-gray-900">
+                      {existingResultForSelected.secondPlace?.length ? existingResultForSelected.secondPlace.join(', ') : (existingResultForSelected.secondPlaceTeams?.join(', ') || 'None')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block font-medium">3rd Place</span>
+                    <span className="font-bold text-gray-900">
+                      {existingResultForSelected.thirdPlace?.length ? existingResultForSelected.thirdPlace.join(', ') : (existingResultForSelected.thirdPlaceTeams?.join(', ') || 'None')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!existingResultForSelected && (
+              <>
             {/* Registered Teams Display (for group AND general programmes) */}
             {showParticipants && (selectedProgramme?.positionType === 'general' || selectedProgramme?.positionType === 'group') && filteredTeams.length > 0 && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
@@ -1483,31 +1706,50 @@ export default function ResultsPage() {
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={(e) => handleSubmitWithStatus(e, 'published')}
-                disabled={submitting || !showParticipants}
-                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 flex items-center gap-2 cursor-pointer"
-              >
-                <span>🚀</span>
-                <span>{submitting ? 'Publishing...' : 'Publish Result'}</span>
-              </button>
+              </>
+            )}
 
-              <button
-                type="button"
-                onClick={(e) => handleSubmitWithStatus(e, 'draft')}
-                disabled={submitting || !showParticipants}
-                className="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 flex items-center gap-2 cursor-pointer"
-              >
-                <span>📝</span>
-                <span>{submitting ? 'Saving...' : 'Save as Draft'}</span>
-              </button>
+            {existingResultForSelected ? (
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => startEdit(existingResultForSelected)}
+                  className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer"
+                >
+                  <span>✏️</span>
+                  <span>Edit Existing Result</span>
+                </button>
+                <span className="text-xs text-amber-800 font-medium">
+                  A result is already recorded for this programme and section. Click &quot;Edit Existing Result&quot; to make changes.
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={(e) => handleSubmitWithStatus(e, 'published')}
+                  disabled={submitting || !showParticipants}
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                >
+                  <span>🚀</span>
+                  <span>{submitting ? 'Publishing...' : 'Publish Result'}</span>
+                </button>
 
-              <span className="text-xs text-gray-500 italic">
-                * Draft results are not visible on public pages or leaderboards until published.
-              </span>
-            </div>
+                <button
+                  type="button"
+                  onClick={(e) => handleSubmitWithStatus(e, 'draft')}
+                  disabled={submitting || !showParticipants}
+                  className="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                >
+                  <span>📝</span>
+                  <span>{submitting ? 'Saving...' : 'Save as Draft'}</span>
+                </button>
+
+                <span className="text-xs text-gray-500 italic">
+                  * Draft results are not visible on public pages or leaderboards until published.
+                </span>
+              </div>
+            )}
           </form>
         </ShowcaseSection>
 

@@ -202,3 +202,56 @@ export function getDefaultGradePoints(grade?: string | null): number {
   if (normalized === 'C' || normalized === 'C+') return 1;
   return DEFAULT_GRADE_POINTS[normalized] ?? 0;
 }
+
+/**
+ * Checks if a result has already been added for a given programme (and optional section).
+ * Returns the matching Result object if found, or undefined otherwise.
+ */
+export function findExistingResultForProgramme(
+  programme: Programme | { _id?: string; id?: string; code?: string; name?: string; section?: string } | null | undefined,
+  results: Result[] = [],
+  targetSection?: string | null
+): Result | undefined {
+  if (!programme || !Array.isArray(results) || results.length === 0) return undefined;
+
+  const progId = programme._id ? String(programme._id).trim() : (programme as any).id ? String((programme as any).id).trim() : null;
+  const progCode = programme.code ? programme.code.trim().toLowerCase() : null;
+  const progName = programme.name ? programme.name.trim().toLowerCase() : null;
+  const expectedSection = (targetSection || programme.section || '').trim().toLowerCase();
+
+  return results.find(r => {
+    const rProgId = r.programmeId ? String(r.programmeId).trim() : null;
+    const rProgStr = r.programme ? String(r.programme).trim().toLowerCase() : '';
+    const rSection = (r.section || '').trim().toLowerCase();
+
+    // Section comparison (if specified)
+    const sectionMatches = !expectedSection || !rSection || expectedSection === rSection;
+
+    // 1. Exact programmeId match
+    if (progId && rProgId && progId === rProgId) {
+      return sectionMatches;
+    }
+
+    // 2. Programme code matched to r.programmeId
+    if (progCode && rProgId && progCode === rProgId.toLowerCase()) {
+      return sectionMatches;
+    }
+
+    // 3. Programme code matched to r.programme prefix "CODE - "
+    if (progCode && rProgStr.startsWith(`${progCode} - `)) {
+      return sectionMatches;
+    }
+
+    // 4. Exact "CODE - Name" match
+    if (progCode && progName && rProgStr === `${progCode} - ${progName}`) {
+      return sectionMatches;
+    }
+
+    // 5. Match by exact name
+    if (progName && rProgStr === progName) {
+      return sectionMatches;
+    }
+
+    return false;
+  });
+}

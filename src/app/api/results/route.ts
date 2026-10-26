@@ -61,6 +61,36 @@ export async function POST(request: Request) {
     const { _id, ...bodyWithoutId } = body;
     const status = body.status === 'draft' ? 'draft' : 'published';
 
+    // Prevent duplicate result creation for the same programme (and section)
+    const duplicateConditions: any[] = [];
+    if (body.programmeId) {
+      duplicateConditions.push({ programmeId: body.programmeId });
+    }
+    if (body.programme) {
+      duplicateConditions.push({ programme: body.programme });
+    }
+
+    if (duplicateConditions.length > 0) {
+      const duplicateQuery: any = {
+        festId: getFestIdFilter(activeFestId),
+        $or: duplicateConditions
+      };
+      if (body.section) {
+        duplicateQuery.section = body.section;
+      }
+
+      const existingResult = await collection.findOne(duplicateQuery);
+      if (existingResult) {
+        return NextResponse.json(
+          {
+            error: `A result for this programme (${existingResult.programme || body.programme}) has already been added. You can edit the existing result, but cannot add it again.`,
+            existingId: existingResult._id?.toString()
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const newResult: Result & { festId?: string } = {
       ...bodyWithoutId,
       status,
