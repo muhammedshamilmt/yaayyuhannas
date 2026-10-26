@@ -20,7 +20,7 @@ export function Hero() {
             height={40}
             className="rounded-full"
           />
-          <span className="font-bold text-xl">wattaqa 2K25</span>
+          <span className="font-bold text-xl">Ayyuhannas 2K25</span>
         </div>
 
         <div className="hidden md:flex items-center space-x-8 text-gray-500">
@@ -61,7 +61,7 @@ export function Hero() {
         <div className="relative mb-8">
           <h1 className="text-5xl md:text-7xl font-bold text-gray-900 leading-tight">
             Celebrate<br />
-            WATTAQA 2K25
+            AYYUHANNAAS
           </h1>
         </div>
 

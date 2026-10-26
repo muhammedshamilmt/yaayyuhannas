@@ -156,7 +156,7 @@ export default function ProfilesPage() {
         <div className="max-w-6xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white shadow-sm border border-slate-200 text-indigo-700 text-xs sm:text-sm font-semibold mb-4">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Ayyuhannas • Wattaqa Arts Fest 2K25
+            AYYUHANNAAS • Arts Fest 2K25
           </div>
 
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-3">
@@ -448,7 +448,7 @@ export default function ProfilesPage() {
             <p className="text-slate-500 text-sm mb-6">
               {searchTerm || selectedTeam !== 'all' || selectedSection !== 'all'
                 ? "No participant matches your active filters. Try searching for another name or clearing filters."
-                : "Participant profiles will appear here once registered for Wattaqa Arts Fest."}
+                : "Participant profiles will appear here once registered for Ayyuhannas Arts Fest."}
             </p>
             {(searchTerm || selectedTeam !== 'all' || selectedSection !== 'all') && (
               <button

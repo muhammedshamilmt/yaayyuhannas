@@ -14,11 +14,11 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | Festival 2K25",
-    default: "Festival 2K25 - Arts & Sports Festival",
+    template: "%s | Ayyuhannas 2K26",
+    default: "Ayyuhannas 2K26 - Arts & Sports Festival",
   },
   description:
-    "Join Festival 2K25 Arts & Sports Festival with 135 talented students competing across 200+ programs in three dynamic teams: Sumud, Aqsa, and Inthifada.",
+    "Join Ayyuhannas Arts & Sports Festival with talented students competing in dynamic championship teams.",
 };
 
 export default function RootLayout({ children }: PropsWithChildren) {

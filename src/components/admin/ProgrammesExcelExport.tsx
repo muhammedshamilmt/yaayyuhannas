@@ -50,7 +50,7 @@ export default function ProgrammesExcelExport({
     if (filterPositionType) filterParts.push(filterPositionType.toUpperCase());
 
     const dateStr = new Date().toISOString().split('T')[0];
-    const prefix = filterParts.length > 0 ? `Programmes_${filterParts.join('_')}` : 'Wattaqa_Programmes_List';
+    const prefix = filterParts.length > 0 ? `Programmes_${filterParts.join('_')}` : 'Ayyuhannas_Programmes_List';
     return `${prefix}_${dateStr}.${extension}`;
   };
 

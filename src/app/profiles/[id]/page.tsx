@@ -209,7 +209,7 @@ export default function ProfileDetailPage() {
             </div>
             <h2 className="text-2xl font-bold text-slate-900 mb-2">Profile Not Found</h2>
             <p className="text-slate-500 text-sm mb-6">
-              The requested participant (#{candidateId}) could not be located in Wattaqa Arts Fest 2k25.
+              The requested participant (#{candidateId}) could not be located in Ayyuhannas Arts Fest 2K25.
             </p>
             <Link
               href="/profiles"

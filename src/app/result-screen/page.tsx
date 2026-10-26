@@ -608,7 +608,7 @@ export default function ResultScreenPage() {
               </span>
             </div>
             <p className="text-xs text-slate-500 hidden sm:block">
-              Ayyuhannas Arts Fest 2025 • Live Championship Results & Standings Broadcast
+              Ayyuhannas Arts Fest 2026 • Live Championship Results & Standings Broadcast
             </p>
           </div>
         </div>
@@ -714,17 +714,17 @@ export default function ResultScreenPage() {
       {/* ========================================================================= */}
       {/* MAIN SCREEN CONTENT                                                       */}
       {/* ========================================================================= */}
-      <main className={`flex-1 ${screenMode === 'tv' ? 'min-h-0 overflow-hidden' : ''} max-w-[1750px] w-full mx-auto p-3 sm:p-5 flex flex-col ${screenMode === 'tv' ? '' : 'space-y-8'}`}>
+      <main className={`flex-1 ${screenMode === 'tv' ? 'min-h-0 overflow-hidden' : ''} max-w-[1850px] w-full mx-auto p-2 sm:p-3 md:p-4 flex flex-col ${screenMode === 'tv' ? '' : 'space-y-8'}`}>
 
         {/* ======================================================================= */}
         {/* TOP SECTION: LEADERBOARD PODIUM (LEFT) + STAR PERFORMERS (RIGHT)        */}
         {/* ======================================================================= */}
-        <div className={`grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 ${screenMode === 'tv' ? 'flex-1 min-h-0' : ''} items-stretch`}>
+        <div className={`grid ${screenMode === 'tv' ? 'grid-cols-12' : 'grid-cols-1 xl:grid-cols-12'} gap-3 sm:gap-4 md:gap-5 ${screenMode === 'tv' ? 'flex-1 min-h-0' : ''} items-stretch`}>
 
           {/* ===================================================================== */}
-          {/* LEFT: 3D ISOMETRIC PODIUM LEADERBOARD (lg:col-span-7)                 */}
+          {/* LEFT: 3D ISOMETRIC PODIUM LEADERBOARD (col-span-7 on TV)              */}
           {/* ===================================================================== */}
-          <section className="lg:col-span-7 flex flex-col justify-between relative bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden h-full">
+          <section className={`${screenMode === 'tv' ? 'col-span-7' : 'col-span-12 xl:col-span-7'} flex flex-col justify-between relative bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden h-full`}>
             {/* Subtle Warm Sunburst Spotlight Radial Gradient Background */}
             <div
               className="absolute inset-x-0 top-0 h-96 pointer-events-none opacity-80"
@@ -734,20 +734,20 @@ export default function ResultScreenPage() {
             />
 
             {/* Leaderboard Card Header */}
-            <div className="relative pt-4 sm:pt-5 pb-3 px-5 sm:px-6 border-b border-slate-100 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl sm:text-3xl">🏆</span>
+            <div className="relative pt-3 sm:pt-4 pb-2 px-4 sm:px-6 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <span className="text-xl sm:text-2xl md:text-3xl">🏆</span>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight">
                       Team Leaderboard
                     </h2>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                       Live Standings
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 hidden xs:block">
                     Real-time championship standings calculated dynamically across published results
                   </p>
                 </div>
@@ -760,49 +760,49 @@ export default function ResultScreenPage() {
             </div>
 
             {/* 3D Isometric / Perspective Podium (Using Team Colors!) */}
-            <div className="relative flex-1 min-h-0 flex flex-col justify-between pt-2 pb-3 px-3 sm:px-6">
-              <div className="flex justify-center items-end gap-2.5 sm:gap-4 pb-2 w-full flex-1 min-h-0">
+            <div className="relative flex-1 min-h-0 flex flex-col justify-between pt-1 pb-2 px-2 sm:px-4 md:px-6">
+              <div className="flex justify-center items-end gap-2 sm:gap-3 md:gap-4 pb-1 w-full flex-1 min-h-0">
 
                 {/* ============================================================ */}
                 {/* RANK 2: LEFT PODIUM (Team Color!)                            */}
                 {/* ============================================================ */}
-                <div className="flex-1 max-w-[190px] sm:max-w-[210px] flex flex-col items-center">
+                <div className="flex-1 max-w-[180px] sm:max-w-[200px] flex flex-col items-center">
                   {rank2 ? (
-                    <div className="flex flex-col items-center mb-2 text-center transition-transform hover:-translate-y-1">
+                    <div className="flex flex-col items-center mb-1 text-center transition-transform hover:-translate-y-1">
                       <div className="relative">
                         {/* Squircle Card Icon */}
-                        <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-3xl ${theme2.squircleBg} shadow-md flex items-center justify-center text-2xl sm:text-3xl`}>
+                        <div className={`${screenMode === 'tv' ? 'w-11 h-11 sm:w-13 sm:h-13 text-xl sm:text-2xl' : 'w-14 h-14 sm:w-16 sm:h-16 text-2xl sm:text-3xl'} rounded-3xl ${theme2.squircleBg} shadow-md flex items-center justify-center`}>
                           🥈
                         </div>
-                        <span className="absolute -top-1.5 -right-1 text-sm">⭐</span>
+                        <span className="absolute -top-1 -right-1 text-xs sm:text-sm">⭐</span>
                       </div>
-                      <h3 className="font-extrabold text-slate-800 text-sm sm:text-base mt-1.5 truncate max-w-[140px]">
+                      <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm md:text-base mt-1 truncate max-w-[130px]">
                         {rank2.team.name}
                       </h3>
                       <div className={`flex items-center gap-1 ${theme2.textColor} font-black text-xs sm:text-sm mt-0.5`}>
                         <span className="text-xs">💎</span>
                         <span>{rank2.totalPoints.toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-600 font-medium bg-slate-100/90 px-2 py-0.5 rounded-full">
+                      <div className="flex items-center gap-1 mt-0.5 text-[9px] sm:text-[10px] text-slate-600 font-medium bg-slate-100/90 px-1.5 sm:px-2 py-0.5 rounded-full">
                         <span>🥇{rank2.medals.gold}</span>
                         <span>🥈{rank2.medals.silver}</span>
                         <span>🥉{rank2.medals.bronze}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="h-24 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                    <div className="h-20 flex items-center justify-center text-xs text-slate-400">No Team</div>
                   )}
 
                   {/* 3D Isometric Podium Block: Rank 2 (Team Color!) */}
                   <div className="w-full flex flex-col items-center">
                     <div
-                      className={`w-full h-5 sm:h-6 ${theme2.topBg} border-t border-x ${theme2.borderTop} shadow-xs`}
+                      className={`w-full h-4 sm:h-5 ${theme2.topBg} border-t border-x ${theme2.borderTop} shadow-xs`}
                       style={{ clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)' }}
                     />
-                    <div className={`w-full h-36 sm:h-44 md:h-48 ${theme2.frontBg} rounded-b-2xl shadow-xl border-b border-x ${theme2.borderFront} flex flex-col items-center justify-center p-2.5 relative overflow-hidden`}>
+                    <div className={`w-full ${screenMode === 'tv' ? 'h-24 sm:h-28 md:h-30' : 'h-36 sm:h-44 md:h-48'} ${theme2.frontBg} rounded-b-2xl shadow-xl border-b border-x ${theme2.borderFront} flex flex-col items-center justify-center p-2 relative overflow-hidden`}>
                       <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                       <ScreenLaurelWreath rank={2} />
-                      <span className="text-[11px] font-bold text-white/95 mt-1.5 tracking-wider uppercase drop-shadow-xs">
+                      <span className="text-[10px] sm:text-[11px] font-bold text-white/95 mt-1 tracking-wider uppercase drop-shadow-xs">
                         Runner Up
                       </span>
                     </div>
@@ -812,47 +812,47 @@ export default function ResultScreenPage() {
                 {/* ============================================================ */}
                 {/* RANK 1: CENTER PODIUM (Team Color!) - TALL & LEADING         */}
                 {/* ============================================================ */}
-                <div className="flex-1 max-w-[210px] sm:max-w-[230px] flex flex-col items-center -mt-6 sm:-mt-8 z-10">
+                <div className="flex-1 max-w-[200px] sm:max-w-[220px] flex flex-col items-center -mt-4 sm:-mt-6 z-10">
                   {rank1 ? (
-                    <div className="flex flex-col items-center mb-2 text-center transition-transform hover:-translate-y-1">
+                    <div className="flex flex-col items-center mb-1 text-center transition-transform hover:-translate-y-1">
                       <div className="relative">
                         {/* Crown on top */}
-                        <div className="absolute -top-4 inset-x-0 flex justify-center text-xl animate-bounce">
+                        <div className="absolute -top-3.5 inset-x-0 flex justify-center text-lg sm:text-xl animate-bounce">
                           👑
                         </div>
                         {/* Squircle Card Icon */}
-                        <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl ${theme1.squircleBg} shadow-xl flex items-center justify-center text-3xl sm:text-4xl ring-4 ring-amber-400/20`}>
+                        <div className={`${screenMode === 'tv' ? 'w-13 h-13 sm:w-16 sm:h-16 text-2xl sm:text-3xl' : 'w-16 h-16 sm:w-20 sm:h-20 text-3xl sm:text-4xl'} rounded-3xl ${theme1.squircleBg} shadow-xl flex items-center justify-center ring-4 ring-amber-400/20`}>
                           🥇
                         </div>
-                        <span className="absolute -top-1 -right-1 text-base">✨</span>
+                        <span className="absolute -top-1 -right-1 text-sm sm:text-base">✨</span>
                       </div>
-                      <h3 className="font-black text-slate-900 text-sm sm:text-lg mt-1.5 tracking-tight truncate max-w-[150px]">
+                      <h3 className="font-black text-slate-900 text-xs sm:text-base md:text-lg mt-1 tracking-tight truncate max-w-[145px]">
                         {rank1.team.name}
                       </h3>
-                      <div className={`flex items-center gap-1 ${theme1.textColor} font-black text-sm sm:text-base mt-0.5`}>
-                        <span className="text-sm">💎</span>
+                      <div className={`flex items-center gap-1 ${theme1.textColor} font-black text-xs sm:text-sm md:text-base mt-0.5`}>
+                        <span className="text-xs sm:text-sm">💎</span>
                         <span>{rank1.totalPoints.toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center gap-1 mt-1 text-xs text-slate-800 font-bold bg-white/95 border border-slate-200/80 px-2.5 py-0.5 rounded-full shadow-xs">
+                      <div className="flex items-center gap-1 mt-0.5 text-[10px] sm:text-xs text-slate-800 font-bold bg-white/95 border border-slate-200/80 px-2 sm:px-2.5 py-0.5 rounded-full shadow-xs">
                         <span>🥇 {rank1.medals.gold}</span>
                         <span>🥈 {rank1.medals.silver}</span>
                         <span>🥉 {rank1.medals.bronze}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="h-28 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                    <div className="h-24 flex items-center justify-center text-xs text-slate-400">No Team</div>
                   )}
 
                   {/* 3D Isometric Podium Block: Rank 1 (Team Color!) */}
                   <div className="w-full flex flex-col items-center">
                     <div
-                      className={`w-full h-7 sm:h-8 ${theme1.topBg} border-t border-x ${theme1.borderTop} shadow-xs`}
+                      className={`w-full h-5 sm:h-6 md:h-7 ${theme1.topBg} border-t border-x ${theme1.borderTop} shadow-xs`}
                       style={{ clipPath: 'polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%)' }}
                     />
-                    <div className={`w-full h-48 sm:h-56 md:h-60 ${theme1.frontBg} rounded-b-2xl shadow-2xl border-b-2 border-x ${theme1.borderFront} flex flex-col items-center justify-center p-2.5 relative overflow-hidden`}>
+                    <div className={`w-full ${screenMode === 'tv' ? 'h-32 sm:h-36 md:h-40' : 'h-48 sm:h-56 md:h-60'} ${theme1.frontBg} rounded-b-2xl shadow-2xl border-b-2 border-x ${theme1.borderFront} flex flex-col items-center justify-center p-2 relative overflow-hidden`}>
                       <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
                       <ScreenLaurelWreath rank={1} />
-                      <span className="text-xs font-black text-slate-900 bg-white/95 px-3 py-0.5 rounded-full mt-2 tracking-wider uppercase shadow-md border border-white/60">
+                      <span className="text-[11px] sm:text-xs font-black text-slate-900 bg-white/95 px-2.5 sm:px-3 py-0.5 rounded-full mt-1.5 tracking-wider uppercase shadow-md border border-white/60">
                         Champion
                       </span>
                     </div>
@@ -862,43 +862,43 @@ export default function ResultScreenPage() {
                 {/* ============================================================ */}
                 {/* RANK 3: RIGHT PODIUM (Team Color!)                           */}
                 {/* ============================================================ */}
-                <div className="flex-1 max-w-[190px] sm:max-w-[210px] flex flex-col items-center">
+                <div className="flex-1 max-w-[180px] sm:max-w-[200px] flex flex-col items-center">
                   {rank3 ? (
-                    <div className="flex flex-col items-center mb-2 text-center transition-transform hover:-translate-y-1">
+                    <div className="flex flex-col items-center mb-1 text-center transition-transform hover:-translate-y-1">
                       <div className="relative">
                         {/* Squircle Card Icon */}
-                        <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-3xl ${theme3.squircleBg} shadow-md flex items-center justify-center text-2xl sm:text-3xl`}>
+                        <div className={`${screenMode === 'tv' ? 'w-11 h-11 sm:w-13 sm:h-13 text-xl sm:text-2xl' : 'w-14 h-14 sm:w-16 sm:h-16 text-2xl sm:text-3xl'} rounded-3xl ${theme3.squircleBg} shadow-md flex items-center justify-center`}>
                           🥉
                         </div>
-                        <span className="absolute -top-1.5 -right-1 text-sm">⭐</span>
+                        <span className="absolute -top-1 -right-1 text-xs sm:text-sm">⭐</span>
                       </div>
-                      <h3 className="font-extrabold text-slate-800 text-sm sm:text-base mt-1.5 truncate max-w-[140px]">
+                      <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm md:text-base mt-1 truncate max-w-[130px]">
                         {rank3.team.name}
                       </h3>
                       <div className={`flex items-center gap-1 ${theme3.textColor} font-black text-xs sm:text-sm mt-0.5`}>
                         <span className="text-xs">💎</span>
                         <span>{rank3.totalPoints.toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-600 font-medium bg-slate-100/90 px-2 py-0.5 rounded-full">
+                      <div className="flex items-center gap-1 mt-0.5 text-[9px] sm:text-[10px] text-slate-600 font-medium bg-slate-100/90 px-1.5 sm:px-2 py-0.5 rounded-full">
                         <span>🥇{rank3.medals.gold}</span>
                         <span>🥈{rank3.medals.silver}</span>
                         <span>🥉{rank3.medals.bronze}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="h-24 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                    <div className="h-20 flex items-center justify-center text-xs text-slate-400">No Team</div>
                   )}
 
                   {/* 3D Isometric Podium Block: Rank 3 (Team Color!) */}
                   <div className="w-full flex flex-col items-center">
                     <div
-                      className={`w-full h-5 sm:h-6 ${theme3.topBg} border-t border-x ${theme3.borderTop} shadow-xs`}
+                      className={`w-full h-4 sm:h-5 ${theme3.topBg} border-t border-x ${theme3.borderTop} shadow-xs`}
                       style={{ clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)' }}
                     />
-                    <div className={`w-full h-28 sm:h-36 md:h-40 ${theme3.frontBg} rounded-b-2xl shadow-lg border-b border-x ${theme3.borderFront} flex flex-col items-center justify-center p-2.5 relative overflow-hidden`}>
+                    <div className={`w-full ${screenMode === 'tv' ? 'h-18 sm:h-22 md:h-24' : 'h-28 sm:h-36 md:h-40'} ${theme3.frontBg} rounded-b-2xl shadow-lg border-b border-x ${theme3.borderFront} flex flex-col items-center justify-center p-2 relative overflow-hidden`}>
                       <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                       <ScreenLaurelWreath rank={3} />
-                      <span className="text-[11px] font-bold text-white/95 mt-1.5 tracking-wider uppercase drop-shadow-xs">
+                      <span className="text-[10px] sm:text-[11px] font-bold text-white/95 mt-1 tracking-wider uppercase drop-shadow-xs">
                         3rd Place
                       </span>
                     </div>
@@ -908,9 +908,9 @@ export default function ResultScreenPage() {
               </div>
 
               {/* Subtitle status bar & dots */}
-              <div className="mt-2 pt-2.5 border-t border-slate-100 flex flex-col items-center justify-center gap-1 shrink-0">
-                <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
-                  <RotateCw className="w-3.5 h-3.5" />
+              <div className="mt-1 pt-1.5 border-t border-slate-100 flex flex-col items-center justify-center gap-0.5 shrink-0">
+                <div className="flex items-center justify-center gap-2 text-[11px] sm:text-xs text-slate-500">
+                  <RotateCw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>Leaderboard updated {getRelativeTime(lastRefreshedAt)}</span>
                   <span>•</span>
                   <span>{publishedResults.length} published results counted</span>
@@ -929,9 +929,9 @@ export default function ResultScreenPage() {
           </section>
 
           {/* ===================================================================== */}
-          {/* RIGHT: STAR PERFORMERS & LIVE BROADCAST FEED (lg:col-span-5)          */}
+          {/* RIGHT: STAR PERFORMERS & LIVE BROADCAST FEED (col-span-5 on TV)        */}
           {/* ===================================================================== */}
-          <section className="lg:col-span-5 flex flex-col justify-between relative bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden h-full">
+          <section className={`${screenMode === 'tv' ? 'col-span-5' : 'col-span-12 xl:col-span-5'} flex flex-col justify-between relative bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden h-full`}>
             {/* Subtle Star Purple-Amber Radial Gradient Background */}
             <div
               className="absolute inset-x-0 top-0 h-64 pointer-events-none opacity-60"
@@ -1470,7 +1470,7 @@ export default function ResultScreenPage() {
       {/* Footer - only in scroll mode */}
       {screenMode === 'scroll' && (
         <footer className="mt-12 py-6 border-t border-slate-200 bg-white text-center text-xs text-slate-500">
-          <p className="font-semibold text-slate-700">Ayyuhannas Arts Fest 2025 • Official Result Screening System</p>
+          <p className="font-semibold text-slate-700">Ayyuhannas Arts Fest 2026 • Official Result Screening System</p>
           <p className="mt-1 text-slate-400">Live Auto-Updating Display for Auditorium & TV Screens</p>
         </footer>
       )}
@@ -1562,17 +1562,17 @@ function ScreenLaurelWreath({ rank }: { rank: 1 | 2 | 3 }) {
   return (
     <div className="flex flex-col items-center justify-center text-white select-none">
       {/* 3 Stars on top */}
-      <div className="flex items-center justify-center gap-1 mb-1">
-        <span className="text-xs text-white/90">★</span>
-        <span className="text-sm font-bold text-white">★</span>
-        <span className="text-xs text-white/90">★</span>
+      <div className="flex items-center justify-center gap-1 mb-0.5">
+        <span className="text-[10px] sm:text-xs text-white/90">★</span>
+        <span className="text-xs sm:text-sm font-bold text-white">★</span>
+        <span className="text-[10px] sm:text-xs text-white/90">★</span>
       </div>
 
       {/* Number with Laurel Wreath SVG */}
       <div className="relative flex items-center justify-center">
         <svg
           viewBox="0 0 120 90"
-          className="w-24 h-20 text-white fill-current drop-shadow-md"
+          className="w-16 h-13 sm:w-20 sm:h-16 md:w-22 md:h-18 text-white fill-current drop-shadow-md"
         >
           {/* Left branch */}
           <g>
@@ -1605,7 +1605,7 @@ function ScreenLaurelWreath({ rank }: { rank: 1 | 2 | 3 }) {
           {/* Bottom Ribbon */}
           <path d="M 55 75 C 58 77 62 77 65 75 C 67 78 63 81 60 81 C 57 81 53 78 55 75 Z" />
         </svg>
-        <span className="absolute font-black text-3xl sm:text-4xl tracking-tighter text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">
+        <span className="absolute font-black text-2xl sm:text-3xl md:text-4xl tracking-tighter text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">
           {rank}
         </span>
       </div>

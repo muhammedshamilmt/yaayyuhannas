@@ -42,7 +42,7 @@ export function Header() {
             />
             <div className="hidden sm:block">
               <h1 className="text-xl font-bold text-gray-900">
-                WATTAQA 2K25
+                AYYUHANNAAS
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 ml-2">
                 </span>
               </h1>

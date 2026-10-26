@@ -490,7 +490,7 @@ export default function ResultsPage() {
               Competition Results
             </h1>
             <p className="text-xl text-green-100 mb-6 max-w-3xl mx-auto">
-              Complete results and winners from the Wattaqa Arts & Sports Festival 2K25
+              Complete results and winners from Ayyuhannas Arts & Sports Festival 2K26
             </p>
             <div className="flex items-center justify-center space-x-4 text-green-200">
               <span className="flex items-center">

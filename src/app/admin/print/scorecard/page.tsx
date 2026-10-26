@@ -37,7 +37,7 @@ export default function ScorecardPrintPage() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>wattaqa Arts fest 2025 - Scorecard</title>
+        <title>Ayyuhannas Arts fest 2025 - Scorecard</title>
         <style>{`
           /* ---------- RESET ---------- */
           * { 
@@ -264,14 +264,14 @@ export default function ScorecardPrintPage() {
           {/* HEADER */}
           <header className="header">
             <div className="header-title">
-              <h1>wattaqa Arts fest 2025</h1>
+              <h1>Ayyuhannas Arts fest 2025</h1>
               <p>scorecard</p>
             </div>
             <div className="logo-section" aria-hidden="true">
               <div className="logo">
                 <img src="/images/festival-logo.png" alt="Festival Logo" style={{width: '36px', height: '36px', objectFit: 'cover', borderRadius: '4px'}} />
               </div>
-              <p><strong>wattaqa</strong><br/>Arts fest 2025</p>
+              <p><strong>Ayyuhannas</strong><br/>Arts fest 2025</p>
             </div>
           </header>
 

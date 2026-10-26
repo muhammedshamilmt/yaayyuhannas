@@ -215,7 +215,7 @@ export default function ProgrammesPage() {
               Festival Programmes
             </h1>
             <p className="text-xl text-blue-100 mb-6 max-w-3xl mx-auto">
-              Explore all competitions and events in the Wattaqa Arts & Sports Festival 2K25
+              Explore all competitions and events in Ayyuhannas Arts & Sports Festival 2K25
             </p>
             <div className="flex items-center justify-center space-x-4 text-blue-200">
               <span className="flex items-center">

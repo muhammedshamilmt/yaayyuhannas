@@ -146,7 +146,7 @@ export default function FestsPage() {
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Fest Name</label>
                 <Input 
-                  placeholder="e.g. Wattaqa Arts Fest 2k26"
+                  placeholder="e.g. Ayyuhannas Arts Fest 2K26"
                   value={newFestName}
                   onChange={(e) => setNewFestName(e.target.value)}
                   required

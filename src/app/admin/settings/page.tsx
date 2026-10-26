@@ -12,11 +12,11 @@ export default function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    name: 'Wattaqa Arts Festival 2K25',
+    name: 'Ayyuhannas Arts Festival 2K25',
     year: '2025',
     startDate: '2025-03-10',
     endDate: '2025-03-16',
-    venue: 'Wattaqa School Campus',
+    venue: 'Ayyuhannas Campus',
     description: 'Annual arts and sports festival celebrating creativity, talent, and teamwork among students.',
     minCandidateParticipation: 1,
     maxCandidateParticipation: 3,
@@ -35,11 +35,11 @@ export default function SettingsPage() {
         if (res.ok) {
           const data: FestivalInfo = await res.json();
           setFormData({
-            name: data.name || 'Wattaqa Arts Festival 2K25',
+            name: data.name || 'Ayyuhannas Arts Festival 2K25',
             year: data.year || '2025',
             startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '2025-03-10',
             endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '2025-03-16',
-            venue: data.venue || 'Wattaqa School Campus',
+            venue: data.venue || 'Ayyuhannas Campus',
             description: data.description || '',
             minCandidateParticipation: data.minCandidateParticipation ?? 2,
             maxCandidateParticipation: data.maxCandidateParticipation ?? 7,

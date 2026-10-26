@@ -685,7 +685,7 @@ export default function ScheduleGeneratorPage() {
   // Export Meta
   const exportMeta: FestExportMeta = useMemo(() => {
     return {
-      festivalName: festInfo?.name || 'Wattaqa Arts Festival 2K25',
+      festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K25',
       scheduleTitle,
       scheduleSubtitle,
       headerDate,

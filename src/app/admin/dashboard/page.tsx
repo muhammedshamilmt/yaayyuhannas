@@ -353,7 +353,7 @@ export default function DashboardPage() {
               <span className="text-purple-100 text-sm font-medium">Festival Management System</span>
             </div>
             <h1 className="text-3xl md:text-4xl font-bold leading-tight mb-2">
-              {festivalInfo?.name || 'Wattaqa Arts Festival 2K25'}
+              {festivalInfo?.name || 'Ayyuhannas Arts Festival 2K25'}
             </h1>
             <p className="text-purple-100 text-lg">
               {festivalInfo?.description || 'Comprehensive Arts & Sports Festival Dashboard'}

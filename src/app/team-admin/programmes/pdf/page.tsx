@@ -364,7 +364,7 @@ function TeamProgrammePdfContent() {
       teamName: teamData?.name || teamCode,
       teamCode: teamCode,
       teamColor: teamData?.color || '#3B82F6',
-      festivalName: festInfo?.name || 'Wattaqa Arts Festival 2K25',
+      festivalName: festInfo?.name || 'Ayyuhannas Arts Festival 2K25',
       year: festInfo?.year || '2026',
       venue: festInfo?.venue || 'Campus Auditorium',
       generatedDate: new Date().toLocaleDateString('en-GB', {

@@ -14,11 +14,11 @@ export async function GET() {
     // If no festival info exists, create default data
     if (!festivalInfo) {
       const defaultInfo: FestivalInfo = {
-        name: 'Wattaqa Arts Festival 2K25',
+        name: 'Ayyuhannas Arts Festival 2K25',
         year: '2025',
         startDate: new Date('2025-03-10'),
         endDate: new Date('2025-03-14'),
-        venue: 'Wattaqa School Campus',
+        venue: 'Ayyuhannas Campus',
         description: 'Annual arts and sports festival celebrating creativity, talent, and teamwork among students.',
         status: 'ongoing',
         minCandidateParticipation: 2,
