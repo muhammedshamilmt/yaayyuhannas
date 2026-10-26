@@ -25,7 +25,9 @@ import {
   Tv,
   Star,
   Medal,
-  User
+  User,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 interface PodiumColorTheme {
@@ -151,6 +153,8 @@ export default function ResultScreenPage() {
   const [screenMode, setScreenMode] = useState<'tv' | 'scroll'>('tv');
   // Right card tab in TV mode: 'stars' or 'results'
   const [rightCardTab, setRightCardTab] = useState<'stars' | 'results'>('stars');
+  // Broadcast header bar visibility toggle (TV Full Screen View)
+  const [showHeader, setShowHeader] = useState<boolean>(true);
 
   // Filter states
   const [selectedSection, setSelectedSection] = useState<string>('all');
@@ -174,6 +178,19 @@ export default function ResultScreenPage() {
 
   // Live Clock
   const [currentTime, setCurrentTime] = useState('');
+
+  // Scroll ref for the right card (Star Performers & Live Results Feed rows)
+  const rightCardScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollRightCard = (direction: 'up' | 'down') => {
+    if (rightCardScrollRef.current) {
+      const scrollAmount = 260; // smoothly scrolls ~2-3 cards
+      rightCardScrollRef.current.scrollBy({
+        top: direction === 'down' ? scrollAmount : -scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   useEffect(() => {
     const updateTime = () => {
@@ -587,129 +604,153 @@ export default function ResultScreenPage() {
   return (
     <div className={`${screenMode === 'tv' ? 'h-screen max-h-screen overflow-hidden' : 'min-h-screen'} bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-amber-100`}>
 
+      {/* Floating Button to Restore Top Broadcast Header when Hidden */}
+      {!showHeader && (
+        <button
+          onClick={() => setShowHeader(true)}
+          title="Show Top Broadcast Header"
+          className="fixed top-3 right-3 z-50 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 text-white text-xs font-bold backdrop-blur-md shadow-2xl border border-white/20 transition-all cursor-pointer active:scale-95 hover:scale-105"
+        >
+          <Eye className="w-3.5 h-3.5 text-amber-400" />
+          <span>Show Header</span>
+        </button>
+      )}
+
       {/* ========================================================================= */}
       {/* TV SCREEN TOP BROADCAST HEADER & DISPLAY CONTROLS                          */}
       {/* ========================================================================= */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0">
+      {showHeader && (
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
 
-        {/* Left: Branding & Live Ticker */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-white shadow-md text-xl shrink-0">
-            🏆
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-black text-lg sm:text-xl tracking-tight text-slate-900 uppercase">
-                AYYUHANNAAS
-              </h1>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-500 text-white shadow-xs">
-                <span className="w-2 h-2 rounded-full bg-white animate-ping"></span>
-                TV SCREEN • LIVE
-              </span>
+          {/* Left: Branding & Live Ticker */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-white shadow-md text-lg shrink-0">
+              🏆
             </div>
-            <p className="text-xs text-slate-500 hidden sm:block">
-              Ayyuhannas Arts Fest 2026 • Live Championship Results & Standings Broadcast
-            </p>
-          </div>
-        </div>
-
-        {/* Center: Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Section Filter Pills */}
-          <div className="inline-flex p-1 bg-slate-100 rounded-xl text-xs font-semibold text-slate-600">
-            {['all', 'senior', 'junior', 'sub-junior', 'general'].map(sec => (
-              <button
-                key={sec}
-                onClick={() => setSelectedSection(sec)}
-                className={`px-3 py-1.5 rounded-lg capitalize transition-all cursor-pointer ${selectedSection === sec
-                  ? 'bg-white text-slate-900 font-black shadow-xs'
-                  : 'hover:text-slate-900'
-                  }`}
-              >
-                {sec === 'all' ? 'All Sections' : sec}
-              </button>
-            ))}
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-black text-base sm:text-lg tracking-tight text-slate-900 uppercase">
+                  AYYUHANNAAS
+                </h1>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-extrabold bg-emerald-500 text-white shadow-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                  TV SCREEN • LIVE
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 hidden xl:block">
+                Ayyuhannas Arts Fest 2026 • Live Championship Results & Standings Broadcast
+              </p>
+            </div>
           </div>
 
-          {/* Category Filter Pills */}
-          <div className="inline-flex p-1 bg-slate-100 rounded-xl text-xs font-semibold text-slate-600">
-            {['all', 'arts', 'sports'].map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg capitalize transition-all cursor-pointer ${selectedCategory === cat
-                  ? 'bg-white text-slate-900 font-black shadow-xs'
-                  : 'hover:text-slate-900'
-                  }`}
-              >
-                {cat === 'all' ? 'All' : cat}
-              </button>
-            ))}
-          </div>
-        </div>
+          {/* Center: Filters */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Section Filter Pills */}
+            <div className="inline-flex p-0.5 bg-slate-100 rounded-xl text-xs font-semibold text-slate-600">
+              {['all', 'senior', 'junior', 'sub-junior', 'general'].map(sec => (
+                <button
+                  key={sec}
+                  onClick={() => setSelectedSection(sec)}
+                  className={`px-2.5 py-1 rounded-lg capitalize transition-all cursor-pointer text-xs ${selectedSection === sec
+                    ? 'bg-white text-slate-900 font-black shadow-xs'
+                    : 'hover:text-slate-900'
+                    }`}
+                >
+                  {sec === 'all' ? 'All Sections' : sec}
+                </button>
+              ))}
+            </div>
 
-        {/* Right: Auto-Refresh Button & TV Controls */}
-        <div className="flex items-center gap-2">
-          {/* Screen Mode Toggle (100vh TV Cover vs Full Scroll) */}
-          <button
-            onClick={() => setScreenMode(prev => prev === 'tv' ? 'scroll' : 'tv')}
-            title={screenMode === 'tv' ? 'Switch to Full Results Scroll View' : 'Switch to 100vh TV Full Screen Cover'}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${screenMode === 'tv'
-              ? 'bg-amber-50 text-amber-800 border border-amber-300'
-              : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
-              }`}
-          >
-            <Tv className="w-3.5 h-3.5 text-amber-600" />
-            <span className="hidden sm:inline">{screenMode === 'tv' ? '100vh TV Cover' : 'Scroll View'}</span>
-          </button>
-
-          {/* Clock */}
-          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-mono text-xs font-bold">
-            <Clock className="w-3.5 h-3.5 text-slate-500" />
-            <span>{currentTime}</span>
+            {/* Category Filter Pills */}
+            <div className="inline-flex p-0.5 bg-slate-100 rounded-xl text-xs font-semibold text-slate-600">
+              {['all', 'arts', 'sports'].map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-2.5 py-1 rounded-lg capitalize transition-all cursor-pointer text-xs ${selectedCategory === cat
+                    ? 'bg-white text-slate-900 font-black shadow-xs'
+                    : 'hover:text-slate-900'
+                    }`}
+                >
+                  {cat === 'all' ? 'All' : cat}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Auto Refresh Toggle Button */}
-          <button
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            title="Toggle Live Auto-Refresh"
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${autoRefresh
-              ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 ring-2 ring-emerald-500/10'
-              : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
-              }`}
-          >
-            {autoRefresh ? (
-              <>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Auto-Refresh: ON ({countdown}s)</span>
-              </>
-            ) : (
-              <>
-                <Pause className="w-3.5 h-3.5 text-slate-400" />
-                <span>Auto-Refresh: OFF</span>
-              </>
-            )}
-          </button>
+          {/* Right: Auto-Refresh Button & TV Controls */}
+          <div className="flex items-center gap-1.5">
+            {/* Screen Mode Toggle (100vh TV Cover vs Full Scroll) */}
+            <button
+              onClick={() => setScreenMode(prev => prev === 'tv' ? 'scroll' : 'tv')}
+              title={screenMode === 'tv' ? 'Switch to Full Results Scroll View' : 'Switch to 100vh TV Full Screen Cover'}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${screenMode === 'tv'
+                ? 'bg-amber-50 text-amber-800 border border-amber-300'
+                : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+                }`}
+            >
+              <Tv className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden md:inline">{screenMode === 'tv' ? '100vh TV Cover' : 'Scroll View'}</span>
+            </button>
 
-          {/* Manual Refresh Button */}
-          <button
-            onClick={() => fetchData(true)}
-            title="Refresh now"
-            className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all cursor-pointer active:scale-95"
-          >
-            <RotateCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
-          </button>
+            {/* Clock */}
+            <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-mono text-xs font-bold">
+              <Clock className="w-3.5 h-3.5 text-slate-500" />
+              <span>{currentTime}</span>
+            </div>
 
-          {/* Fullscreen Button */}
-          <button
-            onClick={toggleFullscreen}
-            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            className="p-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all cursor-pointer active:scale-95 flex items-center justify-center shadow-xs"
-          >
-            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-          </button>
-        </div>
-      </header>
+            {/* Auto Refresh Toggle Button */}
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              title="Toggle Live Auto-Refresh"
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${autoRefresh
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 ring-2 ring-emerald-500/10'
+                : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
+                }`}
+            >
+              {autoRefresh ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>Auto ({countdown}s)</span>
+                </>
+              ) : (
+                <>
+                  <Pause className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Paused</span>
+                </>
+              )}
+            </button>
+
+            {/* Manual Refresh Button */}
+            <button
+              onClick={() => fetchData(true)}
+              title="Refresh now"
+              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all cursor-pointer active:scale-95"
+            >
+              <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
+            </button>
+
+            {/* Hide Header Button */}
+            <button
+              onClick={() => setShowHeader(false)}
+              title="Hide Header Bar (Fullscreen View)"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-xs"
+            >
+              <EyeOff className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden sm:inline">Hide Bar</span>
+            </button>
+
+            {/* Fullscreen Button */}
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              className="p-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all cursor-pointer active:scale-95 flex items-center justify-center shadow-xs"
+            >
+              {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </header>
+      )}
 
       {/* ========================================================================= */}
       {/* MAIN SCREEN CONTENT                                                       */}
@@ -734,75 +775,77 @@ export default function ResultScreenPage() {
             />
 
             {/* Leaderboard Card Header */}
-            <div className="relative pt-3 sm:pt-4 pb-2 px-4 sm:px-6 border-b border-slate-100 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5 sm:gap-3">
-                <span className="text-xl sm:text-2xl md:text-3xl">🏆</span>
+            <div className="relative pt-2 sm:pt-2.5 pb-1.5 px-3 sm:px-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2 sm:gap-2.5">
+                <span className="text-lg sm:text-xl md:text-2xl">🏆</span>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <h2 className="text-base sm:text-lg md:text-xl font-black text-slate-900 tracking-tight">
                       Team Leaderboard
                     </h2>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                       Live Standings
                     </span>
                   </div>
-                  <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 hidden xs:block">
-                    Real-time championship standings calculated dynamically across published results
-                  </p>
+                  {screenMode !== 'tv' && (
+                    <p className="text-xs text-slate-500 mt-0.5 hidden xs:block">
+                      Real-time championship standings calculated dynamically across published results
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60">
+              <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200/60">
                 <Tv className="w-3.5 h-3.5 text-slate-400" />
                 <span>Screening</span>
               </div>
             </div>
 
             {/* 3D Isometric / Perspective Podium (Using Team Colors!) */}
-            <div className="relative flex-1 min-h-0 flex flex-col justify-between pt-1 pb-2 px-2 sm:px-4 md:px-6">
+            <div className="relative flex-1 min-h-0 flex flex-col justify-between pt-1 pb-1.5 px-2 sm:px-4 md:px-5">
               <div className="flex justify-center items-end gap-2 sm:gap-3 md:gap-4 pb-1 w-full flex-1 min-h-0">
 
                 {/* ============================================================ */}
                 {/* RANK 2: LEFT PODIUM (Team Color!)                            */}
                 {/* ============================================================ */}
-                <div className="flex-1 max-w-[180px] sm:max-w-[200px] flex flex-col items-center">
+                <div className="flex-1 max-w-[160px] sm:max-w-[180px] flex flex-col items-center">
                   {rank2 ? (
-                    <div className="flex flex-col items-center mb-1 text-center transition-transform hover:-translate-y-1">
+                    <div className="flex flex-col items-center mb-0.5 text-center transition-transform hover:-translate-y-1">
                       <div className="relative">
                         {/* Squircle Card Icon */}
-                        <div className={`${screenMode === 'tv' ? 'w-11 h-11 sm:w-13 sm:h-13 text-xl sm:text-2xl' : 'w-14 h-14 sm:w-16 sm:h-16 text-2xl sm:text-3xl'} rounded-3xl ${theme2.squircleBg} shadow-md flex items-center justify-center`}>
+                        <div className={`${screenMode === 'tv' ? 'w-8 h-8 sm:w-10 sm:h-10 text-base sm:text-lg' : 'w-14 h-14 sm:w-16 sm:h-16 text-2xl sm:text-3xl'} rounded-2xl ${theme2.squircleBg} shadow-sm flex items-center justify-center`}>
                           🥈
                         </div>
-                        <span className="absolute -top-1 -right-1 text-xs sm:text-sm">⭐</span>
+                        <span className="absolute -top-1 -right-1 text-xs">⭐</span>
                       </div>
-                      <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm md:text-base mt-1 truncate max-w-[130px]">
+                      <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm mt-0.5 truncate max-w-[120px]">
                         {rank2.team.name}
                       </h3>
-                      <div className={`flex items-center gap-1 ${theme2.textColor} font-black text-xs sm:text-sm mt-0.5`}>
-                        <span className="text-xs">💎</span>
+                      <div className={`flex items-center gap-0.5 ${theme2.textColor} font-black text-xs sm:text-sm mt-0.5`}>
+                        <span className="text-[11px]">💎</span>
                         <span>{rank2.totalPoints.toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center gap-1 mt-0.5 text-[9px] sm:text-[10px] text-slate-600 font-medium bg-slate-100/90 px-1.5 sm:px-2 py-0.5 rounded-full">
+                      <div className="flex items-center gap-0.5 mt-0.5 text-[9px] text-slate-600 font-medium bg-slate-100/90 px-1.5 py-0.2 rounded-full">
                         <span>🥇{rank2.medals.gold}</span>
                         <span>🥈{rank2.medals.silver}</span>
                         <span>🥉{rank2.medals.bronze}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="h-20 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                    <div className="h-16 flex items-center justify-center text-xs text-slate-400">No Team</div>
                   )}
 
                   {/* 3D Isometric Podium Block: Rank 2 (Team Color!) */}
                   <div className="w-full flex flex-col items-center">
                     <div
-                      className={`w-full h-4 sm:h-5 ${theme2.topBg} border-t border-x ${theme2.borderTop} shadow-xs`}
+                      className={`w-full ${screenMode === 'tv' ? 'h-3 sm:h-3.5' : 'h-5 sm:h-6'} ${theme2.topBg} border-t border-x ${theme2.borderTop} shadow-xs`}
                       style={{ clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)' }}
                     />
-                    <div className={`w-full ${screenMode === 'tv' ? 'h-24 sm:h-28 md:h-30' : 'h-36 sm:h-44 md:h-48'} ${theme2.frontBg} rounded-b-2xl shadow-xl border-b border-x ${theme2.borderFront} flex flex-col items-center justify-center p-2 relative overflow-hidden`}>
+                    <div className={`w-full ${screenMode === 'tv' ? 'h-15 sm:h-18 md:h-20' : 'h-36 sm:h-44 md:h-48'} ${theme2.frontBg} rounded-b-2xl shadow-xl border-b border-x ${theme2.borderFront} flex flex-col items-center justify-center p-1.5 relative overflow-hidden`}>
                       <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                       <ScreenLaurelWreath rank={2} />
-                      <span className="text-[10px] sm:text-[11px] font-bold text-white/95 mt-1 tracking-wider uppercase drop-shadow-xs">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-white/95 mt-0.5 tracking-wider uppercase drop-shadow-xs">
                         Runner Up
                       </span>
                     </div>
@@ -812,47 +855,47 @@ export default function ResultScreenPage() {
                 {/* ============================================================ */}
                 {/* RANK 1: CENTER PODIUM (Team Color!) - TALL & LEADING         */}
                 {/* ============================================================ */}
-                <div className="flex-1 max-w-[200px] sm:max-w-[220px] flex flex-col items-center -mt-4 sm:-mt-6 z-10">
+                <div className="flex-1 max-w-[170px] sm:max-w-[200px] flex flex-col items-center z-10">
                   {rank1 ? (
-                    <div className="flex flex-col items-center mb-1 text-center transition-transform hover:-translate-y-1">
+                    <div className="flex flex-col items-center mb-0.5 text-center transition-transform hover:-translate-y-1">
                       <div className="relative">
                         {/* Crown on top */}
-                        <div className="absolute -top-3.5 inset-x-0 flex justify-center text-lg sm:text-xl animate-bounce">
+                        <div className="absolute -top-3 inset-x-0 flex justify-center text-xs sm:text-sm animate-bounce">
                           👑
                         </div>
                         {/* Squircle Card Icon */}
-                        <div className={`${screenMode === 'tv' ? 'w-13 h-13 sm:w-16 sm:h-16 text-2xl sm:text-3xl' : 'w-16 h-16 sm:w-20 sm:h-20 text-3xl sm:text-4xl'} rounded-3xl ${theme1.squircleBg} shadow-xl flex items-center justify-center ring-4 ring-amber-400/20`}>
+                        <div className={`${screenMode === 'tv' ? 'w-10 h-10 sm:w-12 sm:h-12 text-lg sm:text-xl' : 'w-16 h-16 sm:w-20 sm:h-20 text-3xl sm:text-4xl'} rounded-2xl ${theme1.squircleBg} shadow-md flex items-center justify-center ring-2 ring-amber-400/30`}>
                           🥇
                         </div>
-                        <span className="absolute -top-1 -right-1 text-sm sm:text-base">✨</span>
+                        <span className="absolute -top-1 -right-1 text-xs sm:text-sm">✨</span>
                       </div>
-                      <h3 className="font-black text-slate-900 text-xs sm:text-base md:text-lg mt-1 tracking-tight truncate max-w-[145px]">
+                      <h3 className="font-black text-slate-900 text-xs sm:text-sm md:text-base mt-0.5 tracking-tight truncate max-w-[135px]">
                         {rank1.team.name}
                       </h3>
-                      <div className={`flex items-center gap-1 ${theme1.textColor} font-black text-xs sm:text-sm md:text-base mt-0.5`}>
-                        <span className="text-xs sm:text-sm">💎</span>
+                      <div className={`flex items-center gap-0.5 ${theme1.textColor} font-black text-xs sm:text-sm mt-0.5`}>
+                        <span className="text-xs">💎</span>
                         <span>{rank1.totalPoints.toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center gap-1 mt-0.5 text-[10px] sm:text-xs text-slate-800 font-bold bg-white/95 border border-slate-200/80 px-2 sm:px-2.5 py-0.5 rounded-full shadow-xs">
+                      <div className="flex items-center gap-0.5 mt-0.5 text-[9px] sm:text-[10px] text-slate-800 font-bold bg-white/95 border border-slate-200/80 px-2 py-0.2 rounded-full shadow-xs">
                         <span>🥇 {rank1.medals.gold}</span>
                         <span>🥈 {rank1.medals.silver}</span>
                         <span>🥉 {rank1.medals.bronze}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="h-24 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                    <div className="h-20 flex items-center justify-center text-xs text-slate-400">No Team</div>
                   )}
 
                   {/* 3D Isometric Podium Block: Rank 1 (Team Color!) */}
                   <div className="w-full flex flex-col items-center">
                     <div
-                      className={`w-full h-5 sm:h-6 md:h-7 ${theme1.topBg} border-t border-x ${theme1.borderTop} shadow-xs`}
+                      className={`w-full ${screenMode === 'tv' ? 'h-4 sm:h-4.5' : 'h-6 sm:h-7'} ${theme1.topBg} border-t border-x ${theme1.borderTop} shadow-xs`}
                       style={{ clipPath: 'polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%)' }}
                     />
-                    <div className={`w-full ${screenMode === 'tv' ? 'h-32 sm:h-36 md:h-40' : 'h-48 sm:h-56 md:h-60'} ${theme1.frontBg} rounded-b-2xl shadow-2xl border-b-2 border-x ${theme1.borderFront} flex flex-col items-center justify-center p-2 relative overflow-hidden`}>
+                    <div className={`w-full ${screenMode === 'tv' ? 'h-22 sm:h-26 md:h-30' : 'h-48 sm:h-56 md:h-60'} ${theme1.frontBg} rounded-b-2xl shadow-2xl border-b-2 border-x ${theme1.borderFront} flex flex-col items-center justify-center p-1.5 relative overflow-hidden`}>
                       <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
                       <ScreenLaurelWreath rank={1} />
-                      <span className="text-[11px] sm:text-xs font-black text-slate-900 bg-white/95 px-2.5 sm:px-3 py-0.5 rounded-full mt-1.5 tracking-wider uppercase shadow-md border border-white/60">
+                      <span className="text-[10px] sm:text-[11px] font-black text-slate-900 bg-white/95 px-2 py-0.2 rounded-full mt-1 tracking-wider uppercase shadow-md border border-white/60">
                         Champion
                       </span>
                     </div>
@@ -862,43 +905,43 @@ export default function ResultScreenPage() {
                 {/* ============================================================ */}
                 {/* RANK 3: RIGHT PODIUM (Team Color!)                           */}
                 {/* ============================================================ */}
-                <div className="flex-1 max-w-[180px] sm:max-w-[200px] flex flex-col items-center">
+                <div className="flex-1 max-w-[160px] sm:max-w-[180px] flex flex-col items-center">
                   {rank3 ? (
-                    <div className="flex flex-col items-center mb-1 text-center transition-transform hover:-translate-y-1">
+                    <div className="flex flex-col items-center mb-0.5 text-center transition-transform hover:-translate-y-1">
                       <div className="relative">
                         {/* Squircle Card Icon */}
-                        <div className={`${screenMode === 'tv' ? 'w-11 h-11 sm:w-13 sm:h-13 text-xl sm:text-2xl' : 'w-14 h-14 sm:w-16 sm:h-16 text-2xl sm:text-3xl'} rounded-3xl ${theme3.squircleBg} shadow-md flex items-center justify-center`}>
+                        <div className={`${screenMode === 'tv' ? 'w-8 h-8 sm:w-10 sm:h-10 text-base sm:text-lg' : 'w-14 h-14 sm:w-16 sm:h-16 text-2xl sm:text-3xl'} rounded-2xl ${theme3.squircleBg} shadow-sm flex items-center justify-center`}>
                           🥉
                         </div>
-                        <span className="absolute -top-1 -right-1 text-xs sm:text-sm">⭐</span>
+                        <span className="absolute -top-1 -right-1 text-xs">⭐</span>
                       </div>
-                      <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm md:text-base mt-1 truncate max-w-[130px]">
+                      <h3 className="font-extrabold text-slate-800 text-xs sm:text-sm mt-0.5 truncate max-w-[120px]">
                         {rank3.team.name}
                       </h3>
-                      <div className={`flex items-center gap-1 ${theme3.textColor} font-black text-xs sm:text-sm mt-0.5`}>
-                        <span className="text-xs">💎</span>
+                      <div className={`flex items-center gap-0.5 ${theme3.textColor} font-black text-xs sm:text-sm mt-0.5`}>
+                        <span className="text-[11px]">💎</span>
                         <span>{rank3.totalPoints.toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center gap-1 mt-0.5 text-[9px] sm:text-[10px] text-slate-600 font-medium bg-slate-100/90 px-1.5 sm:px-2 py-0.5 rounded-full">
+                      <div className="flex items-center gap-0.5 mt-0.5 text-[9px] text-slate-600 font-medium bg-slate-100/90 px-1.5 py-0.2 rounded-full">
                         <span>🥇{rank3.medals.gold}</span>
                         <span>🥈{rank3.medals.silver}</span>
                         <span>🥉{rank3.medals.bronze}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="h-20 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                    <div className="h-16 flex items-center justify-center text-xs text-slate-400">No Team</div>
                   )}
 
                   {/* 3D Isometric Podium Block: Rank 3 (Team Color!) */}
                   <div className="w-full flex flex-col items-center">
                     <div
-                      className={`w-full h-4 sm:h-5 ${theme3.topBg} border-t border-x ${theme3.borderTop} shadow-xs`}
+                      className={`w-full ${screenMode === 'tv' ? 'h-3 sm:h-3.5' : 'h-4 sm:h-5'} ${theme3.topBg} border-t border-x ${theme3.borderTop} shadow-xs`}
                       style={{ clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)' }}
                     />
-                    <div className={`w-full ${screenMode === 'tv' ? 'h-18 sm:h-22 md:h-24' : 'h-28 sm:h-36 md:h-40'} ${theme3.frontBg} rounded-b-2xl shadow-lg border-b border-x ${theme3.borderFront} flex flex-col items-center justify-center p-2 relative overflow-hidden`}>
+                    <div className={`w-full ${screenMode === 'tv' ? 'h-12 sm:h-14 md:h-16' : 'h-28 sm:h-36 md:h-40'} ${theme3.frontBg} rounded-b-2xl shadow-lg border-b border-x ${theme3.borderFront} flex flex-col items-center justify-center p-1.5 relative overflow-hidden`}>
                       <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                       <ScreenLaurelWreath rank={3} />
-                      <span className="text-[10px] sm:text-[11px] font-bold text-white/95 mt-1 tracking-wider uppercase drop-shadow-xs">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-white/95 mt-0.5 tracking-wider uppercase drop-shadow-xs">
                         3rd Place
                       </span>
                     </div>
@@ -908,9 +951,9 @@ export default function ResultScreenPage() {
               </div>
 
               {/* Subtitle status bar & dots */}
-              <div className="mt-1 pt-1.5 border-t border-slate-100 flex flex-col items-center justify-center gap-0.5 shrink-0">
-                <div className="flex items-center justify-center gap-2 text-[11px] sm:text-xs text-slate-500">
-                  <RotateCw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <div className="mt-0.5 pt-1 border-t border-slate-100 flex flex-col items-center justify-center gap-0.5 shrink-0">
+                <div className="flex items-center justify-center gap-2 text-[10px] sm:text-[11px] text-slate-500">
+                  <RotateCw className="w-3 h-3 text-slate-400" />
                   <span>Leaderboard updated {getRelativeTime(lastRefreshedAt)}</span>
                   <span>•</span>
                   <span>{publishedResults.length} published results counted</span>
@@ -918,11 +961,11 @@ export default function ResultScreenPage() {
 
                 {/* Carousel dots */}
                 <div className="flex justify-center items-center gap-1.5 mt-0.5">
-                  <span className="w-2 h-2 rounded-full bg-slate-700"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-700"></span>
+                  <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                  <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                  <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                  <span className="w-1 h-1 rounded-full bg-slate-300"></span>
                 </div>
               </div>
             </div>
@@ -941,37 +984,59 @@ export default function ResultScreenPage() {
             />
 
             {/* Right Card Header with Tab Switcher */}
-            <div className="relative pt-4 sm:pt-5 pb-3 px-4 sm:px-5 border-b border-slate-100 flex flex-col gap-2.5 shrink-0">
-              <div className="flex items-center justify-between gap-2">
+            <div className="relative pt-3 sm:pt-4 pb-2.5 px-3 sm:px-5 border-b border-slate-100 flex flex-col gap-2 shrink-0">
+              <div className="flex items-center justify-between gap-1.5 min-w-0">
                 {/* Switcher: Star Performers vs Live Results Feed */}
-                <div className="inline-flex p-1 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border border-slate-200/60">
+                <div className="inline-flex p-0.5 sm:p-1 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border border-slate-200/60 shrink-0">
                   <button
                     type="button"
                     onClick={() => setRightCardTab('stars')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${rightCardTab === 'stars'
+                    className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs shrink-0 ${rightCardTab === 'stars'
                       ? 'bg-white text-slate-900 font-black shadow-xs'
                       : 'text-slate-500 hover:text-slate-900'
                       }`}
                   >
                     <span>⭐</span>
-                    <span>Star Performers</span>
+                    <span className="whitespace-nowrap">Star Performers</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRightCardTab('results')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${rightCardTab === 'results'
+                    className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs shrink-0 ${rightCardTab === 'results'
                       ? 'bg-white text-slate-900 font-black shadow-xs'
                       : 'text-slate-500 hover:text-slate-900'
                       }`}
                   >
                     <span>📢</span>
-                    <span>Live Results Feed</span>
+                    <span className="whitespace-nowrap">Live Results Feed</span>
                   </button>
                 </div>
 
-                <span className="text-xs font-bold text-slate-400">
-                  {rightCardTab === 'stars' ? `${filteredStarPerformers.length} Ranked` : `${filteredResultsList.length} Results`}
-                </span>
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-400 shrink-0 whitespace-nowrap">
+                    {rightCardTab === 'stars' ? `${filteredStarPerformers.length} Ranked` : `${filteredResultsList.length} Results`}
+                  </span>
+
+                  {/* Header Chevron Controls to scroll rows */}
+                  <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/80 shrink-0 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => scrollRightCard('up')}
+                      title="Scroll Up rows"
+                      className="p-1 rounded-md bg-white hover:bg-slate-200 text-slate-700 hover:text-slate-900 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollRightCard('down')}
+                      title="Scroll Down rows"
+                      className="p-1 rounded-md bg-white hover:bg-slate-200 text-slate-700 hover:text-slate-900 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Section Tabs: All, Senior, Junior, Sub-Junior (Shown for Star Performers) */}
@@ -1005,19 +1070,24 @@ export default function ResultScreenPage() {
             </div>
 
             {/* Content Body: Either Star Performers OR Live Results Feed */}
-            <div className="relative flex-1 min-h-0 p-3 sm:p-4 overflow-y-auto space-y-2.5">
-              {rightCardTab === 'stars' ? (
-                // TAB 1: STAR PERFORMERS LIST
-                filteredStarPerformers.length === 0 ? (
-                  <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-slate-400">
-                    <span className="text-4xl mb-2">⭐</span>
-                    <p className="font-bold text-sm text-slate-600">No Star Performers Found</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      No points recorded yet for {starPerformerSection === 'all' ? 'any candidate' : `${starPerformerSection} section`}
-                    </p>
-                  </div>
-                ) : (
-                  filteredStarPerformers.slice(0, 10).map((performer) => {
+            <div className="relative flex-1 min-h-0 overflow-hidden">
+              {/* Scrollable Container for Rows */}
+              <div
+                ref={rightCardScrollRef}
+                className="h-full p-3 sm:p-4 overflow-y-auto space-y-2.5 scroll-smooth"
+              >
+                {rightCardTab === 'stars' ? (
+                  // TAB 1: STAR PERFORMERS LIST
+                  filteredStarPerformers.length === 0 ? (
+                    <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                      <span className="text-4xl mb-2">⭐</span>
+                      <p className="font-bold text-sm text-slate-600">No Star Performers Found</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        No points recorded yet for {starPerformerSection === 'all' ? 'any candidate' : `${starPerformerSection} section`}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredStarPerformers.slice(0, 50).map((performer) => {
                     const isFirst = performer.rank === 1;
                     const isSecond = performer.rank === 2;
                     const isThird = performer.rank === 3;
@@ -1136,7 +1206,7 @@ export default function ResultScreenPage() {
                     <p className="text-xs text-slate-400 mt-1">Try switching sections or check back later</p>
                   </div>
                 ) : (
-                  filteredResultsList.slice(0, 10).map((res) => {
+                  filteredResultsList.slice(0, 50).map((res) => {
                     const progDoc = programmes.find(p => p._id?.toString() === res.programmeId || (res.programme && p.name && res.programme.includes(p.name)));
                     const sectionBadge = getSectionTheme(res.section || progDoc?.section);
 
@@ -1216,12 +1286,57 @@ export default function ResultScreenPage() {
                   })
                 )
               )}
+              </div>
+
+              {/* Floating Quick Scroll Chevron Buttons (Top & Bottom) for Rows */}
+              <div className="absolute right-3.5 bottom-3.5 z-10 flex flex-col gap-1.5 pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={() => scrollRightCard('up')}
+                  title="Scroll Up rows"
+                  className="w-8 h-8 rounded-xl bg-slate-900/80 hover:bg-slate-900 text-white shadow-lg flex items-center justify-center transition-all cursor-pointer backdrop-blur-xs border border-white/20 hover:scale-105 active:scale-95"
+                >
+                  <ChevronUp className="w-4 h-4 stroke-[2.5]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollRightCard('down')}
+                  title="Scroll Down rows"
+                  className="w-8 h-8 rounded-xl bg-slate-900/80 hover:bg-slate-900 text-white shadow-lg flex items-center justify-center transition-all cursor-pointer backdrop-blur-xs border border-white/20 hover:scale-105 active:scale-95"
+                >
+                  <ChevronDown className="w-4 h-4 stroke-[2.5]" />
+                </button>
+              </div>
             </div>
 
             {/* Bottom mini footer for right card */}
-            <div className="p-2.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium px-4 shrink-0">
+            <div className="p-2 sm:p-2.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium px-3 sm:px-4 shrink-0">
               <span>{rightCardTab === 'stars' ? <>Section: <strong className="capitalize">{starPerformerSection === 'all' ? 'All Sections' : starPerformerSection}</strong></> : <>Showing <strong>latest published results</strong></>}</span>
-              <span className="text-[11px] text-slate-400">Auto-updated live</span>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-slate-400 font-semibold hidden sm:inline">Scroll Rows:</span>
+                <div className="inline-flex items-center gap-0.5 bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => scrollRightCard('up')}
+                    title="Scroll Up rows"
+                    className="p-1 rounded-md hover:bg-slate-100 text-slate-700 hover:text-slate-950 transition-colors cursor-pointer active:scale-95 flex items-center gap-0.5 text-[11px] font-bold px-1.5"
+                  >
+                    <ChevronUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span className="hidden md:inline">Up</span>
+                  </button>
+                  <div className="w-px h-3.5 bg-slate-200"></div>
+                  <button
+                    type="button"
+                    onClick={() => scrollRightCard('down')}
+                    title="Scroll Down rows"
+                    className="p-1 rounded-md hover:bg-slate-100 text-slate-700 hover:text-slate-950 transition-colors cursor-pointer active:scale-95 flex items-center gap-0.5 text-[11px] font-bold px-1.5"
+                  >
+                    <ChevronDown className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span className="hidden md:inline">Down</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -1572,7 +1687,7 @@ function ScreenLaurelWreath({ rank }: { rank: 1 | 2 | 3 }) {
       <div className="relative flex items-center justify-center">
         <svg
           viewBox="0 0 120 90"
-          className="w-16 h-13 sm:w-20 sm:h-16 md:w-22 md:h-18 text-white fill-current drop-shadow-md"
+          className="w-12 h-10 sm:w-15 sm:h-12 md:w-18 md:h-14 text-white fill-current drop-shadow-md"
         >
           {/* Left branch */}
           <g>
@@ -1605,7 +1720,7 @@ function ScreenLaurelWreath({ rank }: { rank: 1 | 2 | 3 }) {
           {/* Bottom Ribbon */}
           <path d="M 55 75 C 58 77 62 77 65 75 C 67 78 63 81 60 81 C 57 81 53 78 55 75 Z" />
         </svg>
-        <span className="absolute font-black text-2xl sm:text-3xl md:text-4xl tracking-tighter text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">
+        <span className="absolute font-black text-xl sm:text-2xl md:text-3xl tracking-tighter text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">
           {rank}
         </span>
       </div>
