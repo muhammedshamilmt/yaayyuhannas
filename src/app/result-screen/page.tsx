@@ -28,12 +28,129 @@ import {
   User
 } from 'lucide-react';
 
+interface PodiumColorTheme {
+  name: string;
+  topBg: string;
+  frontBg: string;
+  borderTop: string;
+  borderFront: string;
+  glow: string;
+  textColor: string;
+  accentBg: string;
+  squircleBg: string;
+  badgeClass: string;
+}
+
+function getPodiumColorTheme(team?: Team): PodiumColorTheme {
+  if (!team) {
+    return {
+      name: 'Team',
+      topBg: 'bg-gradient-to-r from-slate-200 via-slate-100 to-slate-300',
+      frontBg: 'bg-gradient-to-b from-slate-400 via-slate-500 to-slate-600',
+      borderTop: 'border-white/70',
+      borderFront: 'border-slate-400/50',
+      glow: 'shadow-slate-500/20',
+      textColor: 'text-slate-700',
+      accentBg: 'bg-slate-100 text-slate-800 border-slate-200',
+      squircleBg: 'bg-gradient-to-br from-slate-100 to-slate-200 border-slate-300',
+      badgeClass: 'bg-slate-700 text-white',
+    };
+  }
+
+  const code = (team.code || '').toUpperCase();
+  const name = (team.name || '').toLowerCase();
+  const hex = (team.color || '').toLowerCase();
+
+  // ADĀLAH / Blue (#3b82f6)
+  if (code === 'ADL' || name.includes('adāl') || name.includes('adal') || hex.includes('3b82f6') || hex.includes('blue')) {
+    return {
+      name: team.name || 'ADĀLAH',
+      topBg: 'bg-gradient-to-r from-blue-200 via-sky-200 to-blue-300',
+      frontBg: 'bg-gradient-to-b from-[#60A5FA] via-[#3B82F6] to-[#1D4ED8]',
+      borderTop: 'border-white/70',
+      borderFront: 'border-blue-400/50',
+      glow: 'shadow-blue-500/30',
+      textColor: 'text-blue-600',
+      accentBg: 'bg-blue-50 text-blue-700 border-blue-200',
+      squircleBg: 'bg-gradient-to-br from-blue-50 to-sky-100 border-2 border-blue-200',
+      badgeClass: 'bg-blue-600 text-white',
+    };
+  }
+
+  // SHAJĀʿAH / Red (#ef4444)
+  if (code === 'SHJ' || name.includes('shaj') || hex.includes('ef4444') || hex.includes('red')) {
+    return {
+      name: team.name || 'SHAJĀʿAH',
+      topBg: 'bg-gradient-to-r from-rose-200 via-red-200 to-rose-300',
+      frontBg: 'bg-gradient-to-b from-[#F87171] via-[#EF4444] to-[#B91C1C]',
+      borderTop: 'border-white/70',
+      borderFront: 'border-red-400/50',
+      glow: 'shadow-red-500/30',
+      textColor: 'text-red-600',
+      accentBg: 'bg-red-50 text-red-700 border-red-200',
+      squircleBg: 'bg-gradient-to-br from-rose-50 to-red-100 border-2 border-red-200',
+      badgeClass: 'bg-red-600 text-white',
+    };
+  }
+
+  // QIYĀDAH / Green (#22c55e)
+  if (code === 'QIY' || code === 'QYD' || name.includes('qiya') || hex.includes('22c55e') || hex.includes('green')) {
+    return {
+      name: team.name || 'QIYĀDAH',
+      topBg: 'bg-gradient-to-r from-emerald-200 via-green-200 to-emerald-300',
+      frontBg: 'bg-gradient-to-b from-[#4ADE80] via-[#22C55E] to-[#15803D]',
+      borderTop: 'border-white/70',
+      borderFront: 'border-emerald-400/50',
+      glow: 'shadow-emerald-500/30',
+      textColor: 'text-emerald-600',
+      accentBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      squircleBg: 'bg-gradient-to-br from-emerald-50 to-teal-100 border-2 border-emerald-200',
+      badgeClass: 'bg-emerald-600 text-white',
+    };
+  }
+
+  // Yellow / Amber / Gold
+  if (hex.includes('eab308') || hex.includes('f59e0b') || hex.includes('yellow') || hex.includes('amber')) {
+    return {
+      name: team.name || 'TEAM',
+      topBg: 'bg-gradient-to-r from-amber-200 via-yellow-200 to-amber-300',
+      frontBg: 'bg-gradient-to-b from-[#F59E0B] via-[#EAB308] to-[#B45309]',
+      borderTop: 'border-white/80',
+      borderFront: 'border-amber-400/50',
+      glow: 'shadow-amber-500/30',
+      textColor: 'text-amber-600',
+      accentBg: 'bg-amber-50 text-amber-700 border-amber-200',
+      squircleBg: 'bg-gradient-to-br from-amber-50 to-yellow-100 border-2 border-amber-200',
+      badgeClass: 'bg-amber-600 text-white',
+    };
+  }
+
+  // Generic custom hex color fallback
+  return {
+    name: team.name || 'TEAM',
+    topBg: 'bg-gradient-to-r from-indigo-200 via-purple-200 to-indigo-300',
+    frontBg: 'bg-gradient-to-b from-[#818CF8] via-[#6366F1] to-[#4338CA]',
+    borderTop: 'border-white/70',
+    borderFront: 'border-indigo-400/50',
+    glow: 'shadow-indigo-500/30',
+    textColor: 'text-indigo-600',
+    accentBg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    squircleBg: 'bg-gradient-to-br from-indigo-50 to-purple-100 border-2 border-indigo-200',
+    badgeClass: 'bg-indigo-600 text-white',
+  };
+}
+
 export default function ResultScreenPage() {
   const [results, setResults] = useState<Result[]>([]);
   const [programmes, setProgrammes] = useState<Programme[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Screen mode: 'tv' for 100vh full cover broadcast, 'scroll' for extended list
+  const [screenMode, setScreenMode] = useState<'tv' | 'scroll'>('tv');
+  // Right card tab in TV mode: 'stars' or 'results'
+  const [rightCardTab, setRightCardTab] = useState<'stars' | 'results'>('stars');
 
   // Filter states
   const [selectedSection, setSelectedSection] = useState<string>('all');
@@ -296,6 +413,10 @@ export default function ResultScreenPage() {
   const rank2 = teamStandings[1];
   const rank3 = teamStandings[2];
 
+  const theme1 = getPodiumColorTheme(rank1?.team);
+  const theme2 = getPodiumColorTheme(rank2?.team);
+  const theme3 = getPodiumColorTheme(rank3?.team);
+
   // Compute individual star performers dynamically across all published results
   const individualStats = useMemo(() => {
     const candMap: Record<string, {
@@ -464,30 +585,30 @@ export default function ResultScreenPage() {
   }, [publishedResults, selectedSection, selectedCategory, searchTerm, programmes]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-amber-100">
+    <div className={`${screenMode === 'tv' ? 'h-screen max-h-screen overflow-hidden' : 'min-h-screen'} bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-amber-100`}>
 
       {/* ========================================================================= */}
       {/* TV SCREEN TOP BROADCAST HEADER & DISPLAY CONTROLS                          */}
       {/* ========================================================================= */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0">
 
         {/* Left: Branding & Live Ticker */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-white shadow-md text-xl">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-white shadow-md text-xl shrink-0">
             🏆
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-black text-lg sm:text-xl tracking-tight text-slate-900 uppercase">
-                Wattaqa Festival 2k25
+                AYYUHANNAAS
               </h1>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-500 text-white shadow-xs">
                 <span className="w-2 h-2 rounded-full bg-white animate-ping"></span>
-                TV SCREEN
+                TV SCREEN • LIVE
               </span>
             </div>
             <p className="text-xs text-slate-500 hidden sm:block">
-              Live Official Championship Results & Standings Broadcast
+              Ayyuhannas Arts Fest 2025 • Live Championship Results & Standings Broadcast
             </p>
           </div>
         </div>
@@ -528,7 +649,20 @@ export default function ResultScreenPage() {
         </div>
 
         {/* Right: Auto-Refresh Button & TV Controls */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          {/* Screen Mode Toggle (100vh TV Cover vs Full Scroll) */}
+          <button
+            onClick={() => setScreenMode(prev => prev === 'tv' ? 'scroll' : 'tv')}
+            title={screenMode === 'tv' ? 'Switch to Full Results Scroll View' : 'Switch to 100vh TV Full Screen Cover'}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${screenMode === 'tv'
+              ? 'bg-amber-50 text-amber-800 border border-amber-300'
+              : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+              }`}
+          >
+            <Tv className="w-3.5 h-3.5 text-amber-600" />
+            <span className="hidden sm:inline">{screenMode === 'tv' ? '100vh TV Cover' : 'Scroll View'}</span>
+          </button>
+
           {/* Clock */}
           <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-mono text-xs font-bold">
             <Clock className="w-3.5 h-3.5 text-slate-500" />
@@ -580,17 +714,17 @@ export default function ResultScreenPage() {
       {/* ========================================================================= */}
       {/* MAIN SCREEN CONTENT                                                       */}
       {/* ========================================================================= */}
-      <main className="flex-1 max-w-[1500px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+      <main className={`flex-1 ${screenMode === 'tv' ? 'min-h-0 overflow-hidden' : ''} max-w-[1750px] w-full mx-auto p-3 sm:p-5 flex flex-col ${screenMode === 'tv' ? '' : 'space-y-8'}`}>
 
         {/* ======================================================================= */}
         {/* TOP SECTION: LEADERBOARD PODIUM (LEFT) + STAR PERFORMERS (RIGHT)        */}
         {/* ======================================================================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div className={`grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 ${screenMode === 'tv' ? 'flex-1 min-h-0' : ''} items-stretch`}>
 
           {/* ===================================================================== */}
           {/* LEFT: 3D ISOMETRIC PODIUM LEADERBOARD (lg:col-span-7)                 */}
           {/* ===================================================================== */}
-          <section className="lg:col-span-7 flex flex-col justify-between relative bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden">
+          <section className="lg:col-span-7 flex flex-col justify-between relative bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden h-full">
             {/* Subtle Warm Sunburst Spotlight Radial Gradient Background */}
             <div
               className="absolute inset-x-0 top-0 h-96 pointer-events-none opacity-80"
@@ -600,7 +734,7 @@ export default function ResultScreenPage() {
             />
 
             {/* Leaderboard Card Header */}
-            <div className="relative pt-6 pb-4 px-5 sm:px-7 border-b border-slate-100 flex items-center justify-between">
+            <div className="relative pt-4 sm:pt-5 pb-3 px-5 sm:px-6 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <span className="text-2xl sm:text-3xl">🏆</span>
                 <div>
@@ -614,7 +748,7 @@ export default function ResultScreenPage() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Real-time festival championship standings calculated dynamically across published results
+                    Real-time championship standings calculated dynamically across published results
                   </p>
                 </div>
               </div>
@@ -625,50 +759,50 @@ export default function ResultScreenPage() {
               </div>
             </div>
 
-            {/* 3D Isometric / Perspective Podium */}
-            <div className="relative flex-1 flex flex-col justify-between pt-6 pb-6 px-3 sm:px-6">
-              <div className="flex justify-center items-end gap-2.5 sm:gap-4 pt-10 pb-2">
+            {/* 3D Isometric / Perspective Podium (Using Team Colors!) */}
+            <div className="relative flex-1 min-h-0 flex flex-col justify-between pt-2 pb-3 px-3 sm:px-6">
+              <div className="flex justify-center items-end gap-2.5 sm:gap-4 pb-2 w-full flex-1 min-h-0">
 
                 {/* ============================================================ */}
-                {/* RANK 2: LEFT PODIUM (Silver / Ice-Blue)                      */}
+                {/* RANK 2: LEFT PODIUM (Team Color!)                            */}
                 {/* ============================================================ */}
                 <div className="flex-1 max-w-[190px] sm:max-w-[210px] flex flex-col items-center">
                   {rank2 ? (
-                    <div className="flex flex-col items-center mb-3 text-center transition-transform hover:-translate-y-1">
+                    <div className="flex flex-col items-center mb-2 text-center transition-transform hover:-translate-y-1">
                       <div className="relative">
                         {/* Squircle Card Icon */}
-                        <div className="w-14 h-14 sm:w-18 sm:h-18 rounded-3xl bg-gradient-to-br from-slate-100 to-blue-50 border-2 border-blue-200 shadow-md flex items-center justify-center text-2xl sm:text-3xl">
+                        <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-3xl ${theme2.squircleBg} shadow-md flex items-center justify-center text-2xl sm:text-3xl`}>
                           🥈
                         </div>
                         <span className="absolute -top-1.5 -right-1 text-sm">⭐</span>
                       </div>
-                      <h3 className="font-extrabold text-slate-800 text-sm sm:text-base mt-2 truncate max-w-[140px]">
+                      <h3 className="font-extrabold text-slate-800 text-sm sm:text-base mt-1.5 truncate max-w-[140px]">
                         {rank2.team.name}
                       </h3>
-                      <div className="flex items-center gap-1 text-blue-600 font-bold text-xs sm:text-sm mt-0.5">
+                      <div className={`flex items-center gap-1 ${theme2.textColor} font-black text-xs sm:text-sm mt-0.5`}>
                         <span className="text-xs">💎</span>
                         <span>{rank2.totalPoints.toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center gap-1 mt-1.5 text-[10px] text-slate-500 font-medium bg-slate-100/90 px-2 py-0.5 rounded-full">
+                      <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-600 font-medium bg-slate-100/90 px-2 py-0.5 rounded-full">
                         <span>🥇{rank2.medals.gold}</span>
                         <span>🥈{rank2.medals.silver}</span>
                         <span>🥉{rank2.medals.bronze}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="h-28 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                    <div className="h-24 flex items-center justify-center text-xs text-slate-400">No Team</div>
                   )}
 
-                  {/* 3D Isometric Podium Block: Rank 2 */}
+                  {/* 3D Isometric Podium Block: Rank 2 (Team Color!) */}
                   <div className="w-full flex flex-col items-center">
                     <div
-                      className="w-full h-6 bg-gradient-to-r from-blue-200 via-sky-200 to-blue-300 border-t border-x border-white/60 shadow-xs"
+                      className={`w-full h-5 sm:h-6 ${theme2.topBg} border-t border-x ${theme2.borderTop} shadow-xs`}
                       style={{ clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)' }}
                     />
-                    <div className="w-full h-40 sm:h-48 bg-gradient-to-b from-[#93C5FD] via-[#60A5FA] to-[#3B82F6] rounded-b-2xl shadow-lg border-b border-x border-blue-400/40 flex flex-col items-center justify-center p-3 relative overflow-hidden">
+                    <div className={`w-full h-36 sm:h-44 md:h-48 ${theme2.frontBg} rounded-b-2xl shadow-xl border-b border-x ${theme2.borderFront} flex flex-col items-center justify-center p-2.5 relative overflow-hidden`}>
                       <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                       <ScreenLaurelWreath rank={2} />
-                      <span className="text-[11px] font-semibold text-white/90 mt-2 tracking-wider uppercase">
+                      <span className="text-[11px] font-bold text-white/95 mt-1.5 tracking-wider uppercase drop-shadow-xs">
                         Runner Up
                       </span>
                     </div>
@@ -676,49 +810,49 @@ export default function ResultScreenPage() {
                 </div>
 
                 {/* ============================================================ */}
-                {/* RANK 1: CENTER PODIUM (Gold / Warm Amber) - TALL & LEADING   */}
+                {/* RANK 1: CENTER PODIUM (Team Color!) - TALL & LEADING         */}
                 {/* ============================================================ */}
-                <div className="flex-1 max-w-[210px] sm:max-w-[230px] flex flex-col items-center -mt-8 z-10">
+                <div className="flex-1 max-w-[210px] sm:max-w-[230px] flex flex-col items-center -mt-6 sm:-mt-8 z-10">
                   {rank1 ? (
-                    <div className="flex flex-col items-center mb-3 text-center transition-transform hover:-translate-y-1">
+                    <div className="flex flex-col items-center mb-2 text-center transition-transform hover:-translate-y-1">
                       <div className="relative">
                         {/* Crown on top */}
-                        <div className="absolute -top-4 inset-x-0 flex justify-center text-lg animate-bounce">
+                        <div className="absolute -top-4 inset-x-0 flex justify-center text-xl animate-bounce">
                           👑
                         </div>
                         {/* Squircle Card Icon */}
-                        <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-3xl bg-gradient-to-br from-amber-100 via-yellow-50 to-amber-200 border-2 border-amber-300 shadow-xl flex items-center justify-center text-3xl sm:text-4xl ring-4 ring-amber-400/20">
+                        <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl ${theme1.squircleBg} shadow-xl flex items-center justify-center text-3xl sm:text-4xl ring-4 ring-amber-400/20`}>
                           🥇
                         </div>
                         <span className="absolute -top-1 -right-1 text-base">✨</span>
                       </div>
-                      <h3 className="font-black text-slate-900 text-sm sm:text-lg mt-2 tracking-tight truncate max-w-[150px]">
+                      <h3 className="font-black text-slate-900 text-sm sm:text-lg mt-1.5 tracking-tight truncate max-w-[150px]">
                         {rank1.team.name}
                       </h3>
-                      <div className="flex items-center gap-1 text-amber-600 font-extrabold text-sm sm:text-base mt-0.5">
+                      <div className={`flex items-center gap-1 ${theme1.textColor} font-black text-sm sm:text-base mt-0.5`}>
                         <span className="text-sm">💎</span>
                         <span>{rank1.totalPoints.toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 mt-1.5 text-xs text-amber-900 font-bold bg-amber-100/90 border border-amber-200/80 px-2.5 py-0.5 rounded-full shadow-xs">
+                      <div className="flex items-center gap-1 mt-1 text-xs text-slate-800 font-bold bg-white/95 border border-slate-200/80 px-2.5 py-0.5 rounded-full shadow-xs">
                         <span>🥇 {rank1.medals.gold}</span>
                         <span>🥈 {rank1.medals.silver}</span>
                         <span>🥉 {rank1.medals.bronze}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="h-32 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                    <div className="h-28 flex items-center justify-center text-xs text-slate-400">No Team</div>
                   )}
 
-                  {/* 3D Isometric Podium Block: Rank 1 */}
+                  {/* 3D Isometric Podium Block: Rank 1 (Team Color!) */}
                   <div className="w-full flex flex-col items-center">
                     <div
-                      className="w-full h-8 bg-gradient-to-r from-[#FEF08A] via-[#FDE047] to-[#FACC15] border-t border-x border-white/80 shadow-xs"
+                      className={`w-full h-7 sm:h-8 ${theme1.topBg} border-t border-x ${theme1.borderTop} shadow-xs`}
                       style={{ clipPath: 'polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%)' }}
                     />
-                    <div className="w-full h-52 sm:h-60 bg-gradient-to-b from-[#F59E0B] via-[#EAB308] to-[#CA8A04] rounded-b-2xl shadow-2xl border-b-2 border-x border-amber-500/50 flex flex-col items-center justify-center p-3 relative overflow-hidden">
+                    <div className={`w-full h-48 sm:h-56 md:h-60 ${theme1.frontBg} rounded-b-2xl shadow-2xl border-b-2 border-x ${theme1.borderFront} flex flex-col items-center justify-center p-2.5 relative overflow-hidden`}>
                       <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent pointer-events-none" />
                       <ScreenLaurelWreath rank={1} />
-                      <span className="text-xs font-bold text-amber-950/80 bg-white/70 px-2.5 py-0.5 rounded-full mt-2 tracking-wider uppercase shadow-xs">
+                      <span className="text-xs font-black text-slate-900 bg-white/95 px-3 py-0.5 rounded-full mt-2 tracking-wider uppercase shadow-md border border-white/60">
                         Champion
                       </span>
                     </div>
@@ -726,45 +860,45 @@ export default function ResultScreenPage() {
                 </div>
 
                 {/* ============================================================ */}
-                {/* RANK 3: RIGHT PODIUM (Bronze / Coral-Peach)                  */}
+                {/* RANK 3: RIGHT PODIUM (Team Color!)                           */}
                 {/* ============================================================ */}
                 <div className="flex-1 max-w-[190px] sm:max-w-[210px] flex flex-col items-center">
                   {rank3 ? (
-                    <div className="flex flex-col items-center mb-3 text-center transition-transform hover:-translate-y-1">
+                    <div className="flex flex-col items-center mb-2 text-center transition-transform hover:-translate-y-1">
                       <div className="relative">
                         {/* Squircle Card Icon */}
-                        <div className="w-14 h-14 sm:w-18 sm:h-18 rounded-3xl bg-gradient-to-br from-orange-100 to-rose-50 border-2 border-orange-200 shadow-md flex items-center justify-center text-2xl sm:text-3xl">
+                        <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-3xl ${theme3.squircleBg} shadow-md flex items-center justify-center text-2xl sm:text-3xl`}>
                           🥉
                         </div>
                         <span className="absolute -top-1.5 -right-1 text-sm">⭐</span>
                       </div>
-                      <h3 className="font-extrabold text-slate-800 text-sm sm:text-base mt-2 truncate max-w-[140px]">
+                      <h3 className="font-extrabold text-slate-800 text-sm sm:text-base mt-1.5 truncate max-w-[140px]">
                         {rank3.team.name}
                       </h3>
-                      <div className="flex items-center gap-1 text-orange-600 font-bold text-xs sm:text-sm mt-0.5">
+                      <div className={`flex items-center gap-1 ${theme3.textColor} font-black text-xs sm:text-sm mt-0.5`}>
                         <span className="text-xs">💎</span>
                         <span>{rank3.totalPoints.toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center gap-1 mt-1.5 text-[10px] text-slate-500 font-medium bg-slate-100/90 px-2 py-0.5 rounded-full">
+                      <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-600 font-medium bg-slate-100/90 px-2 py-0.5 rounded-full">
                         <span>🥇{rank3.medals.gold}</span>
                         <span>🥈{rank3.medals.silver}</span>
                         <span>🥉{rank3.medals.bronze}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="h-28 flex items-center justify-center text-xs text-slate-400">No Team</div>
+                    <div className="h-24 flex items-center justify-center text-xs text-slate-400">No Team</div>
                   )}
 
-                  {/* 3D Isometric Podium Block: Rank 3 */}
+                  {/* 3D Isometric Podium Block: Rank 3 (Team Color!) */}
                   <div className="w-full flex flex-col items-center">
                     <div
-                      className="w-full h-6 bg-gradient-to-r from-orange-200 via-amber-200 to-orange-300 border-t border-x border-white/60 shadow-xs"
+                      className={`w-full h-5 sm:h-6 ${theme3.topBg} border-t border-x ${theme3.borderTop} shadow-xs`}
                       style={{ clipPath: 'polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%)' }}
                     />
-                    <div className="w-full h-32 sm:h-40 bg-gradient-to-b from-[#FB923C] via-[#F97316] to-[#EA580C] rounded-b-2xl shadow-lg border-b border-x border-orange-400/40 flex flex-col items-center justify-center p-3 relative overflow-hidden">
+                    <div className={`w-full h-28 sm:h-36 md:h-40 ${theme3.frontBg} rounded-b-2xl shadow-lg border-b border-x ${theme3.borderFront} flex flex-col items-center justify-center p-2.5 relative overflow-hidden`}>
                       <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
                       <ScreenLaurelWreath rank={3} />
-                      <span className="text-[11px] font-semibold text-white/90 mt-2 tracking-wider uppercase">
+                      <span className="text-[11px] font-bold text-white/95 mt-1.5 tracking-wider uppercase drop-shadow-xs">
                         3rd Place
                       </span>
                     </div>
@@ -774,7 +908,7 @@ export default function ResultScreenPage() {
               </div>
 
               {/* Subtitle status bar & dots */}
-              <div className="mt-4 pt-3.5 border-t border-slate-100 flex flex-col items-center justify-center gap-1.5">
+              <div className="mt-2 pt-2.5 border-t border-slate-100 flex flex-col items-center justify-center gap-1 shrink-0">
                 <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
                   <RotateCw className="w-3.5 h-3.5" />
                   <span>Leaderboard updated {getRelativeTime(lastRefreshedAt)}</span>
@@ -795,9 +929,9 @@ export default function ResultScreenPage() {
           </section>
 
           {/* ===================================================================== */}
-          {/* RIGHT: STAR PERFORMERS CARD (lg:col-span-5)                           */}
+          {/* RIGHT: STAR PERFORMERS & LIVE BROADCAST FEED (lg:col-span-5)          */}
           {/* ===================================================================== */}
-          <section className="lg:col-span-5 flex flex-col justify-between relative bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden">
+          <section className="lg:col-span-5 flex flex-col justify-between relative bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden h-full">
             {/* Subtle Star Purple-Amber Radial Gradient Background */}
             <div
               className="absolute inset-x-0 top-0 h-64 pointer-events-none opacity-60"
@@ -806,199 +940,298 @@ export default function ResultScreenPage() {
               }}
             />
 
-            {/* Star Performers Header with Section Filter Tabs */}
-            <div className="relative pt-6 pb-4 px-5 sm:px-6 border-b border-slate-100 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center shadow-md text-xl shrink-0">
-                    ⭐
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                        Star Performers
-                      </h2>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
-                        Top Stars
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Top individual candidates by score
-                    </p>
-                  </div>
+            {/* Right Card Header with Tab Switcher */}
+            <div className="relative pt-4 sm:pt-5 pb-3 px-4 sm:px-5 border-b border-slate-100 flex flex-col gap-2.5 shrink-0">
+              <div className="flex items-center justify-between gap-2">
+                {/* Switcher: Star Performers vs Live Results Feed */}
+                <div className="inline-flex p-1 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border border-slate-200/60">
+                  <button
+                    type="button"
+                    onClick={() => setRightCardTab('stars')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${rightCardTab === 'stars'
+                      ? 'bg-white text-slate-900 font-black shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                  >
+                    <span>⭐</span>
+                    <span>Star Performers</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRightCardTab('results')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${rightCardTab === 'results'
+                      ? 'bg-white text-slate-900 font-black shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                  >
+                    <span>📢</span>
+                    <span>Live Results Feed</span>
+                  </button>
                 </div>
 
-                <span className="hidden sm:inline-flex text-xs font-bold text-slate-400">
-                  {filteredStarPerformers.length} Ranked
+                <span className="text-xs font-bold text-slate-400">
+                  {rightCardTab === 'stars' ? `${filteredStarPerformers.length} Ranked` : `${filteredResultsList.length} Results`}
                 </span>
               </div>
 
-              {/* Section Tabs: All, Senior, Junior, Sub-Junior */}
-              <div className="flex items-center justify-between gap-2 pt-1">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Filter by Section:
-                </span>
-                <div className="inline-flex p-1 bg-slate-100/90 rounded-xl text-xs font-bold text-slate-600 border border-slate-200/60">
-                  {[
-                    { key: 'all', label: 'All' },
-                    { key: 'senior', label: 'Senior' },
-                    { key: 'junior', label: 'Junior' },
-                    { key: 'sub-junior', label: 'Sub-Jr' }
-                  ].map(tab => (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => setStarPerformerSection(tab.key)}
-                      className={`px-3 py-1 rounded-lg capitalize transition-all cursor-pointer text-xs ${starPerformerSection === tab.key
-                        ? 'bg-white text-slate-900 font-black shadow-xs'
-                        : 'hover:text-slate-900 text-slate-500'
-                        }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
+              {/* Section Tabs: All, Senior, Junior, Sub-Junior (Shown for Star Performers) */}
+              {rightCardTab === 'stars' && (
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    Filter Section:
+                  </span>
+                  <div className="inline-flex p-1 bg-slate-100/90 rounded-xl text-xs font-bold text-slate-600 border border-slate-200/60">
+                    {[
+                      { key: 'all', label: 'All' },
+                      { key: 'senior', label: 'Senior' },
+                      { key: 'junior', label: 'Junior' },
+                      { key: 'sub-junior', label: 'Sub-Jr' }
+                    ].map(tab => (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setStarPerformerSection(tab.key)}
+                        className={`px-2.5 py-1 rounded-lg capitalize transition-all cursor-pointer text-xs ${starPerformerSection === tab.key
+                          ? 'bg-white text-slate-900 font-black shadow-xs'
+                          : 'hover:text-slate-900 text-slate-500'
+                          }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* List of Top Star Performers */}
-            <div className="relative flex-1 p-4 sm:p-5 overflow-y-auto max-h-[480px] space-y-2.5">
-              {filteredStarPerformers.length === 0 ? (
-                <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-slate-400">
-                  <span className="text-4xl mb-2">⭐</span>
-                  <p className="font-bold text-sm text-slate-600">No Star Performers Found</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    No points recorded yet for {starPerformerSection === 'all' ? 'any candidate' : `${starPerformerSection} section`}
-                  </p>
-                </div>
-              ) : (
-                filteredStarPerformers.slice(0, 5).map((performer) => {
-                  const isFirst = performer.rank === 1;
-                  const isSecond = performer.rank === 2;
-                  const isThird = performer.rank === 3;
+            {/* Content Body: Either Star Performers OR Live Results Feed */}
+            <div className="relative flex-1 min-h-0 p-3 sm:p-4 overflow-y-auto space-y-2.5">
+              {rightCardTab === 'stars' ? (
+                // TAB 1: STAR PERFORMERS LIST
+                filteredStarPerformers.length === 0 ? (
+                  <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                    <span className="text-4xl mb-2">⭐</span>
+                    <p className="font-bold text-sm text-slate-600">No Star Performers Found</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      No points recorded yet for {starPerformerSection === 'all' ? 'any candidate' : `${starPerformerSection} section`}
+                    </p>
+                  </div>
+                ) : (
+                  filteredStarPerformers.slice(0, 10).map((performer) => {
+                    const isFirst = performer.rank === 1;
+                    const isSecond = performer.rank === 2;
+                    const isThird = performer.rank === 3;
 
-                  return (
-                    <div
-                      key={performer.candidate.chestNumber}
-                      className={`p-3 rounded-2xl border transition-all duration-200 flex items-center justify-between gap-3 ${isFirst
-                        ? 'bg-gradient-to-r from-amber-50/90 via-yellow-50/60 to-white border-amber-300 shadow-sm ring-1 ring-amber-400/20'
-                        : isSecond
-                          ? 'bg-gradient-to-r from-slate-50 via-blue-50/40 to-white border-slate-300 shadow-xs'
-                          : isThird
-                            ? 'bg-gradient-to-r from-orange-50/60 to-white border-orange-200 shadow-xs'
-                            : 'bg-white hover:bg-slate-50/80 border-slate-200/80 shadow-xs'
-                        }`}
-                    >
-                      {/* Left: Rank Badge + Avatar + Candidate Info */}
-                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                        {/* Rank Badge */}
-                        <div className="shrink-0 flex items-center justify-center">
-                          {isFirst ? (
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 text-amber-950 font-black text-sm flex items-center justify-center shadow-xs">
-                              🥇
-                            </div>
-                          ) : isSecond ? (
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 text-slate-800 font-black text-sm flex items-center justify-center shadow-xs">
-                              🥈
-                            </div>
-                          ) : isThird ? (
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-200 to-amber-200 text-orange-900 font-black text-sm flex items-center justify-center shadow-xs">
-                              🥉
-                            </div>
-                          ) : (
-                            <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 font-extrabold text-xs flex items-center justify-center border border-slate-200">
-                              #{performer.rank}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Candidate Avatar or Chest Initial */}
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
-                          {performer.candidate.profileImage ? (
-                            <img
-                              src={performer.candidate.profileImage}
-                              alt={performer.candidate.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div
-                              className="w-full h-full flex items-center justify-center font-bold text-white text-xs"
-                              style={{ backgroundColor: performer.team.color || '#6366F1' }}
-                            >
-                              {performer.candidate.chestNumber}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Name & Metadata */}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h4 className="font-extrabold text-slate-900 text-sm truncate">
-                              {performer.candidate.name}
-                            </h4>
-                            {isFirst && <span className="text-xs">👑</span>}
+                    return (
+                      <div
+                        key={performer.candidate.chestNumber}
+                        className={`p-2.5 sm:p-3 rounded-2xl border transition-all duration-200 flex items-center justify-between gap-3 ${isFirst
+                          ? 'bg-gradient-to-r from-amber-50/90 via-yellow-50/60 to-white border-amber-300 shadow-sm ring-1 ring-amber-400/20'
+                          : isSecond
+                            ? 'bg-gradient-to-r from-slate-50 via-blue-50/40 to-white border-slate-300 shadow-xs'
+                            : isThird
+                              ? 'bg-gradient-to-r from-orange-50/60 to-white border-orange-200 shadow-xs'
+                              : 'bg-white hover:bg-slate-50/80 border-slate-200/80 shadow-xs'
+                          }`}
+                      >
+                        {/* Left: Rank Badge + Avatar + Candidate Info */}
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                          {/* Rank Badge */}
+                          <div className="shrink-0 flex items-center justify-center">
+                            {isFirst ? (
+                              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 text-amber-950 font-black text-sm flex items-center justify-center shadow-xs">
+                                🥇
+                              </div>
+                            ) : isSecond ? (
+                              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 text-slate-800 font-black text-sm flex items-center justify-center shadow-xs">
+                                🥈
+                              </div>
+                            ) : isThird ? (
+                              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-200 to-amber-200 text-orange-900 font-black text-sm flex items-center justify-center shadow-xs">
+                                🥉
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 font-extrabold text-xs flex items-center justify-center border border-slate-200">
+                                #{performer.rank}
+                              </div>
+                            )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 font-medium">
-                            <span className="font-mono font-bold text-slate-700">#{performer.candidate.chestNumber}</span>
-                            <span>•</span>
-                            <span
-                              className="px-1.5 py-0.2 rounded text-[10px] font-bold text-white"
-                              style={{ backgroundColor: performer.team.color || '#64748B' }}
-                            >
-                              {performer.team.name || performer.team.code}
-                            </span>
-                            {performer.section && (
-                              <>
-                                <span>•</span>
-                                <span className="capitalize text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded">
-                                  {performer.section}
-                                </span>
-                              </>
+
+                          {/* Candidate Avatar or Chest Initial */}
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                            {performer.candidate.profileImage ? (
+                              <img
+                                src={performer.candidate.profileImage}
+                                alt={performer.candidate.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="w-full h-full flex items-center justify-center font-bold text-white text-xs"
+                                style={{ backgroundColor: performer.team.color || '#6366F1' }}
+                              >
+                                {performer.candidate.chestNumber}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Name & Metadata */}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <h4 className="font-extrabold text-slate-900 text-sm truncate">
+                                {performer.candidate.name}
+                              </h4>
+                              {isFirst && <span className="text-xs">👑</span>}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 font-medium">
+                              <span className="font-mono font-bold text-slate-700">#{performer.candidate.chestNumber}</span>
+                              <span>•</span>
+                              <span
+                                className="px-1.5 py-0.2 rounded text-[10px] font-bold text-white"
+                                style={{ backgroundColor: performer.team.color || '#64748B' }}
+                              >
+                                {performer.team.name || performer.team.code}
+                              </span>
+                              {performer.section && (
+                                <>
+                                  <span>•</span>
+                                  <span className="capitalize text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded">
+                                    {performer.section}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Points & Medals */}
+                        <div className="text-right shrink-0">
+                          <div className="flex items-center justify-end gap-1 font-black text-sm sm:text-base text-slate-900">
+                            <span className="text-xs text-amber-500">💎</span>
+                            <span>{performer.totalPoints}</span>
+                            <span className="text-xs font-semibold text-slate-500">pts</span>
+                          </div>
+                          <div className="flex items-center justify-end gap-1 mt-0.5 text-[11px] font-semibold text-slate-600">
+                            {performer.medals.gold > 0 && (
+                              <span className="bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded-md">🥇{performer.medals.gold}</span>
+                            )}
+                            {performer.medals.silver > 0 && (
+                              <span className="bg-slate-100 text-slate-800 px-1.5 py-0.2 rounded-md">🥈{performer.medals.silver}</span>
+                            )}
+                            {performer.medals.bronze > 0 && (
+                              <span className="bg-orange-100 text-orange-900 px-1.5 py-0.2 rounded-md">🥉{performer.medals.bronze}</span>
                             )}
                           </div>
                         </div>
                       </div>
+                    );
+                  })
+                )
+              ) : (
+                // TAB 2: LIVE RESULTS FEED
+                filteredResultsList.length === 0 ? (
+                  <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                    <span className="text-4xl mb-2">📢</span>
+                    <p className="font-bold text-sm text-slate-600">No Results Found</p>
+                    <p className="text-xs text-slate-400 mt-1">Try switching sections or check back later</p>
+                  </div>
+                ) : (
+                  filteredResultsList.slice(0, 10).map((res) => {
+                    const progDoc = programmes.find(p => p._id?.toString() === res.programmeId || (res.programme && p.name && res.programme.includes(p.name)));
+                    const sectionBadge = getSectionTheme(res.section || progDoc?.section);
 
-                      {/* Right: Points & Medals */}
-                      <div className="text-right shrink-0">
-                        <div className="flex items-center justify-end gap-1 font-black text-sm sm:text-base text-slate-900">
-                          <span className="text-xs text-amber-500">💎</span>
-                          <span>{performer.totalPoints}</span>
-                          <span className="text-xs font-semibold text-slate-500">pts</span>
+                    return (
+                      <div
+                        key={res._id?.toString()}
+                        className="p-3 rounded-2xl bg-slate-50/90 border border-slate-200/80 shadow-2xs space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {progDoc?.code && (
+                              <span className="font-mono text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 text-slate-800">
+                                {progDoc.code}
+                              </span>
+                            )}
+                            <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                              {res.programme || progDoc?.name || 'Programme'}
+                            </h4>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.2 rounded-full font-bold border shrink-0 ${sectionBadge.badgeBg}`}>
+                            {sectionBadge.label}
+                          </span>
                         </div>
-                        <div className="flex items-center justify-end gap-1 mt-1 text-[11px] font-semibold text-slate-600">
-                          {performer.medals.gold > 0 && (
-                            <span className="bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded-md">🥇{performer.medals.gold}</span>
-                          )}
-                          {performer.medals.silver > 0 && (
-                            <span className="bg-slate-100 text-slate-800 px-1.5 py-0.2 rounded-md">🥈{performer.medals.silver}</span>
-                          )}
-                          {performer.medals.bronze > 0 && (
-                            <span className="bg-orange-100 text-orange-900 px-1.5 py-0.2 rounded-md">🥉{performer.medals.bronze}</span>
-                          )}
+
+                        {/* Top 3 summary row */}
+                        <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+                          {/* 1st */}
+                          <div className="bg-white p-1.5 rounded-xl border border-amber-200 shadow-2xs">
+                            <span className="text-[10px] font-extrabold text-amber-700 flex items-center gap-0.5">
+                              🥇 1st
+                            </span>
+                            <div className="text-slate-800 font-bold truncate mt-0.5">
+                              {res.firstPlace && res.firstPlace.length > 0 ? (
+                                <>#{res.firstPlace[0].chestNumber}</>
+                              ) : res.firstPlaceTeams && res.firstPlaceTeams.length > 0 ? (
+                                <>{res.firstPlaceTeams[0].teamCode}</>
+                              ) : (
+                                '-'
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 2nd */}
+                          <div className="bg-white p-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                            <span className="text-[10px] font-extrabold text-slate-600 flex items-center gap-0.5">
+                              🥈 2nd
+                            </span>
+                            <div className="text-slate-800 font-bold truncate mt-0.5">
+                              {res.secondPlace && res.secondPlace.length > 0 ? (
+                                <>#{res.secondPlace[0].chestNumber}</>
+                              ) : res.secondPlaceTeams && res.secondPlaceTeams.length > 0 ? (
+                                <>{res.secondPlaceTeams[0].teamCode}</>
+                              ) : (
+                                '-'
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 3rd */}
+                          <div className="bg-white p-1.5 rounded-xl border border-orange-200 shadow-2xs">
+                            <span className="text-[10px] font-extrabold text-orange-700 flex items-center gap-0.5">
+                              🥉 3rd
+                            </span>
+                            <div className="text-slate-800 font-bold truncate mt-0.5">
+                              {res.thirdPlace && res.thirdPlace.length > 0 ? (
+                                <>#{res.thirdPlace[0].chestNumber}</>
+                              ) : res.thirdPlaceTeams && res.thirdPlaceTeams.length > 0 ? (
+                                <>{res.thirdPlaceTeams[0].teamCode}</>
+                              ) : (
+                                '-'
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  })
+                )
               )}
             </div>
 
-            {/* Bottom mini footer for star performers */}
-            {filteredStarPerformers.length > 0 && (
-              <div className="p-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium px-5">
-                <span>Section: <strong className="capitalize">{starPerformerSection === 'all' ? 'All Sections' : starPerformerSection}</strong></span>
-                <span className="text-[11px] text-slate-400">Auto-updated live</span>
-              </div>
-            )}
+            {/* Bottom mini footer for right card */}
+            <div className="p-2.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium px-4 shrink-0">
+              <span>{rightCardTab === 'stars' ? <>Section: <strong className="capitalize">{starPerformerSection === 'all' ? 'All Sections' : starPerformerSection}</strong></> : <>Showing <strong>latest published results</strong></>}</span>
+              <span className="text-[11px] text-slate-400">Auto-updated live</span>
+            </div>
           </section>
 
         </div>
 
         {/* ======================================================================= */}
-        {/* BOTTOM SECTION: RESULTS LIST (DEFAULT PRIZES, CLICK TO SEE OTHER/GRADES)*/}
+        {/* BOTTOM SECTION: FULL RESULTS LIST (SHOWN IN SCROLL VIEW MODE)           */}
         {/* ======================================================================= */}
-        <section className="space-y-4">
+        {screenMode === 'scroll' && (
+        <section className="space-y-4 pt-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
@@ -1231,13 +1464,16 @@ export default function ResultScreenPage() {
             )}
           </div>
         </section>
+        )}
       </main>
 
-      {/* Footer */}
-      <footer className="mt-12 py-6 border-t border-slate-200 bg-white text-center text-xs text-slate-500">
-        <p className="font-semibold text-slate-700">Wattaqa Arts Fest 2K25 • Official Result Screening System</p>
-        <p className="mt-1 text-slate-400">Live Auto-Updating Display for Auditorium & TV Screens</p>
-      </footer>
+      {/* Footer - only in scroll mode */}
+      {screenMode === 'scroll' && (
+        <footer className="mt-12 py-6 border-t border-slate-200 bg-white text-center text-xs text-slate-500">
+          <p className="font-semibold text-slate-700">Ayyuhannas Arts Fest 2025 • Official Result Screening System</p>
+          <p className="mt-1 text-slate-400">Live Auto-Updating Display for Auditorium & TV Screens</p>
+        </footer>
+      )}
     </div>
   );
 }
