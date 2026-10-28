@@ -262,6 +262,13 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
 
     // Open Modal for Adding New Team Registration
     const handleOpenAddModal = (preselectedTeamCode?: string) => {
+        if (preselectedTeamCode) {
+            const existing = registrations.find(r => r.teamCode === preselectedTeamCode);
+            if (existing) {
+                handleOpenEditModal(existing);
+                return;
+            }
+        }
         setModalMode('add');
         setEditingRegistration(null);
         setSelectedTeam(preselectedTeamCode || '');
@@ -399,40 +406,21 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
 
         setSubmitting(true);
         try {
-            if (modalMode === 'add') {
-                const res = await fetch('/api/programme-participants', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        programmeId: programme._id?.toString() || programmeId,
-                        programmeCode: programme.code,
-                        programmeName: programme.name,
-                        teamCode: selectedTeam,
-                        participants: selectedParticipants,
-                        status: registrationStatus
-                    })
-                });
+            const existingReg = editingRegistration || registrations.find(r => r.teamCode === selectedTeam);
+            const isEditing = modalMode === 'edit' || !!existingReg;
 
-                if (!res.ok) {
-                    const errData = await res.json();
-                    throw new Error(errData.error || 'Failed to add registration');
-                }
-
-                setActionMessage({
-                    type: 'success',
-                    text: `Registered ${selectedParticipants.length} candidate(s) for team ${selectedTeam} successfully!`
-                });
-            } else {
+            if (isEditing && existingReg?._id) {
                 // Edit mode
                 const res = await fetch('/api/programme-participants', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        _id: editingRegistration?._id,
+                        _id: existingReg._id,
                         programmeId: programme._id?.toString() || programmeId,
                         teamCode: selectedTeam,
                         participants: selectedParticipants,
-                        status: registrationStatus
+                        status: registrationStatus,
+                        adminOverride: true
                     })
                 });
 
@@ -444,6 +432,32 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
                 setActionMessage({
                     type: 'success',
                     text: `Updated candidates for team ${selectedTeam} successfully!`
+                });
+            } else {
+                // Add mode
+                const res = await fetch('/api/programme-participants', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        programmeId: programme._id?.toString() || programmeId,
+                        programmeCode: programme.code,
+                        programmeName: programme.name,
+                        teamCode: selectedTeam,
+                        participants: selectedParticipants,
+                        status: registrationStatus,
+                        replaceExisting: true,
+                        adminOverride: true
+                    })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.error || 'Failed to add registration');
+                }
+
+                setActionMessage({
+                    type: 'success',
+                    text: `Registered ${selectedParticipants.length} candidate(s) for team ${selectedTeam} successfully!`
                 });
             }
 
@@ -1117,7 +1131,18 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
                                                     type="button"
                                                     onClick={() => {
                                                         setSelectedTeam(team.code);
-                                                        setSelectedParticipants([]);
+                                                        const existing = registrations.find(r => r.teamCode === team.code);
+                                                        if (existing) {
+                                                            setModalMode('edit');
+                                                            setEditingRegistration(existing);
+                                                            setSelectedParticipants([...(existing.participants || [])]);
+                                                            setRegistrationStatus(existing.status === 'confirmed' ? 'confirmed' : 'registered');
+                                                        } else {
+                                                            setModalMode('add');
+                                                            setEditingRegistration(null);
+                                                            setSelectedParticipants([]);
+                                                            setRegistrationStatus('confirmed');
+                                                        }
                                                         setModalError(null);
                                                     }}
                                                     className={`p-3 rounded-xl border text-left transition-all relative ${
@@ -1150,10 +1175,10 @@ const ProgrammeDetails: React.FC<ProgrammeDetailsProps> = () => {
                                         })}
                                     </div>
                                 )}
-                                {modalMode === 'add' && selectedTeam && registeredTeamCodes.has(selectedTeam) && (
+                                {selectedTeam && registeredTeamCodes.has(selectedTeam) && (
                                     <div className="mt-2 text-xs bg-amber-50 text-amber-900 border border-amber-200 p-2.5 rounded-xl flex items-center justify-between">
                                         <span>
-                                            ⚠️ Team <strong>{selectedTeam}</strong> is already registered. Saving here will update or replace their existing registration.
+                                            ℹ️ Team <strong>{selectedTeam}</strong> is already registered. Any candidate updates made here will update their existing registration.
                                         </span>
                                     </div>
                                 )}

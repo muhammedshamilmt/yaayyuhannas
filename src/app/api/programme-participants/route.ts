@@ -58,19 +58,31 @@ export async function POST(request: NextRequest) {
     const festInfoCollection = db.collection('festival-info');
     const programmesCollection = db.collection('programmes');
 
-    // Look up programme strictly in the active festival
-    let programmeDoc = await programmesCollection.findOne({
-      festId: getFestIdFilter(activeFestId),
-      ...(ObjectId.isValid(programmeId)
-        ? { $or: [{ _id: new ObjectId(programmeId) }, { id: programmeId }, { code: programmeCode }] }
-        : { $or: [{ id: programmeId }, { code: programmeCode }] })
-    });
+    // Look up programme strictly in the active festival - prioritize exact programmeId
+    let programmeDoc = null;
+    if (programmeId) {
+      const idQuery: any = { festId: getFestIdFilter(activeFestId) };
+      if (ObjectId.isValid(programmeId)) {
+        idQuery.$or = [{ _id: new ObjectId(programmeId) }, { id: programmeId }];
+      } else {
+        idQuery.id = programmeId;
+      }
+      programmeDoc = await programmesCollection.findOne(idQuery);
+    }
+
+    // Fallback: if not found by ID, try code
+    if (!programmeDoc && programmeCode) {
+      programmeDoc = await programmesCollection.findOne({
+        code: programmeCode,
+        festId: getFestIdFilter(activeFestId)
+      });
+    }
 
     // If not found directly in active fest, check if an inactive fest programme was passed and find its active counterpart
     if (!programmeDoc) {
       const fallbackQuery = ObjectId.isValid(programmeId)
-        ? { $or: [{ _id: new ObjectId(programmeId) }, { id: programmeId }, { code: programmeCode }] }
-        : { $or: [{ id: programmeId }, { code: programmeCode }] };
+        ? { $or: [{ _id: new ObjectId(programmeId) }, { id: programmeId }] }
+        : { id: programmeId };
       const staleDoc = await programmesCollection.findOne(fallbackQuery);
       if (staleDoc) {
         programmeDoc = await programmesCollection.findOne({
@@ -100,13 +112,92 @@ export async function POST(request: NextRequest) {
       festInfoCollection.findOne({})
     ]);
 
-    if (programmeDoc && (programmeDoc.status === 'completed' || programmeDoc.isOver === true)) {
+    if (programmeDoc && (programmeDoc.status === 'completed' || programmeDoc.isOver === true) && !body.adminOverride) {
       return NextResponse.json({ 
         error: `Programme "${resolvedProgName}" is over. Registrations and changes are closed.` 
       }, { status: 400 });
     }
 
     if (existing) {
+      if (body.replaceExisting || body.upsert) {
+        // Update existing registration
+        const isGeneral = (programmeDoc?.section || '').toLowerCase().trim() === 'general';
+        const isIndividual = !isGeneral && (programmeDoc?.positionType === 'individual' || (programmeDoc as any)?.type === 'individual');
+
+        if (isIndividual && participants && participants.length > 0) {
+          const candidatesCollection = db.collection('candidates');
+          const candidateDocs = await candidatesCollection.find({ chestNumber: { $in: participants } }).toArray();
+          const candMap = new Map<string, any>(candidateDocs.map(c => [c.chestNumber, c]));
+
+          const existingRegs = await collection.find({
+            _id: { $ne: existing._id },
+            participants: { $in: participants },
+            status: { $ne: 'withdrawn' }
+          }).toArray();
+
+          const regProgIds: any[] = [];
+          existingRegs.forEach(r => {
+            if (r.programmeId) {
+              regProgIds.push(r.programmeId);
+              if (ObjectId.isValid(r.programmeId)) {
+                regProgIds.push(new ObjectId(r.programmeId));
+              }
+            }
+          });
+
+          const relatedProgs = regProgIds.length > 0
+            ? await programmesCollection.find({
+                $or: [
+                  { _id: { $in: regProgIds } },
+                  { id: { $in: regProgIds.map(String) } }
+                ]
+              }).toArray()
+            : [];
+
+          const allProgList: any[] = [...relatedProgs];
+          if (programmeDoc && !allProgList.some(p => p._id?.toString() === programmeDoc._id?.toString())) {
+            allProgList.push(programmeDoc);
+          }
+
+          for (const chestNumber of participants) {
+            const candidate = candMap.get(chestNumber) || { chestNumber, section: programmeDoc?.section };
+            const validation = checkCandidateProgrammeEligibility({
+              candidate,
+              programme: programmeDoc as any,
+              registrations: existingRegs as any,
+              allProgrammes: allProgList as any,
+              festInfo,
+              isEditingCurrentRegistration: true
+            });
+
+            if (!validation.eligible) {
+              const candidateName = candidate.name ? `${candidate.name} (#${chestNumber})` : `#${chestNumber}`;
+              return NextResponse.json({
+                error: `Candidate ${candidateName} cannot register: ${validation.reason}`
+              }, { status: 400 });
+            }
+          }
+        }
+
+        const updateData: any = {
+          participants,
+          status,
+          updatedAt: new Date()
+        };
+
+        await collection.updateOne({ _id: existing._id }, { $set: updateData });
+        const updatedDoc = {
+          ...existing,
+          ...updateData
+        };
+
+        syncProgrammeRegistrationToSheets(updatedDoc)
+          .then(() => console.log(`✅ Programme registration updated & synced to Google Sheets for team ${teamCode}`))
+          .catch((error) => console.error('⚠️ Failed to sync to Google Sheets in background:', error));
+
+        return NextResponse.json(updatedDoc, { status: 200 });
+      }
+
       return NextResponse.json({ error: 'Team already registered for this programme' }, { status: 400 });
     }
 
@@ -239,12 +330,17 @@ export async function PUT(request: NextRequest) {
       // Check if programme is over
       const programmesCollection = db.collection('programmes');
       const progId = currentRegistration.programmeId;
-      const progQuery = ObjectId.isValid(progId)
-        ? { $or: [{ _id: new ObjectId(progId) }, { id: progId }, { code: currentRegistration.programmeCode }] }
-        : { $or: [{ id: progId }, { code: currentRegistration.programmeCode }] };
-      
-      const programmeDoc = await programmesCollection.findOne(progQuery);
-      if (programmeDoc && (programmeDoc.status === 'completed' || programmeDoc.isOver === true)) {
+      let programmeDoc = null;
+      if (progId) {
+        const progQuery: any = ObjectId.isValid(progId)
+          ? { $or: [{ _id: new ObjectId(progId) }, { id: progId }] }
+          : { id: progId };
+        programmeDoc = await programmesCollection.findOne(progQuery);
+      }
+      if (!programmeDoc && currentRegistration.programmeCode) {
+        programmeDoc = await programmesCollection.findOne({ code: currentRegistration.programmeCode });
+      }
+      if (programmeDoc && (programmeDoc.status === 'completed' || programmeDoc.isOver === true) && !body.adminOverride) {
         return NextResponse.json({ 
           error: `Programme "${programmeDoc.name || currentRegistration.programmeName}" is over. Editing participants is closed.` 
         }, { status: 400 });
