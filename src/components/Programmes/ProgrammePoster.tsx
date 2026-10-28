@@ -142,7 +142,7 @@ export const ProgrammePoster = forwardRef<HTMLDivElement, ProgrammePosterProps>(
 
           {/* Prize Boxes: Dynamically rendered only for awarded prizes */}
           {prizes.length > 0 ? (
-            <div className={`mt-5 flex flex-col ${isCompact ? 'gap-2.5' : 'gap-3.5'}`}>
+            <div className={`mt-5 flex flex-col ${isCompact ? 'gap-3' : 'gap-4'}`}>
               {prizes.map((prize, index) => {
                 const name = prize.name?.trim() || '';
                 const team = prize.team?.trim() || '';
@@ -152,22 +152,22 @@ export const ProgrammePoster = forwardRef<HTMLDivElement, ProgrammePosterProps>(
                   <div
                     key={prize.id || `prize-${prize.position}-${index}`}
                     className={`w-full ${
-                      isCompact ? 'h-[68px]' : 'h-[86px]'
-                    } bg-[#282930] px-4 flex items-center gap-3.5 shadow-xl border border-white/5 relative overflow-hidden`}
+                      isCompact ? 'h-[78px]' : 'h-[105px]'
+                    } bg-[#282930] px-4 flex items-center gap-4 shadow-xl border border-white/5 relative overflow-hidden`}
                     style={{
                       // Radius only on top-right, bottom-right, and bottom-left. Left-top has NO radius.
-                      borderRadius: isCompact ? '0 16px 16px 16px' : '0 20px 20px 20px',
+                      borderRadius: isCompact ? '0 16px 16px 16px' : '0 22px 22px 22px',
                     }}
                   >
                     {/* Position Badge: Red Circle */}
                     <div
                       className={`${
-                        isCompact ? 'w-[42px] h-[42px]' : 'w-[50px] h-[50px]'
-                      } rounded-full bg-[#dc2626] ml-2 flex items-center justify-center shrink-0 shadow-md`}
+                        isCompact ? 'w-[46px] h-[46px]' : 'w-[56px] h-[56px]'
+                      } rounded-full bg-[#dc2626] ml-2.5 flex items-center justify-center shrink-0 shadow-md`}
                     >
                       <span
                         className={`text-white font-black ${
-                          isCompact ? 'text-[22px]' : 'text-[26px]'
+                          isCompact ? 'text-[24px]' : 'text-[28px]'
                         } leading-none select-none`}
                       >
                         {prize.position}
@@ -175,14 +175,14 @@ export const ProgrammePoster = forwardRef<HTMLDivElement, ProgrammePosterProps>(
                     </div>
 
                     {/* Winner Details */}
-                    <div className="flex ml-1 flex-col justify-center min-w-0 flex-1 pr-2">
+                    <div className="flex ml-1.5 flex-col justify-center min-w-0 flex-1 pr-2">
                       <div
                         className={`text-white font-poppins font-semibold uppercase leading-tight truncate tracking-wide ${
                           isCompact
-                            ? 'text-[15px]'
-                            : isLongName
                             ? 'text-[16px]'
-                            : 'text-[18px]'
+                            : isLongName
+                            ? 'text-[18px]'
+                            : 'text-[20px]'
                         }`}
                         title={name}
                       >
@@ -191,7 +191,7 @@ export const ProgrammePoster = forwardRef<HTMLDivElement, ProgrammePosterProps>(
                       {team && (
                         <div
                           className={`text-[#9ca3af] font-poppins font-medium uppercase tracking-wider truncate mt-0.5 ${
-                            isCompact ? 'text-[12px]' : 'text-[14px]'
+                            isCompact ? 'text-[13px]' : 'text-[16px]'
                           }`}
                           title={team}
                         >
