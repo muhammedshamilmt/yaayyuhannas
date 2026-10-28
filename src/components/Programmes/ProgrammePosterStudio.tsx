@@ -18,7 +18,13 @@ import {
   Trash2
 } from 'lucide-react';
 import { Programme, Result, Candidate, Team } from '@/types';
-import { ProgrammePoster, PosterPrizeItem } from './ProgrammePoster';
+import { 
+  ProgrammePoster, 
+  PosterPrizeItem, 
+  PosterTemplateType, 
+  POSTER_TEMPLATES, 
+  getDefaultPosterTemplate 
+} from './ProgrammePoster';
 import { findProgramme } from '@/lib/resultsHelper';
 
 interface ProgrammePosterStudioProps {
@@ -39,11 +45,10 @@ export function ProgrammePosterStudio({
   // Selected programme ID
   const [selectedProgrammeId, setSelectedProgrammeId] = useState<string>(initialProgrammeId || '');
 
-  // Filters for programme list
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'arts' | 'sports'>('all');
-  const [sectionFilter, setSectionFilter] = useState<'all' | 'senior' | 'junior' | 'sub-junior' | 'general'>('all');
-  const [onlyWithResults, setOnlyWithResults] = useState(false);
+  // Autocomplete Search & Dropdown State
+  const [programmeSearch, setProgrammeSearch] = useState('');
+  const [isProgrammeDropdownOpen, setIsProgrammeDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // UI States
   const [isDownloading, setIsDownloading] = useState(false);
@@ -51,6 +56,9 @@ export function ProgrammePosterStudio({
   const [isCopied, setIsCopied] = useState(false);
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [previewScale, setPreviewScale] = useState(0.42);
+
+  // Poster Template Theme State (defaults to auto based on currentProgramme)
+  const [selectedTemplate, setSelectedTemplate] = useState<PosterTemplateType>('arts-stage');
 
   // Custom Editable Fields
   const [customSection, setCustomSection] = useState('');
@@ -214,15 +222,21 @@ export function ProgrammePosterStudio({
     };
   }, [currentProgramme, results, candidates, teams]);
 
-  // When selected programme changes, synchronize custom fields with DB
+  // When selected programme changes, synchronize custom fields with DB and set default template
   useEffect(() => {
     if (currentProgramme) {
       setCustomSection(currentProgramme.section?.toUpperCase() || 'GENERAL');
       setCustomProgrammeName(currentProgramme.name || '');
       setCustomPrizes(programmeWinnersData.prizes);
+      setSelectedTemplate(getDefaultPosterTemplate(currentProgramme));
       setIsCustomized(false);
     }
   }, [currentProgramme, programmeWinnersData]);
+
+  // Current active poster template config
+  const currentTemplate = useMemo(() => {
+    return POSTER_TEMPLATES.find((t) => t.id === selectedTemplate) || POSTER_TEMPLATES[0];
+  }, [selectedTemplate]);
 
   // Reset to original database values
   const handleReset = () => {
@@ -230,6 +244,7 @@ export function ProgrammePosterStudio({
       setCustomSection(currentProgramme.section?.toUpperCase() || 'GENERAL');
       setCustomProgrammeName(currentProgramme.name || '');
       setCustomPrizes(programmeWinnersData.prizes);
+      setSelectedTemplate(getDefaultPosterTemplate(currentProgramme));
       setIsCustomized(false);
     }
   };
@@ -268,52 +283,62 @@ export function ProgrammePosterStudio({
     setIsCustomized(true);
   };
 
-  // Responsive scale observer for the preview container
+  // Responsive scale observer for the preview container using ResizeObserver
   useEffect(() => {
+    if (!previewContainerRef.current) return;
+
     const updateScale = () => {
       if (previewContainerRef.current) {
         const containerWidth = previewContainerRef.current.clientWidth;
-        // Poster master canvas is 1200px
-        const newScale = containerWidth / 1200;
-        setPreviewScale(newScale);
+        if (containerWidth > 0) {
+          // Poster master canvas is 1200px
+          setPreviewScale(containerWidth / 1200);
+        }
       }
     };
 
     updateScale();
+    const observer = new ResizeObserver(() => updateScale());
+    observer.observe(previewContainerRef.current);
     window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateScale);
+    };
   }, []);
 
-  // Filtered programmes list for dropdown/selector
-  const filteredProgrammes = useMemo(() => {
-    return programmes.filter((prog) => {
-      const matchesSearch =
-        prog.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        prog.code.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = categoryFilter === 'all' || prog.category === categoryFilter;
-      const matchesSection = sectionFilter === 'all' || prog.section === sectionFilter;
-      const hasResults = getResultForProgramme(prog) !== null;
-      const matchesResults = !onlyWithResults || hasResults;
-
-      return matchesSearch && matchesCategory && matchesSection && matchesResults;
-    });
-  }, [programmes, searchTerm, categoryFilter, sectionFilter, onlyWithResults, results]);
-
-  // Separate programmes with results to show them first
-  const { programmesWithResults, programmesWithoutResults } = useMemo(() => {
-    const withRes: Programme[] = [];
-    const withoutRes: Programme[] = [];
-
-    filteredProgrammes.forEach((p) => {
-      if (getResultForProgramme(p) !== null) {
-        withRes.push(p);
-      } else {
-        withoutRes.push(p);
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsProgrammeDropdownOpen(false);
       }
-    });
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-    return { programmesWithResults: withRes, programmesWithoutResults: withoutRes };
-  }, [filteredProgrammes, results]);
+  // Only programmes with published results
+  const publishedProgrammes = useMemo(() => {
+    return programmes.filter((prog) => getResultForProgramme(prog) !== null);
+  }, [programmes, results]);
+
+  // Filtered published programmes for the autocomplete suggestion dropdown
+  const filteredProgrammesForSelect = useMemo(() => {
+    const term = programmeSearch.trim().toLowerCase();
+    return publishedProgrammes.filter((prog) => {
+      if (!term) return true;
+
+      const codeMatch = prog.code?.toLowerCase().includes(term);
+      const nameMatch = prog.name?.toLowerCase().includes(term);
+      const catMatch = prog.category?.toLowerCase().includes(term);
+      const subCatMatch = prog.subcategory?.toLowerCase().includes(term);
+      const secMatch = prog.section?.toLowerCase().includes(term);
+
+      return codeMatch || nameMatch || catMatch || subCatMatch || secMatch;
+    });
+  }, [publishedProgrammes, programmeSearch]);
 
   // Handle High-Res Download
   const handleDownload = async () => {
@@ -425,140 +450,195 @@ export function ProgrammePosterStudio({
         {/* Left Column: Programme Selector & Controls (5 Cols) */}
         <div className="lg:col-span-5 space-y-6">
           {/* Programme Selection Card */}
-          <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6 space-y-5">
-            <div className="flex items-center justify-between border-b pb-4">
-              <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-red-600" />
-                Select Programme
+          <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-red-600" />
+                Choose Event
               </h3>
-              <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-bold">
-                {programmesWithResults.length} with results
+              <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">
+                {publishedProgrammes.length} published results
               </span>
             </div>
 
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search programme name or code..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white transition"
-              />
-            </div>
-
-            {/* Filters Row */}
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <label className="block text-gray-500 mb-1 font-medium">Category</label>
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value as any)}
-                  className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                  <option value="all">All Categories</option>
-                  <option value="arts">Arts 🎭</option>
-                  <option value="sports">Sports ⚽</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-gray-500 mb-1 font-medium">Section</label>
-                <select
-                  value={sectionFilter}
-                  onChange={(e) => setSectionFilter(e.target.value as any)}
-                  className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                  <option value="all">All Sections</option>
-                  <option value="senior">Senior</option>
-                  <option value="junior">Junior</option>
-                  <option value="sub-junior">Sub-Junior</option>
-                  <option value="general">General</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Only With Results Toggle */}
-            <div className="flex items-center justify-between pt-1">
-              <label className="text-xs font-semibold text-gray-700 flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={onlyWithResults}
-                  onChange={(e) => setOnlyWithResults(e.target.checked)}
-                  className="rounded text-red-600 focus:ring-red-500 w-4 h-4 cursor-pointer"
-                />
-                Show only programmes with declared results ({programmesWithResults.length})
-              </label>
-            </div>
-
-            {/* Programme Dropdown List */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
-                Choose Event
+            {/* Autocomplete Programme Search & Dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
+                Search Published Programme
               </label>
               <div className="relative">
-                <select
-                  value={selectedProgrammeId}
-                  onChange={(e) => setSelectedProgrammeId(e.target.value)}
-                  className="w-full p-3 bg-white border-2 border-gray-200 hover:border-gray-300 rounded-xl font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm cursor-pointer appearance-none pr-10 shadow-sm"
-                >
-                  {programmesWithResults.length > 0 && (
-                    <optgroup label="🏆 Programmes With Results">
-                      {programmesWithResults.map((p) => (
-                        <option
-                          key={p._id?.toString() || p.id}
-                          value={p._id?.toString() || p.id}
-                        >
-                          ✅ {p.code} - {p.name} ({p.section})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-
-                  {!onlyWithResults && programmesWithoutResults.length > 0 && (
-                    <optgroup label="📋 Other Scheduled Programmes">
-                      {programmesWithoutResults.map((p) => (
-                        <option
-                          key={p._id?.toString() || p.id}
-                          value={p._id?.toString() || p.id}
-                        >
-                          ⏳ {p.code} - {p.name} ({p.section})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-
-                  {filteredProgrammes.length === 0 && (
-                    <option value="" disabled>
-                      No matching programmes found
-                    </option>
-                  )}
-                </select>
-                <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={programmeSearch}
+                  onChange={(e) => {
+                    setProgrammeSearch(e.target.value);
+                    setIsProgrammeDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsProgrammeDropdownOpen(true)}
+                  placeholder="Search by code, name, category, or section..."
+                  className="w-full pl-10 pr-9 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white text-gray-900 transition-all placeholder:text-gray-400 shadow-xs"
+                />
+                {programmeSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setProgrammeSearch('')}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
+
+              {/* Floating Suggestions Dropdown */}
+              {isProgrammeDropdownOpen && (
+                <div className="absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 max-h-80 overflow-y-auto divide-y divide-gray-100 animate-in fade-in slide-in-from-top-1 duration-150">
+                  {/* Clean Dropdown Header */}
+                  <div className="px-3.5 py-2.5 bg-gray-50/95 sticky top-0 z-10 border-b border-gray-100 backdrop-blur-xs flex items-center justify-between">
+                    <span className="text-gray-800 font-bold text-xs">
+                      {filteredProgrammesForSelect.length} published event{filteredProgrammesForSelect.length !== 1 ? 's' : ''}
+                    </span>
+                    {currentProgramme && (
+                      <button
+                        type="button"
+                        onClick={() => setIsProgrammeDropdownOpen(false)}
+                        className="text-[11px] text-red-600 hover:text-red-800 font-semibold cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Suggestion List Items */}
+                  {filteredProgrammesForSelect.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-gray-500">
+                      <p className="font-semibold text-gray-700">No published programmes found</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {programmeSearch ? `No published events matching "${programmeSearch}"` : 'No published results available yet'}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredProgrammesForSelect.map((prog) => {
+                      const progId = prog._id?.toString() || prog.id || '';
+                      const isSelected = selectedProgrammeId === progId;
+
+                      return (
+                        <div
+                          key={progId}
+                          onClick={() => {
+                            setSelectedProgrammeId(progId);
+                            setIsProgrammeDropdownOpen(false);
+                            setProgrammeSearch('');
+                          }}
+                          className={`w-full text-left p-3 transition-colors flex items-center justify-between group cursor-pointer ${
+                            isSelected
+                              ? 'bg-red-50/90 font-medium border-l-4 border-red-600'
+                              : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 pr-2">
+                            <span
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono border shrink-0 transition-colors ${
+                                isSelected
+                                  ? 'bg-red-600 text-white border-red-600'
+                                  : 'bg-blue-100 text-blue-800 border-blue-200 group-hover:bg-blue-600 group-hover:text-white'
+                              }`}
+                            >
+                              {prog.code}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-gray-900 group-hover:text-red-700 truncate">
+                                {prog.name}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5 text-xs text-gray-500 truncate">
+                                <span className="capitalize">{prog.category}</span>
+                                {prog.subcategory && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="capitalize">{prog.subcategory}</span>
+                                  </>
+                                )}
+                                <span>•</span>
+                                <span className="capitalize">{prog.positionType || prog.type || 'individual'}</span>
+                                <span>•</span>
+                                <span className="capitalize">{prog.section}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0 text-right">
+                            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Result Ready
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Current Programme Result Status */}
+            {/* Selected Programme Summary Card */}
             {currentProgramme && (
-              <div className="pt-2">
-                {programmeWinnersData.hasResults ? (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-xs text-emerald-800">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold">Official Results Loaded: </span>
-                      {customPrizes.length} prize winner{customPrizes.length !== 1 ? 's' : ''} populated dynamically from the database.
+              <div className="bg-gradient-to-br from-slate-50 to-gray-50 rounded-xl p-4 border border-gray-200 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <span className="px-2.5 py-1 rounded-md bg-blue-600 text-white font-mono font-bold text-xs shrink-0 shadow-xs">
+                      {currentProgramme.code}
+                    </span>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-gray-900 text-sm leading-snug truncate">
+                        {currentProgramme.name}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-600 mt-0.5">
+                        <span className="capitalize font-medium">{currentProgramme.category}</span>
+                        {currentProgramme.subcategory && (
+                          <>
+                            <span>•</span>
+                            <span className="capitalize">{currentProgramme.subcategory}</span>
+                          </>
+                        )}
+                        <span>•</span>
+                        <span className="capitalize">{currentProgramme.section}</span>
+                      </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-800">
-                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold">Result Awaiting: </span>
-                      No prizes awarded yet for this event. You can add winner details manually below.
-                    </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsProgrammeDropdownOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 font-bold shrink-0 cursor-pointer hover:underline"
+                  >
+                    <span>Change</span>
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Auto Template & Results Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-gray-200 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-gray-500 font-medium">Theme:</span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-900 text-white font-bold text-[11px]">
+                      {currentTemplate.badge} {currentTemplate.name}
+                      <span className="text-zinc-400 font-normal text-[10px] ml-0.5">(Auto)</span>
+                    </span>
                   </div>
-                )}
+
+                  <div>
+                    {programmeWinnersData.hasResults ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px]">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {customPrizes.length} Winners Loaded
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium text-[11px]">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        Awaiting Results
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -619,6 +699,30 @@ export function ProgrammePosterStudio({
                       className="w-full p-2 bg-gray-50 border rounded-lg text-gray-900 font-medium focus:ring-2 focus:ring-red-500"
                     />
                   </div>
+                </div>
+
+                {/* Optional Template Override inside Fine-Tune */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-gray-700">Template Theme</label>
+                    <span className="text-[10px] text-gray-400">
+                      Auto: {POSTER_TEMPLATES.find(t => t.id === getDefaultPosterTemplate(currentProgramme))?.name || 'Arts - Stage'}
+                    </span>
+                  </div>
+                  <select
+                    value={selectedTemplate}
+                    onChange={(e) => {
+                      setSelectedTemplate(e.target.value as PosterTemplateType);
+                      setIsCustomized(true);
+                    }}
+                    className="w-full p-2 bg-gray-50 border rounded-lg text-gray-900 font-medium focus:ring-2 focus:ring-red-500 cursor-pointer"
+                  >
+                    {POSTER_TEMPLATES.map((tpl) => (
+                      <option key={tpl.id} value={tpl.id}>
+                        {tpl.name} ({tpl.badge})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Dynamic Prizes List */}
@@ -782,6 +886,7 @@ export function ProgrammePosterStudio({
                 section={customSection}
                 programmeName={customProgrammeName}
                 prizes={customPrizes}
+                backgroundImage={currentTemplate.imagePath}
               />
             </div>
           </div>
@@ -814,6 +919,7 @@ export function ProgrammePosterStudio({
           section={customSection}
           programmeName={customProgrammeName}
           prizes={customPrizes}
+          backgroundImage={currentTemplate.imagePath}
         />
       </div>
     </div>
