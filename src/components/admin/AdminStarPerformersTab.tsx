@@ -270,9 +270,9 @@ export function AdminStarPerformersTab({
       const rawCat = (matchedProg?.category || (res as any).category || '').toLowerCase().trim();
       const category: 'arts' | 'sports' = rawCat === 'sports' ? 'sports' : rawCat === 'arts' ? 'arts' : (classifyProgramme(matchedProg, matchedProg?.code, res.programme).category === 'sports' ? 'sports' : 'arts');
 
-      const firstPoints = Number(res.firstPoints) || 10;
-      const secondPoints = Number(res.secondPoints) || 8;
-      const thirdPoints = Number(res.thirdPoints) || 5;
+      const firstPoints = res.firstPoints !== undefined && res.firstPoints !== null ? Number(res.firstPoints) : (matchedProg?.firstPoints ?? 10);
+      const secondPoints = res.secondPoints !== undefined && res.secondPoints !== null ? Number(res.secondPoints) : (matchedProg?.secondPoints ?? 8);
+      const thirdPoints = res.thirdPoints !== undefined && res.thirdPoints !== null ? Number(res.thirdPoints) : (matchedProg?.thirdPoints ?? 5);
 
       // Track winners in this programme to record achievements cleanly
       const recordedChests = new Set<string>();
@@ -282,7 +282,11 @@ export function AdminStarPerformersTab({
         const chest = String(p.chestNumber || '').trim();
         if (candMap[chest]) {
           recordedChests.add(chest);
-          const gradePoints = p.grade ? (getDefaultGradePoints(p.grade) || 0) : 0;
+          const pgItem = (res.participationGrades || []).find(pg => String(pg.chestNumber || '').trim() === chest);
+          const grade = p.grade || pgItem?.grade;
+          const gradePoints = pgItem?.points !== undefined && pgItem?.points !== null
+            ? Number(pgItem.points)
+            : (grade ? (getDefaultGradePoints(grade) || 0) : 0);
           const totalEarned = firstPoints + gradePoints;
 
           if (isDraft) {
@@ -297,7 +301,7 @@ export function AdminStarPerformersTab({
           candMap[chest].totalPoints += totalEarned;
           candMap[chest].totalWins += 1;
           candMap[chest].participations += 1;
-          if (p.grade) candMap[chest].gradesCount += 1;
+          if (grade) candMap[chest].gradesCount += 1;
 
           candMap[chest].achievements.push({
             resultId: res._id?.toString() || '',
@@ -310,7 +314,7 @@ export function AdminStarPerformersTab({
             isDraft,
             position: 1,
             positionPoints: firstPoints,
-            grade: p.grade,
+            grade,
             gradePoints,
             totalPoints: totalEarned
           });
@@ -322,7 +326,11 @@ export function AdminStarPerformersTab({
         const chest = String(p.chestNumber || '').trim();
         if (candMap[chest]) {
           recordedChests.add(chest);
-          const gradePoints = p.grade ? (getDefaultGradePoints(p.grade) || 0) : 0;
+          const pgItem = (res.participationGrades || []).find(pg => String(pg.chestNumber || '').trim() === chest);
+          const grade = p.grade || pgItem?.grade;
+          const gradePoints = pgItem?.points !== undefined && pgItem?.points !== null
+            ? Number(pgItem.points)
+            : (grade ? (getDefaultGradePoints(grade) || 0) : 0);
           const totalEarned = secondPoints + gradePoints;
 
           if (isDraft) {
@@ -337,7 +345,7 @@ export function AdminStarPerformersTab({
           candMap[chest].totalPoints += totalEarned;
           candMap[chest].totalWins += 1;
           candMap[chest].participations += 1;
-          if (p.grade) candMap[chest].gradesCount += 1;
+          if (grade) candMap[chest].gradesCount += 1;
 
           candMap[chest].achievements.push({
             resultId: res._id?.toString() || '',
@@ -350,7 +358,7 @@ export function AdminStarPerformersTab({
             isDraft,
             position: 2,
             positionPoints: secondPoints,
-            grade: p.grade,
+            grade,
             gradePoints,
             totalPoints: totalEarned
           });
@@ -362,7 +370,11 @@ export function AdminStarPerformersTab({
         const chest = String(p.chestNumber || '').trim();
         if (candMap[chest]) {
           recordedChests.add(chest);
-          const gradePoints = p.grade ? (getDefaultGradePoints(p.grade) || 0) : 0;
+          const pgItem = (res.participationGrades || []).find(pg => String(pg.chestNumber || '').trim() === chest);
+          const grade = p.grade || pgItem?.grade;
+          const gradePoints = pgItem?.points !== undefined && pgItem?.points !== null
+            ? Number(pgItem.points)
+            : (grade ? (getDefaultGradePoints(grade) || 0) : 0);
           const totalEarned = thirdPoints + gradePoints;
 
           if (isDraft) {
@@ -377,7 +389,7 @@ export function AdminStarPerformersTab({
           candMap[chest].totalPoints += totalEarned;
           candMap[chest].totalWins += 1;
           candMap[chest].participations += 1;
-          if (p.grade) candMap[chest].gradesCount += 1;
+          if (grade) candMap[chest].gradesCount += 1;
 
           candMap[chest].achievements.push({
             resultId: res._id?.toString() || '',
@@ -390,7 +402,7 @@ export function AdminStarPerformersTab({
             isDraft,
             position: 3,
             positionPoints: thirdPoints,
-            grade: p.grade,
+            grade,
             gradePoints,
             totalPoints: totalEarned
           });

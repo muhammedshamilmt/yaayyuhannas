@@ -5,6 +5,7 @@ import NextTopLoader from "nextjs-toploader";
 import type { PropsWithChildren } from "react";
 import { Providers } from "./providers";
 import { Poppins } from "next/font/google";
+import { NetworkErrorGuard } from "@/components/NetworkError/NetworkErrorGuard";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -69,10 +70,12 @@ export default function RootLayout({ children }: PropsWithChildren) {
         />
       </head>
       <body className={`${poppins.variable} font-poppins`}>
-        <Providers>
-          <NextTopLoader color="#5750F1" showSpinner={false} />
-          {children}
-        </Providers>
+        <NetworkErrorGuard>
+          <Providers>
+            <NextTopLoader color="#5750F1" showSpinner={false} />
+            {children}
+          </Providers>
+        </NetworkErrorGuard>
       </body>
     </html>
   );
