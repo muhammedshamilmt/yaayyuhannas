@@ -16,7 +16,7 @@ export function PublicNavbar() {
       if (stored) {
         setUser(JSON.parse(stored));
       }
-    } catch {}
+    } catch { }
   }, []);
 
   const isActive = (href: string) => {
@@ -106,8 +106,8 @@ export function PublicNavbar() {
             Schedule
           </Link>
           <Link
-            href="/public-programme"
-            className={`hover:text-gray-900 transition-colors ${isActive('/public-programme') || isActive('/programmes') ? 'text-gray-900 font-semibold' : ''
+            href="/programmes"
+            className={`hover:text-gray-900 transition-colors ${isActive('/programmes') || isActive('/programmes') ? 'text-gray-900 font-semibold' : ''
               }`}
           >
             Public Programme
@@ -191,9 +191,9 @@ export function PublicNavbar() {
               Schedule
             </Link>
             <Link
-              href="/public-programme"
+              href="/programmes"
               onClick={() => setIsOpen(false)}
-              className={`block text-gray-500 hover:text-gray-900 transition-colors ${isActive('/public-programme') || isActive('/programmes') ? 'text-gray-900 font-semibold' : ''
+              className={`block text-gray-500 hover:text-gray-900 transition-colors ${isActive('/programmes') || isActive('/programmes') ? 'text-gray-900 font-semibold' : ''
                 }`}
             >
               Public Programme
