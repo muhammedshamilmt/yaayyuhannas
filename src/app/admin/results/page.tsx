@@ -7,10 +7,11 @@ import { ShowcaseSection } from "@/components/Layouts/showcase-section";
 import { Result, Programme, Candidate, ProgrammeParticipant } from '@/types';
 import { AdminResultsLeaderboard } from "@/components/admin/AdminResultsLeaderboard";
 import { AdminDraftSimulator } from "@/components/admin/AdminDraftSimulator";
+import { AdminStarPerformersTab } from "@/components/admin/AdminStarPerformersTab";
 import { getDefaultGradePoints, findExistingResultForProgramme } from '@/lib/resultsHelper';
 
 export default function ResultsPage() {
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'manage' | 'draft-simulator'>('leaderboard');
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'manage' | 'draft-simulator' | 'star-performers'>('leaderboard');
   const [results, setResults] = useState<Result[]>([]);
   const [programmes, setProgrammes] = useState<Programme[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -886,6 +887,22 @@ export default function ResultsPage() {
               {results.filter(r => r.status === 'draft').length} Drafts
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('star-performers')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+              activeTab === 'star-performers'
+                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>⭐</span>
+            <span>Star Performers</span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+              Live &amp; Draft
+            </span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -937,6 +954,20 @@ export default function ResultsPage() {
 
       {activeTab === 'draft-simulator' && (
         <AdminDraftSimulator
+          results={results}
+          programmes={programmes}
+          candidates={candidates}
+          teams={teams}
+          participants={participants}
+          onRefresh={fetchData}
+          onEditResult={(res) => {
+            startEdit(res);
+          }}
+        />
+      )}
+
+      {activeTab === 'star-performers' && (
+        <AdminStarPerformersTab
           results={results}
           programmes={programmes}
           candidates={candidates}
