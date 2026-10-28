@@ -126,13 +126,13 @@ export const ProgrammePoster = forwardRef<HTMLDivElement, ProgrammePosterProps>(
           }}
         >
           {/* Section Heading: e.g. SUB-JUNIOR, JUNIOR, SENIOR, GENERAL */}
-          <div className="font-poppins font-bold text-[26px] uppercase tracking-wider text-black leading-none">
+          <div className="font-poppins font-bold text-[40px] mt-10 uppercase  text-black leading-none">
             {section || 'GENERAL'}
           </div>
 
           {/* Programme Name: e.g. Arabic Handwriting */}
           <div
-            className="font-semibold text-[26px] text-[#b81d24] leading-tight break-words mt-1"
+            className="font-medium text-[30px] text-[#b81d24] leading-tight break-words "
             style={{
               wordBreak: 'break-word',
             }}
@@ -142,7 +142,7 @@ export const ProgrammePoster = forwardRef<HTMLDivElement, ProgrammePosterProps>(
 
           {/* Prize Boxes: Dynamically rendered only for awarded prizes */}
           {prizes.length > 0 ? (
-            <div className={`mt-5 flex flex-col ${isCompact ? 'gap-3' : 'gap-4'}`}>
+            <div className={`mt-8 flex flex-col ${isCompact ? 'gap-3' : 'gap-4'}`}>
               {prizes.map((prize, index) => {
                 const name = prize.name?.trim() || '';
                 const team = prize.team?.trim() || '';
@@ -151,9 +151,8 @@ export const ProgrammePoster = forwardRef<HTMLDivElement, ProgrammePosterProps>(
                 return (
                   <div
                     key={prize.id || `prize-${prize.position}-${index}`}
-                    className={`w-full ${
-                      isCompact ? 'h-[78px]' : 'h-[105px]'
-                    } bg-[#282930] px-4 flex items-center gap-4 shadow-xl border border-white/5 relative overflow-hidden`}
+                    className={`w-full ${isCompact ? 'h-[80px]' : 'h-[110px]'
+                      } bg-[#282930] px-4 flex items-center gap-4 shadow-xl border border-white/5 relative overflow-hidden`}
                     style={{
                       // Radius only on top-right, bottom-right, and bottom-left. Left-top has NO radius.
                       borderRadius: isCompact ? '0 16px 16px 16px' : '0 22px 22px 22px',
@@ -161,14 +160,12 @@ export const ProgrammePoster = forwardRef<HTMLDivElement, ProgrammePosterProps>(
                   >
                     {/* Position Badge: Red Circle */}
                     <div
-                      className={`${
-                        isCompact ? 'w-[46px] h-[46px]' : 'w-[56px] h-[56px]'
-                      } rounded-full bg-[#dc2626] ml-2.5 flex items-center justify-center shrink-0 shadow-md`}
+                      className={`${isCompact ? 'w-[50px] h-[50px]' : 'w-[60px] h-[60px]'
+                        } rounded-full bg-[#dc2626] ml-2.5 flex items-center justify-center shrink-0 shadow-md`}
                     >
                       <span
-                        className={`text-white font-black ${
-                          isCompact ? 'text-[24px]' : 'text-[28px]'
-                        } leading-none select-none`}
+                        className={`text-white font-black ${isCompact ? 'text-[24px]' : 'text-[30px]'
+                          } leading-none select-none`}
                       >
                         {prize.position}
                       </span>
@@ -177,22 +174,20 @@ export const ProgrammePoster = forwardRef<HTMLDivElement, ProgrammePosterProps>(
                     {/* Winner Details */}
                     <div className="flex ml-1.5 flex-col justify-center min-w-0 flex-1 pr-2">
                       <div
-                        className={`text-white font-poppins font-semibold uppercase leading-tight truncate tracking-wide ${
-                          isCompact
-                            ? 'text-[16px]'
-                            : isLongName
+                        className={`text-white font-poppins text-[27px] font-semibold uppercase leading-tight  tracking-wide ${isCompact
+                          ? 'text-[16px]'
+                          : isLongName
                             ? 'text-[18px]'
                             : 'text-[20px]'
-                        }`}
+                          }`}
                         title={name}
                       >
                         {name || 'WINNER'}
                       </div>
                       {team && (
                         <div
-                          className={`text-[#9ca3af] font-poppins font-medium uppercase tracking-wider truncate mt-0.5 ${
-                            isCompact ? 'text-[13px]' : 'text-[16px]'
-                          }`}
+                          className={`text-[#9ca3af] font-poppins text-[20px] font-medium uppercase tracking-wider -mt-1 ${isCompact ? 'text-[13px]' : 'text-[16px]'
+                            }`}
                           title={team}
                         >
                           {team}
