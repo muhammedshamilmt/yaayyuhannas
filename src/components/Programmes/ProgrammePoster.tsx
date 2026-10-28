@@ -142,7 +142,7 @@ export const ProgrammePoster = forwardRef<HTMLDivElement, ProgrammePosterProps>(
 
           {/* Prize Boxes: Dynamically rendered only for awarded prizes */}
           {prizes.length > 0 ? (
-            <div className={`mt-6 flex flex-col ${isCompact ? 'gap-3' : 'gap-4'}`}>
+            <div className={`mt-4 flex flex-col ${isCompact ? 'gap-3' : 'gap-4'}`}>
               {prizes.map((prize, index) => {
                 const name = prize.name?.trim() || '';
                 const team = prize.team?.trim() || '';
